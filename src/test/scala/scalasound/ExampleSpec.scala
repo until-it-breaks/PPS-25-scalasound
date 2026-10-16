@@ -5,6 +5,6 @@ import org.scalatest.matchers.should.Matchers
 
 class ExampleSpec extends AnyFlatSpec with Matchers:
 
-  "A test" should "succeed" in {
+  "A test" should "succeeed" in {
     1 + 1 shouldBe 2
   }

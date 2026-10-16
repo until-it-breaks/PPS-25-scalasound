@@ -1,0 +1,51 @@
+name: PDF & Release
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'doc/**' ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'doc/**' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build PDF
+      uses: docker://pandoc/extra:latest
+      with:
+        entrypoint: /bin/sh
+        args: -c "pandoc --output=relazione.pdf --pdf-engine=xelatex --toc --number-sections doc/*.md"
+
+    - name: Setup Java & SBT
+      uses: actions/setup-java@v5
+      with:
+        distribution: 'temurin'
+        java-version: '25'
+
+    - uses: sbt/setup-sbt@v1
+
+    - name: Build JAR
+      run: sbt assembly
+
+    - name: Upload PDF Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: relazione-pdf
+        path: relazione.pdf
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          relazione.pdf
+          target/app.jar

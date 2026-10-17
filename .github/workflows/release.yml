@@ -17,35 +17,37 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Build PDF
-      uses: docker://pandoc/extra:latest
-      with:
-        entrypoint: /bin/sh
-        args: -c "pandoc --output=relazione.pdf --pdf-engine=xelatex --toc --number-sections doc/*.md"
+      - name: Build PDF
+        uses: docker://pandoc/extra:latest
+        with:
+          entrypoint: /bin/sh
+          args: -c "pandoc --output=relazione.pdf --pdf-engine=xelatex --toc --number-sections doc/*.md"
 
-    - name: Setup Java & SBT
-      uses: actions/setup-java@v5
-      with:
-        distribution: 'temurin'
-        java-version: '25'
+      - name: Setup Java & SBT
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
 
-    - uses: sbt/setup-sbt@v1
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
 
-    - name: Build JAR
-      run: sbt assembly
+      - name: Build JAR
+        run: sbt assembly
 
-    - name: Upload PDF Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: relazione-pdf
-        path: relazione.pdf
+      - name: Upload PDF Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: relazione-pdf
+          path: relazione.pdf
 
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          relazione.pdf
-          target/app.jar
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            relazione.pdf
+            target/app.jar

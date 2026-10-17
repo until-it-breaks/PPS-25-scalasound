@@ -21,5 +21,8 @@ jobs:
       - name: Set up sbt
         uses: sbt/setup-sbt@v1
 
-      - name: Test & Build
-        run: sbt test assembly
+      - name: Run Tests
+        run: sbt testFull
+
+      - name: Build Assembly
+        run: sbt assembly

@@ -2,6 +2,12 @@ package scalasound.domain
 
 import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
 
+// TODO: Modificare Mono e Stereo in modo da renderlo più pulito.
+/*
+enum AudioChunk:
+  case MonoChunk(samples: Vector[Float])
+  case StereoChunk(left: MonoChunk, right: MonoChunk)
+ */
 enum AudioChunk:
   case MonoChunk(samples: Vector[Float])
   case StereoChunk(left: Vector[Float], right: Vector[Float])
@@ -24,3 +30,7 @@ case class StereoTrack(sampleRate: Int, chunks: Vector[StereoChunk]) extends Aud
 
   val stereoTrack = StereoTrack(44100, Vector(StereoChunk(Vector.fill(10)(0f), Vector.fill(10)(0f))))
   println(stereoTrack.chunks)
+  /*
+  val stereoTrack = StereoTrack(44100, Vector(StereoChunk(monoTrack.chunks.head, monoTrack.chunks.head)))
+  println(stereoTrack)
+   */

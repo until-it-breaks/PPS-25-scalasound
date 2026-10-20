@@ -12,6 +12,10 @@ enum AudioChunk:
   case MonoChunk(samples: Vector[Float])
   case StereoChunk(left: Vector[Float], right: Vector[Float])
 
+  def getVectors: List[Vector[Float]] = this match
+    case MonoChunk(samples) => List(samples)
+    case StereoChunk(left, right) => List(left, right)
+
 trait AudioTrack:
   def sampleRate: Int
   def durationInSeconds: Double

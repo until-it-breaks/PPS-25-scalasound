@@ -3,13 +3,17 @@ package scalasound.processing
 import scalasound.domain.AudioChunk
 import scalasound.domain.AudioChunk.*
 
-// TODO: Scrivere meglio la documentazione con @param, @throws, @return etc...
-// TODO: Eliminare i require e gestire in modo diverso.
+// TODO: Scrivere meglio la documentazione con @param, @return etc...
 /**
  * Defines a contract that applies a transformation on an audio block.
  */
 trait AudioEffect:
-  def apply(chunk: AudioChunk): AudioChunk
+  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
+
+  /* Check whether the constraints for a given effect are met. */
+  protected def checkConstraints(isValid: Boolean, msg: String): Option[AudioError] =
+    if isValid then Option.empty
+    else Some(AudioError.AudioEffectsError(this, msg))
 
 /* *** IDENTITY EFFECT *** */
   
@@ -19,7 +23,9 @@ trait AudioEffect:
  * No effect applied on the chunk.
  */
 case class IdentityEffect() extends AudioEffect:
-  def apply(chunk: AudioChunk): AudioChunk = chunk
+  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
+    Right(chunk)
+
 
 /* *** GAIN EFFECT *** */
   
@@ -38,10 +44,9 @@ object GainEffect:
  * Effect that applies the Gain effect on the input audio chunk.
  * @param gain defines the strength of the gain.
  *             Values accepted between [0.0f,2.0f].
- * @throws IllegalArgumentException if the gain values is not in the admissible range.
  */
 case class GainEffect(gain: Float = GainEffect.DefaultGain) extends AudioEffect:
-  require(gain >= GainEffect.MinGain && gain <= GainEffect.MaxGain, "Exceeded the limits for the Gain effect!")
+  private val isGainValid: Boolean = gain >= GainEffect.MinGain && gain <= GainEffect.MaxGain
 
   /*
    * Defines the "clamp" logic necessary to maintain
@@ -51,13 +56,23 @@ case class GainEffect(gain: Float = GainEffect.DefaultGain) extends AudioEffect:
   private def clamp(value: Float): Float =   // TODO: Farlo inline il metodo? per evitare l'overhead della chiamata e "inserire" direttamente nel map
     math.max(-1.0f, math.min(1.0f, value))
 
-  def apply(chunk: AudioChunk): AudioChunk =
-    chunk match
-      case MonoChunk(samples) =>
-        MonoChunk(samples.map(x => clamp(x * gain)))
-      case StereoChunk(left, right) =>
-        StereoChunk(left.map(l => clamp(l * gain)), right.map(r =>  clamp(r * gain)))
-        
+  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
+    checkConstraints(isGainValid, "Exceeded the range [" + GainEffect.MinGain + "," + GainEffect.MaxGain + "]!").toLeft({
+      chunk match
+        case MonoChunk(samples) =>
+          MonoChunk(samples.map(x => clamp(x * gain)))
+        case StereoChunk(left, right) =>
+          StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
+    })
+    
+    /*
+     * toLeft is the same to:
+     * checkConstraints() match
+     *  case Some(_) => AudioErrors
+     *  case None => process(AudioChunk)
+     */
+  end apply
+
 end GainEffect
 
 /* *** PAN EFFECT *** */
@@ -105,12 +120,11 @@ extension (angle: Float)
  * Effect that applies the pan effect on the input audio chunk.
  * @param pan defines the strength of the pan.
  *            Values accepted between [-1.0f,1.0f].
- * @throws IllegalArgumentException if the pan values is not in the admissible range.
  */
 case class PanEffect(pan: Float = PanEffect.DefaultPan) extends AudioEffect:
-  require(pan >= PanEffect.MinPan && pan <= PanEffect.MaxPan, "Exceeded the limits for the Pan effect!")
+  private val isPanValid: Boolean = pan >= PanEffect.MinPan && pan <= PanEffect.MaxPan
 
-  def apply(chunk:  AudioChunk): AudioChunk =
+  def apply(chunk:  AudioChunk): Either[AudioError, AudioChunk] =
 
     /*
      * Since the range of admissible angles is between [-45°,45°],
@@ -118,14 +132,16 @@ case class PanEffect(pan: Float = PanEffect.DefaultPan) extends AudioEffect:
      * can be obtained by this ratio:
      * (-1)/(-45) = pan/x , as x the angle to find.
      */
-    val angle = pan * 45
-    val (leftPan, rightPan) = PanEffect.getPanFactors(angle.toRadiant)
+    checkConstraints(isPanValid, "Exceeded the range [" + PanEffect.MinPan + "," + PanEffect.MaxPan + "]!").toLeft({
+      val angle = pan * 45
+      val (leftPan, rightPan) = PanEffect.getPanFactors(angle.toRadiant)
 
-    chunk match
-      case MonoChunk(samples) =>
-        StereoChunk(samples.map(x => x * leftPan), samples.map(x => x * rightPan))
-      case StereoChunk(left, right) =>
-        StereoChunk(left.map(x => x * leftPan), right.map(x => x * rightPan))
+      chunk match
+        case MonoChunk(samples) =>
+          StereoChunk(samples.map(x => x * leftPan), samples.map(x => x * rightPan))
+        case StereoChunk(left, right) =>
+          StereoChunk(left.map(x => x * leftPan), right.map(x => x * rightPan))
+    })
   
 end PanEffect
 
@@ -146,20 +162,22 @@ object VolumeEffect:
  * Effect that applies the volume effect on the input audio chunk.
  * @param volume defines the volume of the output.
  *            Values accepted between [0.0f,1.0f].
- * @throws IllegalArgumentException if the volume values is not in the admissible range.
  */
 case class VolumeEffect(volume: Float = VolumeEffect.DefaultVolume) extends AudioEffect:
-  require(volume >= VolumeEffect.MinVolume && volume <= VolumeEffect.MaxVolume, "Exceeded the limits for the Volume effect!")
+  private val isVolumeValid: Boolean = volume >= VolumeEffect.MinVolume && volume <= VolumeEffect.MaxVolume
 
-  def apply(chunk: AudioChunk): AudioChunk =
-    if volume == VolumeEffect.DefaultVolume then chunk
-    else
-      chunk match
-        case MonoChunk(samples) =>
-          MonoChunk(samples.map(x => x * volume))
-        case StereoChunk(left, right) =>
-          StereoChunk(left.map(l => l * volume), right.map(r => r * volume))
-          
+  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] = {
+    checkConstraints(isVolumeValid, "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").toLeft({
+      if volume == VolumeEffect.DefaultVolume then chunk
+      else
+        chunk match
+          case MonoChunk(samples) =>
+            MonoChunk(samples.map(x => x * volume))
+          case StereoChunk(left, right) =>
+            StereoChunk(left.map(l => l * volume), right.map(r => r * volume))
+    })
+  }
+
 end VolumeEffect
 
 

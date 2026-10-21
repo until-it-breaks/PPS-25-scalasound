@@ -7,6 +7,9 @@ import scalasound.domain.AudioChunk
 import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.processing.{GainEffect, IdentityEffect, PanEffect, VolumeEffect}
 
+/**
+ * Test class containing all the checks for the effects applied on an audio chunk.
+ */
 class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter:
 
   val sizeChunk: Int = 10
@@ -67,3 +70,6 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter:
       val resultChunk = VolumeEffect(volume)(chunk)
     }
   }
+
+  // TODO: add test for other effects and for the processing?
+  // TODO: Remove tests with throw IllegalArgumentException

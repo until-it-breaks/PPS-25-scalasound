@@ -2,12 +2,6 @@ package scalasound.domain
 
 import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
 
-// TODO: Modificare Mono e Stereo in modo da renderlo più pulito.
-/*
-enum AudioChunk:
-  case MonoChunk(samples: Vector[Float])
-  case StereoChunk(left: MonoChunk, right: MonoChunk)
- */
 enum AudioChunk:
   case MonoChunk(samples: Vector[Float])
   case StereoChunk(left: Vector[Float], right: Vector[Float])

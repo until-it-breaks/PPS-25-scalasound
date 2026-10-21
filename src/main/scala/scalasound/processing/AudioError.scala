@@ -21,3 +21,20 @@ enum AudioError:
    * @param msg the error message.
    */
   case AudioProcessorError(processor: AudioProcessor, msg: String)
+
+  /* Returns the name of the audio effect. */
+  private def getEffectName(effect: AudioEffect): String =
+    effect.getClass.getSimpleName
+
+  /* Returns the name of the audio processor.*/
+  private def getProcessorName(processor: AudioProcessor): String =
+    processor.getClass.getSimpleName.stripSuffix("$")
+
+  /**
+   * Returns the content of the error.
+   */
+  def getContent: String = this match
+    case AudioEffectsError(effect, msg) => s"${getEffectName(effect)} -> $msg"
+    case AudioProcessorError(processor, msg) => s"${getProcessorName(processor)} -> $msg"
+
+end AudioError

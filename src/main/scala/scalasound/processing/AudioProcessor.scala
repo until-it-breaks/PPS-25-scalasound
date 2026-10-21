@@ -13,19 +13,19 @@ trait AudioProcessor:
    * @param chunk the chunk audio to be processed.
    * @param effects the list of all requested effects.
    */
-  def process(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
-    if chunk.getVectors.isEmpty then Left(AudioError.AudioProcessorError(this, "Chunk is empty!"))
+  def apply(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
+    if chunk.getVectors.forall(_.isEmpty) then Left(AudioError.AudioProcessorError(this, "Chunk is empty!"))
     else
       if effects.isEmpty then Right(chunk)
-      else apply(chunk, effects)
+      else process(chunk, effects)
 
-  protected def apply(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk]
+  protected def process(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk]
 
 /**
  * AudioProcessor with no rules on how to apply effects.
  */
 object IdentityAudioProcessor extends AudioProcessor:
-  protected def apply(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
+  protected def process(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
     effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)){
       (currentChunk, effect) => currentChunk.flatMap(chunky => effect(chunky))
     }
@@ -56,7 +56,7 @@ object AudioProcessorWithRules extends AudioProcessor:
   /* Implicit ordering. */
   given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
 
-  protected def apply(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
+  protected def process(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
     effects.sorted.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)){
       (currentChunk, effect) => currentChunk.flatMap(chunky => effect(chunky))
     }

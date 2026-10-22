@@ -14,11 +14,12 @@ trait AudioProcessor:
    * @param effects the list of all requested effects.
    */
   def apply(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
-    if chunk.getVectors.forall(_.isEmpty) then Left(AudioError.AudioProcessorError(this, "Chunk is empty!"))
+    if chunk.isEmpty then Left(AudioError.AudioProcessorError(this, "Chunk is empty!"))
     else
       if effects.isEmpty then Right(chunk)
       else process(chunk, effects)
 
+  /* Applies the effect on the given chunk. */
   protected def process(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk]
 
 /**

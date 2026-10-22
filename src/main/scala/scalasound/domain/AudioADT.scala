@@ -6,6 +6,16 @@ enum AudioChunk:
   case MonoChunk(samples: Vector[Float])
   case StereoChunk(left: Vector[Float], right: Vector[Float])
 
+  /**
+   * Checks the emptiness of the vectors contained in a chunk.
+   */
+  def isEmpty: Boolean = this match
+    case MonoChunk(samples) => samples.isEmpty
+    case StereoChunk(left, right) => left.isEmpty && right.isEmpty
+
+  /**
+   * Return the content of a chunk in a list.
+   */
   def getVectors: List[Vector[Float]] = this match
     case MonoChunk(samples) => List(samples)
     case StereoChunk(left, right) => List(left, right)

@@ -28,7 +28,11 @@ trait AudioProcessor:
 object IdentityAudioProcessor extends AudioProcessor:
   protected def process(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
     effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)){
-      (currentChunk, effect) => currentChunk.flatMap(chunky => effect(chunky))
+      (currentChunk, effect) =>
+        for
+          chunky <- currentChunk
+          result <- effect(chunky)
+        yield  result
     }
 
 /**
@@ -54,7 +58,7 @@ object AudioProcessorWithRules extends AudioProcessor:
     case _: VolumeEffect => EffectPriority.VolumeEffect.ordinal
     case _ => EffectPriority.values.length
 
-  /* Implicit ordering. */
+  /* Implicit ordering by using priority on the effects. */
   given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
 
   protected def process(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =

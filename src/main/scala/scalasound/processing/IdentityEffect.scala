@@ -12,3 +12,5 @@ import scalasound.domain.AudioChunk
 private[processing] case class IdentityEffect() extends AudioEffect:
   def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     Right(chunk)
+
+// TODO: Make IdentityEffect as a case object?

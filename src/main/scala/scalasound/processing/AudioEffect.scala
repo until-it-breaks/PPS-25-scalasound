@@ -17,18 +17,36 @@ trait AudioEffect:
     else Some(AudioError.AudioEffectsError(this, msg))
 
 object AudioEffect:
+  /**
+   * Returns the Identity effect.
+   */
   def identity: AudioEffect =
     IdentityEffect()
 
+  /**
+   * Returns the Gain effect.
+   * @param gainValue if the value is not present the Gain effect will be
+   *                  applied with the default value.
+   */
   def gain(gainValue: Option[Float]): AudioEffect =
     gainValue.fold(GainEffect())(GainEffect(_))
 
+  /**
+   * Returns the Pan effect.
+   * @param panValue if the value is not present the Pan effect will be
+   *                 applied with the default value.
+   */
   def pan(panValue: Option[Float]): AudioEffect =
     panValue.fold(PanEffect())(PanEffect(_))
 
+  /**
+   * Returns the Volume effect.
+   * @param volumeValue if the value is not present the Volume effect will be
+   *                    applied with the default value.
+   */
   def volume(volumeValue: Option[Float]): AudioEffect =
     volumeValue.fold(VolumeEffect())(VolumeEffect(_))
 
-// TODO: aggiungere anche distorsione??
+// TODO: aggiungere anche distorsione
 
 // TODO: Autopan: θ una funzione del tempo θ(t)= A * sin(2 * pi * f * t)), dove f è la frequenza dell'oscillazione.

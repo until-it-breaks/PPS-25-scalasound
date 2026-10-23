@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scalasound.domain.MonoTrack
+import scalasound.domain.{MonoTrack, StereoTrack}
 import scalasound.io.WavFixtures.*
 
 class WavAudioReaderSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach:
@@ -27,6 +27,13 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
         track
       case other =>
         fail(s"expected a MonoTrack but got $other")
+
+  private def loadStereo(path: String): StereoTrack =
+    WavAudioReader.load(path) match
+      case Right(track: StereoTrack) =>
+        track
+      case other =>
+        fail(s"expected a StereoTrack but got $other")
 
   // 256 = 0x0100 detects swapped bytes;
   // negative values detect a missing sign;
@@ -75,6 +82,45 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
 
   it should "be accepted when it contains no frames, with duration zero" in {
     val track = loadMono(writeFile("empty.wav", pcm16Wav(44100, 1, Vector.empty)))
+
+    track.chunks shouldBe Vector.empty
+    track.durationInSeconds shouldBe 0.0
+  }
+
+  // Interleaved as (L0,R0,L1,R1,...) so that swapped channels or a wrong interleaving change the result.
+  private final val StereoFrames = Vector((16384, -16384), (0, 32767), (-32768, 256), (1, -1))
+
+  private def interleave(frames: Seq[(Int, Int)]): Vector[Int] =
+    frames.flatMap((l, r) => Vector(l, r)).toVector
+
+  "A stereo PCM 16 bit WAV" should "be decoded into separate left and right channels" in {
+    val track = loadStereo(writeFile("stereo.wav", pcm16Wav(48000, 2, interleave(StereoFrames))))
+
+    track.sampleRate shouldBe 48000
+    track.chunks.flatMap(_.left) shouldBe Vector(0.5f, 0f, -1.0f, 1 / 32768f)
+    track.chunks.flatMap(_.right) shouldBe Vector(-0.5f, 32767 / 32768f, 256 / 32768f, -1 / 32768f)
+  }
+
+  it should "count one frame per left-right pair and derive the duration from it" in {
+    val frames = Vector.tabulate(4800)(i => (i % 100, -(i % 100)))
+    val track = loadStereo(writeFile("stereo-duration.wav", pcm16Wav(48000, 2, interleave(frames))))
+
+    track.frameCount shouldBe 4800L
+    track.durationInSeconds shouldBe 0.1
+  }
+
+  it should "be split in chunks of 1024 frames keeping both channels aligned" in {
+    val frames = Vector.tabulate(2500)(i => (i, -i))
+    val track = loadStereo(writeFile("stereo-long.wav", pcm16Wav(44100, 2, interleave(frames))))
+
+    track.chunks.map(_.left.length) shouldBe Vector(1024, 1024, 452)
+    track.chunks.map(_.right.length) shouldBe Vector(1024, 1024, 452)
+    track.chunks.flatMap(_.left) shouldBe frames.map(_._1 / 32768f)
+    track.chunks.flatMap(_.right) shouldBe frames.map(_._2 / 32768f)
+  }
+
+  it should "be accepted when it contains no frames, with duration zero" in {
+    val track = loadStereo(writeFile("stereo-empty.wav", pcm16Wav(44100, 2, Vector.empty)))
 
     track.chunks shouldBe Vector.empty
     track.durationInSeconds shouldBe 0.0

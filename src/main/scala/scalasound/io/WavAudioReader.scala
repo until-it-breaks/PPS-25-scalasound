@@ -3,13 +3,13 @@ package scalasound.io
 import java.io.{EOFException, File, IOException}
 import javax.sound.sampled.{AudioFormat, AudioInputStream, AudioSystem, UnsupportedAudioFileException}
 import scala.util.{Failure, Success, Using}
-import scalasound.domain.AudioChunk.MonoChunk
-import scalasound.domain.{AudioTrack, MonoTrack}
+import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.domain.{AudioTrack, MonoTrack, StereoTrack}
 import scalasound.io.AudioLoadError.*
 
 /** Loads WAV files from the file system, using the standard Java Sound API.
   *
-  * Supported subset: PCM signed, 16 bit per sample, little-endian, mono.
+  * Supported subset: PCM signed, 16 bit per sample, little-endian, mono or stereo.
   *
   * Samples are normalised to [-1.0, 1.0): a 16 bit sample `s` becomes
   * `s / 32768f`, so -32768 maps to -1.0 and 32767 to 32767/32768.
@@ -54,7 +54,9 @@ object WavAudioReader extends AudioReader:
       sampleRate <- validateFormat(format)
       bytes = stream.readAllBytes()
       frameCount <- validateData(bytes, stream.getFrameLength, format.getFrameSize)
-    yield buildMonoTrack(sampleRate, bytes, frameCount)
+    yield
+      if format.getChannels == 1 then buildMonoTrack(sampleRate, bytes, frameCount)
+      else buildStereoTrack(sampleRate, bytes, frameCount)
 
   private def validateFormat(format: AudioFormat): Either[AudioLoadError, Int] =
     if format.getEncoding != AudioFormat.Encoding.PCM_SIGNED || format.getSampleSizeInBits != 16 then
@@ -62,7 +64,8 @@ object WavAudioReader extends AudioReader:
         s"only 16 bit signed PCM is supported, found ${format.getEncoding} ${format.getSampleSizeInBits} bit"
       ))
     else if format.isBigEndian then Left(UnsupportedFormat("big-endian samples are not supported"))
-    else if format.getChannels != 1 then Left(UnsupportedFormat(s"unsupported channel count: ${format.getChannels}"))
+    else if format.getChannels != 1 && format.getChannels != 2 then
+      Left(UnsupportedFormat(s"unsupported channel count: ${format.getChannels}"))
     else if format.getFrameSize != format.getChannels * BytesPerSample then
       Left(CorruptedData(s"inconsistent frame size: ${format.getFrameSize}"))
     else if format.getSampleRate <= 0 then Left(CorruptedData(s"invalid sample rate: ${format.getSampleRate}"))
@@ -89,3 +92,11 @@ object WavAudioReader extends AudioReader:
     val samples = Vector.tabulate(frameCount)(sampleAt(bytes, _))
     val chunks = chunkStarts(frameCount).map[MonoChunk](start => MonoChunk(samples.slice(start, start + FramesPerChunk)))
     MonoTrack(sampleRate, chunks)
+
+  private def buildStereoTrack(sampleRate: Int, bytes: Array[Byte], frameCount: Int): StereoTrack =
+    val left = Vector.tabulate(frameCount)(frame => sampleAt(bytes, 2 * frame))
+    val right = Vector.tabulate(frameCount)(frame => sampleAt(bytes, 2 * frame + 1))
+    val chunks = chunkStarts(frameCount).map[StereoChunk] { start =>
+      StereoChunk(left.slice(start, start + FramesPerChunk), right.slice(start, start + FramesPerChunk))
+    }
+    StereoTrack(sampleRate, chunks)

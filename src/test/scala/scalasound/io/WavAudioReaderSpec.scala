@@ -125,3 +125,83 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
     track.chunks shouldBe Vector.empty
     track.durationInSeconds shouldBe 0.0
   }
+
+  "Loading a file" should "return FileNotFound when the path does not exist" in {
+    val path = tempDir.resolve("missing.wav").toString
+
+    WavAudioReader.load(path) shouldBe Left(AudioLoadError.FileNotFound(path))
+  }
+
+  it should "return FileNotFound when the path is a directory" in {
+    val path = tempDir.toString
+
+    WavAudioReader.load(path) shouldBe Left(AudioLoadError.FileNotFound(path))
+  }
+
+  private def isUnsupported(result: Either[AudioLoadError, ?]): Boolean = result match
+    case Left(_: AudioLoadError.UnsupportedFormat) => true
+    case _                                         => false
+
+  private def isCorrupted(result: Either[AudioLoadError, ?]): Boolean = result match
+    case Left(_: AudioLoadError.CorruptedData) => true
+    case _                                     => false
+
+  it should "reject 8 bit PCM as an unsupported format" in {
+    val bytes = wav(PcmFormatTag, 44100, 1, 8, Array.fill[Byte](16)(120))
+
+    isUnsupported(WavAudioReader.load(writeFile("pcm8.wav", bytes))) shouldBe true
+  }
+
+  it should "reject 24 bit PCM as an unsupported format" in {
+    val bytes = wav(PcmFormatTag, 44100, 1, 24, Array.fill[Byte](24)(1))
+
+    isUnsupported(WavAudioReader.load(writeFile("pcm24.wav", bytes))) shouldBe true
+  }
+
+  it should "reject 32 bit float WAV as an unsupported format" in {
+    val bytes = wav(FloatFormatTag, 44100, 1, 32, Array.fill[Byte](16)(0))
+
+    isUnsupported(WavAudioReader.load(writeFile("float32.wav", bytes))) shouldBe true
+  }
+
+  it should "reject WAV files with more than two channels" in {
+    val bytes = pcm16Wav(44100, 3, Vector.fill(30)(100))
+
+    isUnsupported(WavAudioReader.load(writeFile("three-channels.wav", bytes))) shouldBe true
+  }
+
+  it should "reject a file that is not a WAV at all" in {
+    val bytes = "this is plain text, not audio".getBytes("UTF-8")
+
+    val result = WavAudioReader.load(writeFile("notes.wav", bytes))
+
+    isUnsupported(result) shouldBe true
+  }
+
+  it should "reject an empty file without throwing" in {
+    val result = WavAudioReader.load(writeFile("zero-bytes.wav", Array.emptyByteArray))
+
+    result.isLeft shouldBe true
+  }
+
+  it should "report CorruptedData when the data is shorter than the header declares" in {
+    val data = pcm16Data(Vector.tabulate(100)(_ * 10))
+    val truncated = wav(PcmFormatTag, 44100, 1, 16, data.take(100), declaredDataSize = Some(data.length))
+
+    isCorrupted(WavAudioReader.load(writeFile("truncated.wav", truncated))) shouldBe true
+  }
+
+  it should "discard an incomplete trailing frame, as Java Sound does, keeping all whole frames" in {
+    val data = pcm16Data(Vector(100, -100, 200, -200, 300, -300)).dropRight(3)
+    val track = loadStereo(writeFile("partial-frame.wav", wav(PcmFormatTag, 44100, 2, 16, data)))
+
+    track.frameCount shouldBe 2L
+    track.chunks.flatMap(_.left) shouldBe Vector(100 / 32768f, 200 / 32768f)
+    track.chunks.flatMap(_.right) shouldBe Vector(-100 / 32768f, -200 / 32768f)
+  }
+
+  it should "report CorruptedData for a zero sample rate" in {
+    val bytes = wav(PcmFormatTag, 0, 1, 16, pcm16Data(Vector(1, 2, 3)))
+
+    WavAudioReader.load(writeFile("zero-rate.wav", bytes)).isLeft shouldBe true
+  }

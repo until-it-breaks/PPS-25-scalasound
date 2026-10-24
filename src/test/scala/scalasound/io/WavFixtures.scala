@@ -20,12 +20,26 @@ object WavFixtures:
   def pcm16Wav(sampleRate: Int, channels: Int, samples: Seq[Int]): Array[Byte] =
     wav(PcmFormatTag, sampleRate, channels, 16, pcm16Data(samples))
 
-  private def pcm16Data(samples: Seq[Int]): Array[Byte] =
+  /** Builds the raw PCM data for 16-bit little-endian signed integers.
+   *
+   *  @param samples the audio samples as a sequence of integers
+   *  @return a byte array representing the raw PCM data
+   */
+  def pcm16Data(samples: Seq[Int]): Array[Byte] =
     val buffer = ByteBuffer.allocate(samples.length * 2).order(LITTLE_ENDIAN)
     samples.foreach(s => buffer.putShort(s.toShort))
     buffer.array()
 
-  private def wav(
+  /** Builds a WAV file with the specified format.
+   *
+   * @param formatTag     the format tag
+   * @param sampleRate    the sample rate in Hz
+   * @param channels      the number of audio channels (1 for mono, 2 for stereo)
+   * @param bitsPerSample the number of bits per sample
+   * @param data          the audio data as a byte array
+   * @return a byte array representing the WAV file
+   */
+  def wav(
       formatTag: Int,
       sampleRate: Int,
       channels: Int,

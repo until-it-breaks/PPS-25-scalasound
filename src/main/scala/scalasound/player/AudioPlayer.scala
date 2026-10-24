@@ -1,6 +1,7 @@
 package scalasound.player
 
 import cats.effect.IO
+import scalasound.domain.AudioChunk.MonoChunk
 import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.processing.AudioProcessor
 import scalasound.state.{AppState, AppStateStore}
@@ -53,7 +54,8 @@ final class StreamingAudioPlayer(
       case AppState(Playing, Some(track), index) =>
         track.chunks.lift(index) match
           case Some(chunk) =>
-            IO { out.write(processor.process(chunk, List()), track.sampleRate) } *>
+            // TODO handle error
+            IO { out.write(processor.apply(chunk, List()).getOrElse(MonoChunk(Vector(0f))), track.sampleRate) } *>
               store.update(_.nextChunk).as(true)
           case None =>
             store.update(_.stop()).as(false)

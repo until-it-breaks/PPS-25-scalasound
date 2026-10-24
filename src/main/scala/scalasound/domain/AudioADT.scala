@@ -49,6 +49,20 @@ enum AudioChunk:
  *
  *  An audio track may contain one or more chunks of audio samples.
  */
+  /**
+   * Checks the emptiness of the vectors contained in a chunk.
+   */
+  def isEmpty: Boolean = this match
+    case MonoChunk(samples) => samples.isEmpty
+    case StereoChunk(left, right) => left.isEmpty && right.isEmpty
+
+  /**
+   * Return the content of a chunk in a list.
+   */
+  def getVectors: List[Vector[Float]] = this match
+    case MonoChunk(samples) => List(samples)
+    case StereoChunk(left, right) => List(left, right)
+
 trait AudioTrack:
 
   /** Returns the number of audio samples per second for each channel.
@@ -101,7 +115,6 @@ case class MonoTrack(
   def durationInSeconds: Double =
     frameCount.toDouble / sampleRate
 }
-
 
 /** Represents a stereo audio track composed of stereo chunks.
  *

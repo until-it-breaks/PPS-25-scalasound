@@ -1,49 +1,32 @@
 package scalasound.player
 
+import cats.effect.IO
 import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.processing.AudioProcessor
-import scalasound.state.{AppState, StateStore}
+import scalasound.state.{AppState, AppStateStore}
 
 /**
  * Controls playback of a loaded track.
  */
 trait AudioPlayer:
-  /**
-   * Starts playback, or resumes it if paused.
-   */
-  def play(): Unit
-
-  /**
-   * Pauses playback, keeping the current position.
-   */
-  def pause(): Unit
-
-  /**
-   * Stops playback, rewinds to chunk 0, and keeps the track loaded.
-   */
-  def stop(): Unit
-
-  /**
-   * Moves to the given chunk index, keeping the current status.
-   *
-   * @param chunkIndex index of the chunk to jump to
-   */
-  def seek(chunkIndex: Int): Unit
+  def play(): IO[Unit]
+  def pause(): IO[Unit]
+  def stop(): IO[Unit]
+  def seek(chunkIndex: Int): IO[Unit]
 
 /**
- * Streams a track chunk by chunk, reading state externally from a [[StateStore]].
- * Playback must be driven by calling [[tick]] repeatedly.
+ * Streams a track chunk by chunk, driven by calling [[tick]].
  *
- * @param store     holds the playback state (status, track, chunk index)
+ * @param store     holds the [[AppState]]
  * @param processor applies the active effects to each chunk before output
- * @param out      receives each processed chunk; may block until the audio is consumed
+ * @param out       receives each processed chunk to be played
  */
 final class StreamingAudioPlayer(
-  store: StateStore,
+  store: AppStateStore,
   processor: AudioProcessor,
   out: AudioOutput
 ) extends AudioPlayer:
-  import scalasound.state.Status.*
+  import scalasound.state.PlaybackStatus.*
 
   // temporary. adt needs some changes
   extension (track: AudioTrack)
@@ -52,28 +35,28 @@ final class StreamingAudioPlayer(
       case t: StereoTrack => t.chunks
       case other => throw IllegalArgumentException("Unsupported track")
 
-  def play(): Unit =
-    store.update(_.play())
+  def play(): IO[Unit] =
+    store.update(_.play()).void
 
-  def pause(): Unit =
-    store.update(_.pause())
+  def pause(): IO[Unit] =
+    store.update(_.pause()).void
 
-  def stop(): Unit =
-    store.update(_.stop())
+  def stop(): IO[Unit] =
+    store.update(_.stop()).void
 
-  def seek(index: Int): Unit =
-    store.update(_.seek(index))
+  def seek(index: Int): IO[Unit] =
+    store.update(_.seek(index)).void
 
-  def tick(): Boolean =
-    val current = store.current
-    current match
+  /** Executes a single streaming tick, returning true if playback continues. */
+  def tick(): IO[Boolean] =
+    store.current.flatMap {
       case AppState(Playing, Some(track), index) =>
         track.chunks.lift(index) match
           case Some(chunk) =>
-            out.write(processor.process(chunk, List()), track.sampleRate)
-            store.update(_.nextChunk)
-            true
+            IO { out.write(processor.process(chunk, List()), track.sampleRate) } *>
+              store.update(_.nextChunk).as(true)
           case None =>
-            store.update(_.stop())
-            false
-      case _ => false
+            store.update(_.stop()).as(false)
+      case _ =>
+        IO.pure(false)
+    }

@@ -52,7 +52,7 @@ private[processing] case class PanEffect(pan: Float = PanEffect.DefaultPan) exte
 
   import PanEffect.toRadiant
 
-  def apply(chunk:  AudioChunk): Either[AudioError, AudioChunk] =
+  override def apply(chunk:  AudioChunk): Either[AudioError, AudioChunk] =
 
     /*
      * Since the range of admissible angles is between [-45°,45°],
@@ -60,15 +60,16 @@ private[processing] case class PanEffect(pan: Float = PanEffect.DefaultPan) exte
      * can be obtained by this ratio:
      * (-1)/(-45) = pan/x , as x the angle to find.
      */
-    checkConstraints(isPanValid, "Exceeded the range [" + PanEffect.MinPan + "," + PanEffect.MaxPan + "]!").toLeft({
-      val angle = pan * 45
-      val (leftPan, rightPan) = PanEffect.getPanFactors(angle.toRadiant)
+    checkConstraints(isPanValid, "Exceeded the range [" + PanEffect.MinPan + "," + PanEffect.MaxPan + "]!")
+      .toLeft({
+        val angle = pan * 45
+        val (leftPan, rightPan) = PanEffect.getPanFactors(angle.toRadiant)
 
-      chunk match
-        case MonoChunk(samples) =>
-          StereoChunk(samples.map(x => x * leftPan), samples.map(x => x * rightPan))
-        case StereoChunk(left, right) =>
-          StereoChunk(left.map(x => x * leftPan), right.map(x => x * rightPan))
-    })
+        chunk match
+          case MonoChunk(samples) =>
+            StereoChunk(samples.map(x => x * leftPan), samples.map(x => x * rightPan))
+          case StereoChunk(left, right) =>
+            StereoChunk(left.map(x => x * leftPan), right.map(x => x * rightPan))
+      })
 
 end PanEffect

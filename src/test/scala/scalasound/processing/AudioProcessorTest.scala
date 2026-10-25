@@ -19,17 +19,17 @@ class AudioProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter w
 
   "AudioProcessor" should "identify the emptiness of a chunk" in:
     val emptyChunk: AudioChunk = MonoChunk(Vector.empty)
-    val resultChunk = IdentityAudioProcessor(emptyChunk, effects)
+    val resultChunk = SimpleAudioProcessor(emptyChunk, effects)
     resultChunk.left.value shouldBe a [AudioError.AudioProcessorError]
 
   it should "identify the lack of the effects" in:
     val emptyEffects: List[AudioEffect] = List.empty
-    val resultChunk = IdentityAudioProcessor(chunk, emptyEffects)
+    val resultChunk = SimpleAudioProcessor(chunk, emptyEffects)
     resultChunk.value shouldBe chunk
 
   "IdentityAudioProcessor" should "apply the effects in the same order " +
     "in which they were added to the list" in:
-    val resultChunk = IdentityAudioProcessor(chunk, effects)
+    val resultChunk = SimpleAudioProcessor(chunk, effects)
     val pipeline = effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)){
       (currentChunk, effect) => currentChunk.flatMap(chunky => effect(chunky))
     }

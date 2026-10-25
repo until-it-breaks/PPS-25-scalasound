@@ -17,6 +17,17 @@ trait AudioEffect:
     else Some(AudioError.AudioEffectsError(this, msg))
 
 object AudioEffect:
+
+  /**
+   * Defines the list of available effects.
+   */
+  def effects: List[String] =
+    this.getClass.
+      getMethods.
+      filter(_.getReturnType == classOf[AudioEffect]).
+      map(_.getName).
+      toList
+
   /**
    * Returns the Identity effect.
    */

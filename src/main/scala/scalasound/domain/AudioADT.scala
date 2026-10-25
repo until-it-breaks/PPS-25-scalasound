@@ -41,6 +41,22 @@ enum AudioChunk:
     case MonoChunk(samples)  => samples.length
     case StereoChunk(left, _) => left.length
 
+  /**
+   * Checks the emptiness of the vectors contained in a chunk.
+   * @return [[true]] if the chunk is empty false otherwise.
+   */
+  def isEmpty: Boolean = this match
+    case MonoChunk(samples) => samples.isEmpty
+    case StereoChunk(left, right) => left.isEmpty && right.isEmpty
+
+  /**
+   * Return the content of a chunk in a list.
+   * @return the list of float.
+   */
+  def getVectors: List[Vector[Float]] = this match
+    case MonoChunk(samples) => List(samples)
+    case StereoChunk(left, right) => List(left, right)
+
 
 /** Represents an audio track.
  *
@@ -49,20 +65,7 @@ enum AudioChunk:
  *
  *  An audio track may contain one or more chunks of audio samples.
  */
-  /**
-   * Checks the emptiness of the vectors contained in a chunk.
-   */
-  def isEmpty: Boolean = this match
-    case MonoChunk(samples) => samples.isEmpty
-    case StereoChunk(left, right) => left.isEmpty && right.isEmpty
-
-  /**
-   * Return the content of a chunk in a list.
-   */
-  def getVectors: List[Vector[Float]] = this match
-    case MonoChunk(samples) => List(samples)
-    case StereoChunk(left, right) => List(left, right)
-
+// TODO: RIVEDERE LA DEFINIZIONE DI AUDIOTRACK VISTO CHE E' MOLTO RIDONDANTE
 trait AudioTrack:
 
   /** Returns the number of audio samples per second for each channel.
@@ -77,6 +80,18 @@ trait AudioTrack:
    */
   def durationInSeconds: Double
 
+  /**
+   * Checks the emptiness of the track.
+   * @return [[true]] if the track is empty and false otherwise.
+   */
+  def isEmpty: Boolean
+
+  /**
+   * Return the content of a track in a list.
+   * @return the list of float.
+   */
+  def getVectors: List[AudioChunk]
+
 
 /** Represents a mono audio track composed of mono chunks.
  *
@@ -86,11 +101,9 @@ trait AudioTrack:
  *  @param sampleRate the sampling rate in hertz; must be positive
  *  @param chunks     the ordered sequence of mono audio chunks
  */
-case class MonoTrack(
-                      sampleRate: Int,
-                      chunks: Vector[MonoChunk]
-                    ) extends AudioTrack {
+case class MonoTrack(sampleRate: Int, chunks: Vector[MonoChunk]) extends AudioTrack:
 
+  // TODO: MODIFICARE I REQUIRE E MODIFICARE LA DOC PERCHE' RIDONDANTE.
   require(
     sampleRate > 0,
     s"sampleRate must be positive, got $sampleRate"
@@ -114,7 +127,12 @@ case class MonoTrack(
    */
   def durationInSeconds: Double =
     frameCount.toDouble / sampleRate
-}
+    
+  def isEmpty: Boolean = chunks.isEmpty && chunks.forall(_.isEmpty)
+
+  def getVectors: List[AudioChunk] = this.chunks.toList
+
+end MonoTrack
 
 /** Represents a stereo audio track composed of stereo chunks.
  *
@@ -125,11 +143,9 @@ case class MonoTrack(
  *  @param sampleRate the sampling rate in hertz; must be positive
  *  @param chunks     the ordered sequence of stereo audio chunks
  */
-case class StereoTrack(
-                        sampleRate: Int,
-                        chunks: Vector[StereoChunk]
-                      ) extends AudioTrack {
+case class StereoTrack(sampleRate: Int, chunks: Vector[StereoChunk]) extends AudioTrack:
 
+  // TODO: MODIFICARE I REQUIRE E MODIFICARE LA DOC PERCHE' RIDONDANTE
   require(
     sampleRate > 0,
     s"sampleRate must be positive, got $sampleRate"
@@ -160,7 +176,12 @@ case class StereoTrack(
    */
   def durationInSeconds: Double =
     frameCount.toDouble / sampleRate
-}
+    
+  def isEmpty: Boolean = chunks.isEmpty && chunks.forall(_.isEmpty)
+
+  def getVectors: List[AudioChunk] = this.chunks.toList
+
+end StereoTrack
 
 @main def main(): Unit =
   val monoTrack = MonoTrack(44100, Vector(MonoChunk(Vector.fill(10)(0f))))

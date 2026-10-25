@@ -23,16 +23,16 @@ object VolumeEffect:
 private[processing] case class VolumeEffect(volume: Float = VolumeEffect.DefaultVolume) extends AudioEffect:
   private val isVolumeValid: Boolean = volume >= VolumeEffect.MinVolume && volume <= VolumeEffect.MaxVolume
 
-  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] = {
-    checkConstraints(isVolumeValid, "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").toLeft({
-      if volume == VolumeEffect.DefaultVolume then chunk
-      else
-        chunk match
-          case MonoChunk(samples) =>
-            MonoChunk(samples.map(x => x * volume))
-          case StereoChunk(left, right) =>
-            StereoChunk(left.map(l => l * volume), right.map(r => r * volume))
-    })
-  }
+  override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
+    checkConstraints(isVolumeValid, "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").
+      toLeft({
+        if volume == VolumeEffect.DefaultVolume then chunk
+        else
+          chunk match
+            case MonoChunk(samples) =>
+              MonoChunk(samples.map(x => x * volume))
+            case StereoChunk(left, right) =>
+              StereoChunk(left.map(l => l * volume), right.map(r => r * volume))
+      })
 
 end VolumeEffect

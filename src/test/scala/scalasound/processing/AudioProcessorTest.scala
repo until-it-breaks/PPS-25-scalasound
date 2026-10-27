@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import scalasound.domain.AudioChunk
 import scalasound.domain.AudioChunk.MonoChunk
 
-// TODO: Complete when all the effects are completed.
+// TODO: Complete when all the effects are completed and add test for process track too.
 class AudioProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter with EitherValues:
 
   val sizeChunk: Int = 10

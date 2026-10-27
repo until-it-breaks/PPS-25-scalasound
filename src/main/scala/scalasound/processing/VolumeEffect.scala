@@ -15,10 +15,9 @@ object VolumeEffect:
   private val MinVolume: Float = 0.0f
   private val MaxVolume: Float = 1.0f
 
-// TODO: il volume deve essere applicato come ultimo effetto quando si fa processing.
 /*
  * Effect that applies the volume effect on the input audio chunk.
- * volume defines the strength of the effect where values accepted are between [0.0f,1.0f].
+ * Volume defines the strength of the effect where values accepted are between [0.0f,1.0f].
  */
 private[processing] case class VolumeEffect(volume: Float = VolumeEffect.DefaultVolume) extends AudioEffect:
   private val isVolumeValid: Boolean = volume >= VolumeEffect.MinVolume && volume <= VolumeEffect.MaxVolume

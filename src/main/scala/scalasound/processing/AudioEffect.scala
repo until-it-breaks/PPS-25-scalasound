@@ -20,6 +20,7 @@ object AudioEffect:
 
   /**
    * Defines the list of available effects.
+   * @return the names of the available effects.
    */
   def effects: List[String] =
     this.getClass.
@@ -43,6 +44,19 @@ object AudioEffect:
     gainValue.fold(GainEffect())(GainEffect(_))
 
   /**
+   * Returns the Distortion effect.
+   * @param distortionValue if the value is not present the Distortion effect will be
+   *                        applied with the default value.
+   */
+  def distortion(distortionValue: Option[Float], isSoftClipping: Option[Boolean]): AudioEffect =
+    (distortionValue, isSoftClipping) match
+      case (Some(dist), Some(isSoftClip)) => DistortionEffect(dist, isSoftClip)
+      case (Some(dist),  None) => DistortionEffect(distortion = dist)
+      case (None, Some(isSoftClip)) => DistortionEffect(isSoftClipping = isSoftClip)
+      case (None, None) => DistortionEffect()
+
+
+  /**
    * Returns the Pan effect.
    * @param panValue if the value is not present the Pan effect will be
    *                 applied with the default value.
@@ -57,7 +71,5 @@ object AudioEffect:
    */
   def volume(volumeValue: Option[Float]): AudioEffect =
     volumeValue.fold(VolumeEffect())(VolumeEffect(_))
-
-// TODO: aggiungere anche distorsione
 
 // TODO: Autopan: θ una funzione del tempo θ(t)= A * sin(2 * pi * f * t)), dove f è la frequenza dell'oscillazione.

@@ -78,7 +78,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = VolumeEffect(volume)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
 
-  // TODO: add test for other effects and for the processing (in a different file)?
-  // TODO: Remove tests with throw IllegalArgumentException
+  // TODO: add test for other effects: distortion, autopan and echo
+  // TODO: add test for StereoChunk
 
 end AudioEffectsTest

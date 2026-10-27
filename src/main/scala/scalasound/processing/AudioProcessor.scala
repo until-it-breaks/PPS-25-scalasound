@@ -15,19 +15,22 @@ trait AudioProcessor:
   /**
    * It defines the initial checks on the inputs and,
    * if these are successful, applies the effects.
-   * @param chunk the chunk audio to be processed.
+   * @param input the input audio to be processed.
+   *              It can be an [[AudioChunk]] or an [[AudioTrack]].
    * @param effects the list of all requested effects.
+   * @return an [[AudioError]] when an error occurs or
+   *         the type of input if everything is ok.
    */
   def apply[T](input: T, effects: List[AudioEffect]): Either[AudioError, T] =
     if effects.isEmpty then Right(input)
     else input match
       case chunk: AudioChunk =>
-        if chunk.isEmpty then Left(AudioError.AudioProcessorError(this, "Chunk is empty!"))
+        if chunk.isEmpty then Left(AudioProcessorError(this, "Chunk is empty!"))
         else processChunk(chunk, effects).asInstanceOf[Either[AudioError, T]]
       case track: AudioTrack =>
-        if track.isEmpty then Left(AudioError.AudioProcessorError(this, "Track is empty!"))
+        if track.isEmpty then Left(AudioProcessorError(this, "Track is empty!"))
         else processTrack(track, effects).asInstanceOf[Either[AudioError, T]]
-      case _ => Left(AudioError.AudioProcessorError(this, "Input is not valid!"))
+      case _ => Left(AudioProcessorError(this, "Input is not valid!"))
 
     // TODO: Change the if else with?:
     /*
@@ -37,16 +40,17 @@ trait AudioProcessor:
      *  case _ => process(chunk, effects)
      */
 
-  /* Applies the effect on the given chunk. */
+  /* Applies the effects on the given chunk. */
   protected def processChunk(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
     effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)) {
       (currentChunk, effect) =>
         for
-          chunky <- currentChunk
-          result <- effect(chunky)
+          chunky <- currentChunk  /* Extracts the chunk if is Right. */
+          result <- effect(chunky) /* Applies the effect on the given chunk. */
         yield result
     }
 
+  /* Applies the effects on the given track. */
   protected def processTrack(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
     for
       reversedChunks <- track.getVectors.
@@ -58,7 +62,18 @@ trait AudioProcessor:
           yield chunk :: acc /* Adds the chunk in front of the list. */
         }
 
+      /*
+       * If the track is [C1, C2, C3], the foldLeft returns [C3, C2, C1].
+       * FoldLeft chosen for performance because it starts at the beginning
+       * and add element at the front of the list.
+       */
       chunks = reversedChunks.reverse
+
+      /*
+       * Checks if there is at least one StereoChunk in the track.
+       * If the outcome is positive then the result track is an StereoTrack
+       * otherwise a MonoTrack.
+       */
       isStereo = chunks.exists(_.isInstanceOf[StereoChunk])
 
       resultTrack <- if isStereo then
@@ -86,7 +101,7 @@ object AudioProcessorWithRules extends AudioProcessor:
   private enum EffectPriority:
     case IdentityEffect
     case GainEffect
-    // case DistortionEffect
+    case DistortionEffect
     case PanEffect
     // case EchoEffect
     // case AutopanEffect
@@ -96,9 +111,18 @@ object AudioProcessorWithRules extends AudioProcessor:
   private def orderingByPriority(effect: AudioEffect): Int = effect match
     case _: IdentityEffect => EffectPriority.IdentityEffect.ordinal
     case _: GainEffect => EffectPriority.GainEffect.ordinal
+    case _: DistortionEffect => EffectPriority.DistortionEffect.ordinal
     case _: PanEffect => EffectPriority.PanEffect.ordinal
     case _: VolumeEffect => EffectPriority.VolumeEffect.ordinal
     case _ => EffectPriority.values.length
+    /* TODO: TEST IT.
+    case typ if EffectPriority.
+      values.
+      contains(EffectPriority.
+        valueOf(typ.getClass.getName)) =>
+      EffectPriority.
+        valueOf(typ.getClass.getName).ordinal
+    */
 
   /* Implicit ordering by using priority on the effects. */
   given Ordering[AudioEffect] = Ordering.by(orderingByPriority)

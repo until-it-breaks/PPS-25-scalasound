@@ -28,7 +28,7 @@ private[processing] case class GainEffect(gain: Float = GainEffect.DefaultGain) 
    * the values inside the domain of the chunk,
    * defined between [-1.0f,1.0f].
    */
-  private def clamp(value: Float): Float =   // TODO: Farlo inline il metodo? per evitare l'overhead della chiamata e "inserire" direttamente nel map
+  private inline def clamp(value: Float): Float =
     math.max(-1.0f, math.min(1.0f, value))
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
@@ -46,6 +46,9 @@ private[processing] case class GainEffect(gain: Float = GainEffect.DefaultGain) 
    * checkConstraints() match
    *  case Some(_) => AudioErrors
    *  case None => process(AudioChunk)
+   *
+   * If the Option of the checkConstraints
+   * is empty then do something.
    */
   end apply
 

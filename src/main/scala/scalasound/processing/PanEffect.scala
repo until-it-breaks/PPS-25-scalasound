@@ -22,7 +22,7 @@ object PanEffect:
    * to compute to corresponding radiant value.
    */
   extension (angle: Float)
-    private def toRadiant: Float = (angle * (math.Pi / 180)).toFloat
+    inline private def toRadiant: Float = (angle * (math.Pi / 180)).toFloat
 
   /*
    * The pan effect can be computed by using sin-cos functions.

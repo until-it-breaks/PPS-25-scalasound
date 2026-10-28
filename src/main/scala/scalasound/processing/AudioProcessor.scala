@@ -11,7 +11,7 @@ import scalasound.processing.AudioError.AudioProcessorError
  * and applying them on the given chunk.
  */
 trait AudioProcessor:
-
+/*
   /**
    * It defines the initial checks on the inputs and,
    * if these are successful, applies the effects.
@@ -31,14 +31,33 @@ trait AudioProcessor:
         if track.isEmpty then Left(AudioProcessorError(this, "Track is empty!"))
         else processTrack(track, effects).asInstanceOf[Either[AudioError, T]]
       case _ => Left(AudioProcessorError(this, "Input is not valid!"))
+*/
 
-    // TODO: Change the if else with?:
-    /*
-     * (chunk.isEmpty, effects.isEmpty) match
-     *  case (true, _) => Left(AudioError.AudioProcessorError(this, "Chunk is empty!"))
-     *  case (_, true) => Right(chunk)
-     *  case _ => process(chunk, effects)
-     */
+  /**
+   * It defines the initial checks on the inputs and,
+   * if these are successful, applies the effects.
+   * @param chunk the chunk where to apply the effects.
+   * @param effects the list of all the effects that will be applied.
+   * @return an [[AudioError]] when an error occurs or
+   *         the type of input if everything is ok.
+   */
+  def apply(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
+    if effects.isEmpty then Right(chunk)
+    else if chunk.isEmpty then Left(AudioProcessorError(this, "Chunk is empty!"))
+    else processChunk(chunk, effects)
+
+  /**
+   * It defines the initial checks on the inputs and,
+   * if these are successful, applies the effects.
+   * @param track the track where to apply the effects
+   * @param effects the list of all the effects that will be applied.
+   * @return an [[AudioError]] when an error occurs or
+   *         the type of input if everything is ok.
+   */
+  def apply(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
+    if effects.isEmpty then Right(track)
+    else if track.isEmpty then Left(AudioProcessorError(this, "Track is empty!"))
+    else processTrack(track, effects)
 
   /* Applies the effects on the given chunk. */
   protected def processChunk(chunk: AudioChunk, effects: List[AudioEffect]): Either[AudioError, AudioChunk] =
@@ -104,7 +123,7 @@ object AudioProcessorWithRules extends AudioProcessor:
     case DistortionEffect
     case PanEffect
     // case EchoEffect
-    // case AutopanEffect
+    case AutopanEffect
     case VolumeEffect
 
   /* It defines the mechanism for ordering the various effects based on priority. */
@@ -113,16 +132,9 @@ object AudioProcessorWithRules extends AudioProcessor:
     case _: GainEffect => EffectPriority.GainEffect.ordinal
     case _: DistortionEffect => EffectPriority.DistortionEffect.ordinal
     case _: PanEffect => EffectPriority.PanEffect.ordinal
+    case _: AutopanEffect => EffectPriority.AutopanEffect.ordinal
     case _: VolumeEffect => EffectPriority.VolumeEffect.ordinal
     case _ => EffectPriority.values.length
-    /* TODO: TEST IT.
-    case typ if EffectPriority.
-      values.
-      contains(EffectPriority.
-        valueOf(typ.getClass.getName)) =>
-      EffectPriority.
-        valueOf(typ.getClass.getName).ordinal
-    */
 
   /* Implicit ordering by using priority on the effects. */
   given Ordering[AudioEffect] = Ordering.by(orderingByPriority)

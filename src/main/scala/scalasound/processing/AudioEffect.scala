@@ -65,6 +65,15 @@ object AudioEffect:
     panValue.fold(PanEffect())(PanEffect(_))
 
   /**
+   * Returns the AutoPan effect.
+   * @param autopanValue if the value is not present the AutoPan effect will be
+   *                     applied with the default value.
+   * @param sampleRate the frequency or the sampling rate in Hz.
+   */
+  def autopan(autopanValue: Option[Float], sampleRate: Int): AudioEffect =
+    autopanValue.fold(AutopanEffect(sampleRate = sampleRate))(AutopanEffect(_, sampleRate))
+
+  /**
    * Returns the Volume effect.
    * @param volumeValue if the value is not present the Volume effect will be
    *                    applied with the default value.
@@ -73,3 +82,4 @@ object AudioEffect:
     volumeValue.fold(VolumeEffect())(VolumeEffect(_))
 
 // TODO: Autopan: θ una funzione del tempo θ(t)= A * sin(2 * pi * f * t)), dove f è la frequenza dell'oscillazione.
+// TODO: echo

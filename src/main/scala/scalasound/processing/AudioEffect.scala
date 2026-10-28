@@ -16,7 +16,31 @@ trait AudioEffect:
     if isValid then Option.empty
     else Some(AudioError.AudioEffectsError(this, msg))
 
+/**
+ * Defines a contract that applies a transformation on an audio block,
+ * but keeping trace of the passing of time by using the chunk index.
+ */
+trait TimeAudioEffect extends AudioEffect:
+  def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
+
+  /* If the index is not present then every chunk is the first one. */
+  final override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
+    apply(chunk, 0)
+
+
 object AudioEffect:
+
+  /**
+   * Defines the list of available effects.
+   * @return the names of the available effects.
+   */
+  def effects: List[String] =
+    this.getClass.
+      getMethods.
+      filter(_.getReturnType == classOf[AudioEffect]).
+      map(_.getName).
+      toList
+
   /**
    * Returns the Identity effect.
    */
@@ -32,12 +56,34 @@ object AudioEffect:
     gainValue.fold(GainEffect())(GainEffect(_))
 
   /**
+   * Returns the Distortion effect.
+   * @param distortionValue if the value is not present the Distortion effect will be
+   *                        applied with the default value.
+   */
+  def distortion(distortionValue: Option[Float], isSoftClipping: Option[Boolean]): AudioEffect =
+    (distortionValue, isSoftClipping) match
+      case (Some(dist), Some(isSoftClip)) => DistortionEffect(dist, isSoftClip)
+      case (Some(dist),  None) => DistortionEffect(distortion = dist)
+      case (None, Some(isSoftClip)) => DistortionEffect(isSoftClipping = isSoftClip)
+      case (None, None) => DistortionEffect()
+
+
+  /**
    * Returns the Pan effect.
    * @param panValue if the value is not present the Pan effect will be
    *                 applied with the default value.
    */
   def pan(panValue: Option[Float]): AudioEffect =
     panValue.fold(PanEffect())(PanEffect(_))
+
+  /**
+   * Returns the AutoPan effect.
+   * @param autopanValue if the value is not present the AutoPan effect will be
+   *                     applied with the default value.
+   *                     It's the frequency or the sampling rate in Hz.
+   */
+  def autopan(autopanValue: Option[Int]): AudioEffect =
+    autopanValue.fold(AutopanEffect())(AutopanEffect(_))
 
   /**
    * Returns the Volume effect.
@@ -47,6 +93,5 @@ object AudioEffect:
   def volume(volumeValue: Option[Float]): AudioEffect =
     volumeValue.fold(VolumeEffect())(VolumeEffect(_))
 
-// TODO: aggiungere anche distorsione
-
 // TODO: Autopan: θ una funzione del tempo θ(t)= A * sin(2 * pi * f * t)), dove f è la frequenza dell'oscillazione.
+// TODO: echo

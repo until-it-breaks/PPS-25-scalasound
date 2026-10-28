@@ -16,6 +16,18 @@ trait AudioEffect:
     if isValid then Option.empty
     else Some(AudioError.AudioEffectsError(this, msg))
 
+/**
+ * Defines a contract that applies a transformation on an audio block,
+ * but keeping trace of the passing of time by using the chunk index.
+ */
+trait TimeAudioEffect extends AudioEffect:
+  def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
+
+  /* If the index is not present then every chunk is the first one. */
+  final override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
+    apply(chunk, 0)
+
+
 object AudioEffect:
 
   /**
@@ -68,10 +80,10 @@ object AudioEffect:
    * Returns the AutoPan effect.
    * @param autopanValue if the value is not present the AutoPan effect will be
    *                     applied with the default value.
-   * @param sampleRate the frequency or the sampling rate in Hz.
+   *                     It's the frequency or the sampling rate in Hz.
    */
-  def autopan(autopanValue: Option[Float], sampleRate: Int): AudioEffect =
-    autopanValue.fold(AutopanEffect(sampleRate = sampleRate))(AutopanEffect(_, sampleRate))
+  def autopan(autopanValue: Option[Int]): AudioEffect =
+    autopanValue.fold(AutopanEffect())(AutopanEffect(_))
 
   /**
    * Returns the Volume effect.

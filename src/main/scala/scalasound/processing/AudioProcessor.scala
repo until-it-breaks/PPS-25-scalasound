@@ -4,35 +4,11 @@ import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.processing.AudioError.AudioProcessorError
 
-// TODO: MODIFICARE DOCUMENTAZIONE
-
 /**
  * Defines the entity capable of managing the various effects
  * and applying them on the given chunk.
  */
 trait AudioProcessor:
-/*
-  /**
-   * It defines the initial checks on the inputs and,
-   * if these are successful, applies the effects.
-   * @param input the input audio to be processed.
-   *              It can be an [[AudioChunk]] or an [[AudioTrack]].
-   * @param effects the list of all requested effects.
-   * @return an [[AudioError]] when an error occurs or
-   *         the type of input if everything is ok.
-   */
-  def apply[T](input: T, effects: List[AudioEffect]): Either[AudioError, T] =
-    if effects.isEmpty then Right(input)
-    else input match
-      case chunk: AudioChunk =>
-        if chunk.isEmpty then Left(AudioProcessorError(this, "Chunk is empty!"))
-        else processChunk(chunk, effects).asInstanceOf[Either[AudioError, T]]
-      case track: AudioTrack =>
-        if track.isEmpty then Left(AudioProcessorError(this, "Track is empty!"))
-        else processTrack(track, effects).asInstanceOf[Either[AudioError, T]]
-      case _ => Left(AudioProcessorError(this, "Input is not valid!"))
-*/
-
   /**
    * It defines the initial checks on the inputs and,
    * if these are successful, applies the effects.

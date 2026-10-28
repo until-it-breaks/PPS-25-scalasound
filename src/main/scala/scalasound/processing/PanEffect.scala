@@ -65,11 +65,13 @@ private[processing] case class PanEffect(pan: Float = PanEffect.DefaultPan) exte
         val angle = pan * 45
         val (leftPan, rightPan) = PanEffect.getPanFactors(angle.toRadiant)
 
-        chunk match
-          case MonoChunk(samples) =>
-            StereoChunk(samples.map(x => x * leftPan), samples.map(x => x * rightPan))
-          case StereoChunk(left, right) =>
-            StereoChunk(left.map(x => x * leftPan), right.map(x => x * rightPan))
+        val (lch, rch) = chunk match
+          case MonoChunk(samples) => (samples, samples)
+          case StereoChunk(left, right) => (left, right)
+
+        StereoChunk(
+          lch.map(x => x * leftPan),
+          rch.map(x => x * rightPan))
       })
 
 end PanEffect

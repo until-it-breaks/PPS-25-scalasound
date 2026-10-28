@@ -44,7 +44,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = GainEffect(gain)(chunk)
     resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(gain))
 
-  it should "return an AudioErrors if the gain is > 2.0f or gain < 0.0f" in:
+  it should "return an AudioError if the gain is > 2.0f or gain < 0.0f" in:
     val gain = 3.0f
     val resultChunk = GainEffect(gain)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
@@ -54,7 +54,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = PanEffect(pan)(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
-  it should "return an AudioErrors if the pan is < -1.0f or pan > 1.0f" in:
+  it should "return an AudioError if the pan is < -1.0f or pan > 1.0f" in:
     val pan = 3.0f
     val resultChunk = PanEffect(pan)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
@@ -73,12 +73,22 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = VolumeEffect(volume)(stereoChunk)
     resultChunk.value shouldBe StereoChunk(Vector.fill(sizeChunk)(0.1f), Vector.fill(sizeChunk)(-0.1f))
 
-  it should "return an AudioErrors if the volume is < 0.0f or volume > 1.0f" in:
+  it should "return an AudioError if the volume is < 0.0f or volume > 1.0f" in:
     val volume = 2.0f
     val resultChunk = VolumeEffect(volume)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
 
-  // TODO: add test for other effects: distortion, autopan and echo
+  "DistortionEffect" should "return a new AudioChunk with the effect applied (tanh)" in:
+    val resultValue = math.tanh(defaultValueChunk).toFloat
+    val resultChunk = DistortionEffect()(chunk)
+    resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(resultValue))
+
+  it should "return an AudioError if the distortion is not in range [0.0f, 2.0f]" in:
+    val distortion = 3.0f
+    val resultChunk = DistortionEffect(distortion = distortion)(chunk)
+    resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
+
+  // TODO: add test for other effects: autopan and echo
   // TODO: add test for StereoChunk
 
 end AudioEffectsTest

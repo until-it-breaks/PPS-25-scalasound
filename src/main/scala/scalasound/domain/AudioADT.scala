@@ -2,40 +2,41 @@ package scalasound.domain
 
 import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
 
-/** Represents a block of audio samples for either a mono or a stereo signal.
+/**
+ * Represents a block of audio samples for either a mono or a stereo signal.
  *
- *  A mono chunk contains one sample per frame, while a stereo chunk contains
- *  one sample for the left channel and one sample for the right channel
- *  per frame.
+ * A mono chunk contains one sample per frame, while a stereo chunk contains
+ * one sample for the left channel and one sample for the right channel
+ * per frame.
  */
 enum AudioChunk:
 
-  /** Represents a block of mono audio samples.
-   *
-   *  @param samples the sequence of audio samples, one per frame
+  /**
+   * Represents a block of mono audio samples.
+   * @param samples the sequence of audio samples, one per frame
    */
   case MonoChunk(samples: Vector[Float])
 
-  /** Represents a block of stereo audio samples.
+  /**
+   * Represents a block of stereo audio samples.
    *
-   *  The samples of the left and right channels are stored separately.
-   *  Both channels must contain the same number of samples.
-   *
-   *  @param left  the sequence of samples for the left channel
-   *  @param right the sequence of samples for the right channel
+   * The samples of the left and right channels are stored separately.
+   * Both channels must contain the same number of samples.
+   * @param left  the sequence of samples for the left channel
+   * @param right the sequence of samples for the right channel
    */
   case StereoChunk(left: Vector[Float], right: Vector[Float])
 
-  /** Returns the number of audio frames in this chunk.
+  /**
+   * Returns the number of audio frames in this chunk.
    *
-   *  A frame contains one sample per channel. Therefore, a mono frame
-   *  corresponds to one sample, while a stereo frame corresponds to one
-   *  sample from each channel.
+   * A frame contains one sample per channel. Therefore, a mono frame
+   * corresponds to one sample, while a stereo frame corresponds to one
+   * sample from each channel.
    *
-   *  For stereo chunks, this method returns the length of one channel,
-   *  assuming both channels have the same length.
-   *
-   *  @return the number of audio frames in this chunk
+   * For stereo chunks, this method returns the length of one channel,
+   * assuming both channels have the same length.
+   * @return the number of audio frames in this chunk
    */
   def frameCount: Int = this match
     case MonoChunk(samples)  => samples.length
@@ -58,14 +59,14 @@ enum AudioChunk:
     case StereoChunk(left, right) => List(left, right)
 
 
-/** Represents an audio track.
+/**
+ * Represents an audio track.
  *
- *  The duration is calculated from the total number of audio frames
- *  and the sampling rate, rather than from the number of chunks.
+ * The duration is calculated from the total number of audio frames
+ * and the sampling rate, rather than from the number of chunks.
  *
- *  An audio track may contain one or more chunks of audio samples.
+ * An audio track may contain one or more chunks of audio samples.
  */
-// TODO: RIVEDERE LA DEFINIZIONE DI AUDIOTRACK VISTO CHE E' MOLTO RIDONDANTE
 trait AudioTrack:
 
   /**
@@ -128,7 +129,7 @@ trait AudioTrack:
  */
 case class MonoTrack(sampleRate: Int, chunks: Vector[MonoChunk]) extends AudioTrack:
 
-  // TODO: MODIFICARE I REQUIRE E MODIFICARE LA DOC PERCHE' RIDONDANTE.
+  // TODO: MODIFICARE I REQUIRE.
   require(
     sampleRate > 0,
     s"sampleRate must be positive, got $sampleRate"
@@ -136,18 +137,18 @@ case class MonoTrack(sampleRate: Int, chunks: Vector[MonoChunk]) extends AudioTr
 
 end MonoTrack
 
-/** Represents a stereo audio track composed of stereo chunks.
+/**
+ * Represents a stereo audio track composed of stereo chunks.
  *
- *  Each stereo frame contains one left-channel sample and one
- *  right-channel sample. Consequently, the frame count is the length
- *  of either channel, not the sum of both channel lengths.
- *
- *  @param sampleRate the sampling rate in hertz; must be positive
- *  @param chunks     the ordered sequence of stereo audio chunks
+ * Each stereo frame contains one left-channel sample and one
+ * right-channel sample. Consequently, the frame count is the length
+ * of either channel, not the sum of both channel lengths.
+ * @param sampleRate the sampling rate in hertz; must be positive
+ * @param chunks     the ordered sequence of stereo audio chunks
  */
 case class StereoTrack(sampleRate: Int, chunks: Vector[StereoChunk]) extends AudioTrack:
 
-  // TODO: MODIFICARE I REQUIRE E MODIFICARE LA DOC PERCHE' RIDONDANTE
+  // TODO: MODIFICARE I REQUIRE
   require(
     sampleRate > 0,
     s"sampleRate must be positive, got $sampleRate"

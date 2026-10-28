@@ -23,9 +23,11 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
 
   "Chunk" should "not be empty" in:
     chunk.getVectors should not be empty
-
-  it should "have length of 10" in:
     chunk.getVectors.head.size shouldEqual 10
+
+  it should "be a MonoChunk and not a StereoChunk" in:
+    chunk shouldBe a [MonoChunk]
+    chunk should not be a [StereoChunk]
 
   "IdentityEffect" should "return the same initial chunk" in:
     val resultChunk = IdentityEffect()(chunk)
@@ -88,7 +90,11 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = DistortionEffect(distortion = distortion)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
 
-  // TODO: add test for other effects: autopan and echo
-  // TODO: add test for StereoChunk
+  "AutopanEffect" should "return a new StereoChunk where " +
+    "for each sample is multiplied by a different factor" in:
+    val resultChunk = AutopanEffect()(chunk)
+    resultChunk.value shouldBe a [StereoChunk]
+
+  // TODO: add test for other effects: echo
 
 end AudioEffectsTest

@@ -5,16 +5,16 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack}
 import scalasound.domain.AudioChunk.MonoChunk
+import scalasound.processing.{SimpleAudioProcessor, AudioProcessorWithRules}
 
-// TODO: Complete when all the effects are completed and add test for process track too.
 class AudioProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter with EitherValues:
 
-  val sizeChunk: Int = 10
-  val sizeTrack: Int = 3
-  val sampleRate = 44100
-  val initialValue: Float = 0.2f
-  val effects: List[AudioEffect] = List(GainEffect(), VolumeEffect(), PanEffect())
-  var chunk: AudioChunk = MonoChunk(Vector.fill(sizeChunk)(initialValue))
+  private val sizeChunk: Int = 10
+  private val sizeTrack: Int = 3
+  private val sampleRate = 44100
+  private val initialValue: Float = 0.2f
+  private val effects: List[AudioEffect] = List(GainEffect(), VolumeEffect(), PanEffect())
+  private val chunk: AudioChunk = MonoChunk(Vector.fill(sizeChunk)(initialValue))
 
   private def pipeline(effects: List[AudioEffect], chunk: AudioChunk): Either[AudioError, AudioChunk] =
     effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)){
@@ -50,7 +50,7 @@ class AudioProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter w
     val track = createTrack
     val resultTrack = SimpleAudioProcessor(track, effects)
     val pipe = pipeline(effects, chunk)
-    resultTrack.value.getVectors.forall(c => c == pipe.value)
+    resultTrack.value.getVectors.forall(c => c == pipe.value) shouldBe true
 
   "AudioProcessorWithRules" should "apply the effects in a specific order: [Gain, Pan, Volume] " +
     "for all the chunk inside the track" in:
@@ -58,7 +58,7 @@ class AudioProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter w
     val resultTrack = AudioProcessorWithRules(track, effects)
     val orderedEffects = List(GainEffect(), PanEffect(), VolumeEffect())
     val pipe = pipeline(orderedEffects, chunk)
-    resultTrack.value.getVectors.forall(c => c == pipe.value)
+    resultTrack.value.getVectors.forall(c => c == pipe.value) shouldBe true
 
 end AudioProcessorTest
 

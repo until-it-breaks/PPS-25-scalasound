@@ -59,14 +59,24 @@ object AudioEffect:
    * Returns the Distortion effect.
    * @param distortionValue if the value is not present the Distortion effect will be
    *                        applied with the default value.
+   * @param isSoftClipping if [[true]] applies a tanh transformation else a sin-based effect.
    */
   def distortion(distortionValue: Option[Float], isSoftClipping: Option[Boolean]): AudioEffect =
-    (distortionValue, isSoftClipping) match
-      case (Some(dist), Some(isSoftClip)) => DistortionEffect(dist, isSoftClip)
-      case (Some(dist),  None) => DistortionEffect(distortion = dist)
-      case (None, Some(isSoftClip)) => DistortionEffect(isSoftClipping = isSoftClip)
-      case (None, None) => DistortionEffect()
+    val distortion = DistortionEffect()
+    val withDis = distortionValue.fold(distortion)(dv => distortion.copy(distortion = dv))
+    isSoftClipping.fold(withDis)(sf => withDis.copy(isSoftClipping = sf))
 
+  /**
+   * Returns the Echo effect.
+   * @param alpha is an attenuator for the echo effect.
+   * @param delay expressed in milliseconds defines the delay of the echo effect.
+   * @param sampleRate the sampling rate in Hz.
+   */
+  def echo(alpha: Option[Float], delay: Option[Int], sampleRate: Option[Int]): AudioEffect =
+    val echo = EchoEffect()
+    val withAlpha = alpha.fold(echo)(alp => echo.copy(alpha = alp))
+    val withDelay = delay.fold(withAlpha)(del => withAlpha.copy(delay = del))
+    sampleRate.fold(withDelay)(sr => withDelay.copy(frequency = sr))
 
   /**
    * Returns the Pan effect.
@@ -92,6 +102,3 @@ object AudioEffect:
    */
   def volume(volumeValue: Option[Float]): AudioEffect =
     volumeValue.fold(VolumeEffect())(VolumeEffect(_))
-
-// TODO: Autopan: θ una funzione del tempo θ(t)= A * sin(2 * pi * f * t)), dove f è la frequenza dell'oscillazione.
-// TODO: echo

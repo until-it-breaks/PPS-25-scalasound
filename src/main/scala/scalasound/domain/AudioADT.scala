@@ -70,14 +70,13 @@ enum AudioChunk:
 trait AudioTrack:
 
   /**
-   * Returns the number of audio samples per second for each channel.
-   * @return the sampling rate in hertz (Hz)
+   * The number of audio samples per second for each channel.
+   * The sampling rate is represented in hertz (Hz)
    */
   def sampleRate: Int
 
   /**
-   * Returns the vector of chunks that composing the corresponding track.
-   * @return all the chunk of the track.
+   * The vector of chunks that composing the corresponding track.
    */
   def chunks: Vector[AudioChunk]
 
@@ -160,10 +159,3 @@ case class StereoTrack(sampleRate: Int, chunks: Vector[StereoChunk]) extends Aud
   )
 
 end StereoTrack
-
-@main def main(): Unit =
-  val monoTrack = MonoTrack(44100, Vector(MonoChunk(Vector.fill(10)(0f))))
-  println(monoTrack.chunks)
-
-  val stereoTrack = StereoTrack(44100, Vector(StereoChunk(Vector.fill(10)(0f), Vector.fill(10)(0f))))
-  println(stereoTrack.chunks)

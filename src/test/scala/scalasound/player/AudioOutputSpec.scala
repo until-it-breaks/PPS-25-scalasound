@@ -15,7 +15,7 @@ class AudioOutputSpec extends CatsEffectSuite:
   }
 
   test("BlockingConsoleAudioOutput correctly paces a chunk being played") {
-    val output = AudioOutput.blocking
+    val output = AudioOutput.blockingConsole
     val sampleRate = 44100
     // 4410 frames at 44100 Hz = exactly 0.1 seconds (100 ms)
     val chunk = AudioChunk.MonoChunk(Vector.fill(4410)(0.0f))
@@ -32,7 +32,7 @@ class AudioOutputSpec extends CatsEffectSuite:
   }
 
   test("BlockingConsoleAudioOutput correctly paces multiple sequential chunks being played") {
-    val output = AudioOutput.blocking
+    val output = AudioOutput.blockingConsole
     val sampleRate = 44100
     // 4410 frames per chunk at 44100 Hz = 0.1 seconds per chunk (totaling 300ms for 3 chunks)
     val chunks = Vector.fill(3)(AudioChunk.MonoChunk(Vector.fill(4410)(0.0f)))

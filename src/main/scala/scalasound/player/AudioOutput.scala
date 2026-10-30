@@ -54,8 +54,8 @@ class BlockingConsoleAudioOutput extends AudioOutput:
 
 object AudioOutput:
   def console: AudioOutput = ConsoleAudioOutput()
-  def blocking: AudioOutput = BlockingConsoleAudioOutput()
-
+  def blockingConsole: AudioOutput = BlockingConsoleAudioOutput()
+  def speakers: AudioOutput = SpeakerAudioOutput()
 
 import cats.effect.IOApp
 
@@ -63,11 +63,28 @@ object AudioOutputMain extends IOApp.Simple:
   val run: IO[Unit] =
     for
       sampleRate = 44100
-      chunks = Vector.fill(10)(AudioChunk.MonoChunk(Vector.fill(4410)(0.0f)))
-      _ <- IO.println("Starting audio playback...")
-      output = AudioOutput.blocking
-      _ <- chunks.foldLeft(IO.unit) { (acc, chunk) =>
-        acc *> output.write(chunk, sampleRate)
+      durationPerChunk = 0.1
+      totalChunks = 50
+
+      _ <- IO.println("Starting 5 seconds of stereo audio playback...")
+      output = AudioOutput.speakers
+
+      _ <- (0 until totalChunks).foldLeft(IO.unit) { (acc, chunkIndex) =>
+        acc *> IO.delay {
+          val frames = (sampleRate * durationPerChunk).toInt
+          val startTime = chunkIndex * durationPerChunk
+          val left = (0 until frames).map { i =>
+            val t = startTime + (i.toDouble / sampleRate)
+            math.sin(2.0 * math.Pi * 440.0 * t).toFloat
+          }.toVector
+          val right = (0 until frames).map { i =>
+            val t = startTime + (i.toDouble / sampleRate)
+            math.sin(2.0 * math.Pi * 554.37 * t).toFloat
+          }.toVector
+          AudioChunk.StereoChunk(left, right)
+        }.flatMap { chunk =>
+          output.write(chunk, sampleRate)
+        }
       }
-      _ <- IO.println("Playback complete")
+      _ <- IO.println("Playback complete!")
     yield ()

@@ -97,8 +97,8 @@ object AudioProcessorWithRules extends AudioProcessor:
     case IdentityEffect
     case GainEffect
     case DistortionEffect
+    case EchoEffect
     case PanEffect
-    // case EchoEffect
     case AutopanEffect
     case VolumeEffect
 
@@ -107,6 +107,7 @@ object AudioProcessorWithRules extends AudioProcessor:
     case _: IdentityEffect => EffectPriority.IdentityEffect.ordinal
     case _: GainEffect => EffectPriority.GainEffect.ordinal
     case _: DistortionEffect => EffectPriority.DistortionEffect.ordinal
+    case _: EchoEffect => EffectPriority.EchoEffect.ordinal
     case _: PanEffect => EffectPriority.PanEffect.ordinal
     case _: AutopanEffect => EffectPriority.AutopanEffect.ordinal
     case _: VolumeEffect => EffectPriority.VolumeEffect.ordinal

@@ -23,9 +23,11 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
 
   "Chunk" should "not be empty" in:
     chunk.getVectors should not be empty
-
-  it should "have length of 10" in:
     chunk.getVectors.head.size shouldEqual 10
+
+  it should "be a MonoChunk and not a StereoChunk" in:
+    chunk shouldBe a [MonoChunk]
+    chunk should not be a [StereoChunk]
 
   "IdentityEffect" should "return the same initial chunk" in:
     val resultChunk = IdentityEffect()(chunk)
@@ -44,7 +46,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = GainEffect(gain)(chunk)
     resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(gain))
 
-  it should "return an AudioErrors if the gain is > 2.0f or gain < 0.0f" in:
+  it should "return an AudioError if the gain is > 2.0f or gain < 0.0f" in:
     val gain = 3.0f
     val resultChunk = GainEffect(gain)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
@@ -54,7 +56,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = PanEffect(pan)(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
-  it should "return an AudioErrors if the pan is < -1.0f or pan > 1.0f" in:
+  it should "return an AudioError if the pan is < -1.0f or pan > 1.0f" in:
     val pan = 3.0f
     val resultChunk = PanEffect(pan)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
@@ -73,12 +75,26 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = VolumeEffect(volume)(stereoChunk)
     resultChunk.value shouldBe StereoChunk(Vector.fill(sizeChunk)(0.1f), Vector.fill(sizeChunk)(-0.1f))
 
-  it should "return an AudioErrors if the volume is < 0.0f or volume > 1.0f" in:
+  it should "return an AudioError if the volume is < 0.0f or volume > 1.0f" in:
     val volume = 2.0f
     val resultChunk = VolumeEffect(volume)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
 
-  // TODO: add test for other effects and for the processing (in a different file)?
-  // TODO: Remove tests with throw IllegalArgumentException
+  "DistortionEffect" should "return a new AudioChunk with the effect applied (tanh)" in:
+    val resultValue = math.tanh(defaultValueChunk).toFloat
+    val resultChunk = DistortionEffect()(chunk)
+    resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(resultValue))
+
+  it should "return an AudioError if the distortion is not in range [0.0f, 2.0f]" in:
+    val distortion = 3.0f
+    val resultChunk = DistortionEffect(distortion = distortion)(chunk)
+    resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
+
+  "AutopanEffect" should "return a new StereoChunk where " +
+    "for each sample is multiplied by a different factor" in:
+    val resultChunk = AutopanEffect()(chunk)
+    resultChunk.value shouldBe a [StereoChunk]
+
+  // TODO: add test for other effects: echo
 
 end AudioEffectsTest

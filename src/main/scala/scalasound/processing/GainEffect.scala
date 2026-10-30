@@ -28,23 +28,27 @@ private[processing] case class GainEffect(gain: Float = GainEffect.DefaultGain) 
    * the values inside the domain of the chunk,
    * defined between [-1.0f,1.0f].
    */
-  private def clamp(value: Float): Float =   // TODO: Farlo inline il metodo? per evitare l'overhead della chiamata e "inserire" direttamente nel map
+  private inline def clamp(value: Float): Float =
     math.max(-1.0f, math.min(1.0f, value))
 
-  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(isGainValid, "Exceeded the range [" + GainEffect.MinGain + "," + GainEffect.MaxGain + "]!").toLeft({
-      chunk match
-        case MonoChunk(samples) =>
-          MonoChunk(samples.map(x => clamp(x * gain)))
-        case StereoChunk(left, right) =>
-          StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
-    })
+  override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
+    checkConstraints(isGainValid, "Exceeded the range [" + GainEffect.MinGain + "," + GainEffect.MaxGain + "]!").
+      toLeft({
+        chunk match
+          case MonoChunk(samples) =>
+            MonoChunk(samples.map(x => clamp(x * gain)))
+          case StereoChunk(left, right) =>
+            StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
+      })
 
   /*
    * toLeft is the same to:
    * checkConstraints() match
    *  case Some(_) => AudioErrors
    *  case None => process(AudioChunk)
+   *
+   * If the Option of the checkConstraints
+   * is empty then do something.
    */
   end apply
 

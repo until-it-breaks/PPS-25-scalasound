@@ -5,7 +5,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.domain.AudioChunk
 import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.processing.{GainEffect, IdentityEffect, PanEffect, VolumeEffect}
+import scalasound.processing.AudioEffect
 
 /**
  * Test class containing all the checks for the effects applied on an audio chunk.
@@ -37,11 +37,6 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val saturationGain = 1.9f
     val upperChunk = GainEffect(saturationGain)(chunk)
     upperChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(maxValueChunk))
-    val gain = 0.5f
-    val resultChunk = GainEffect(gain)(chunk)
-    resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(gain))
-
-  it should "correctly applying the gain on the chunk when the value does not saturate" in:
     val gain = 0.5f
     val resultChunk = GainEffect(gain)(chunk)
     resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(gain))
@@ -95,6 +90,21 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val resultChunk = AutopanEffect()(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
-  // TODO: add test for other effects: echo
+  it should "return an AudioError if the frequency (sampleRate) is negative" in:
+    val frequency = -2
+    val resultChunk = AutopanEffect(frequency)(chunk)
+    resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
+
+  "EchoEffect" should "return an AudioError when the " +
+    "input parameters are not in the admissible ranges" in:
+    val alpha = 2.0f
+    val resultAlpha = EchoEffect(alpha = alpha)(chunk)
+    resultAlpha.left.value shouldBe a[AudioError.AudioEffectsError]
+    val delay = 10
+    val resultDelay = EchoEffect(delay = delay)(chunk)
+    resultDelay.left.value shouldBe a[AudioError.AudioEffectsError]
+    val freq = -1
+    val resultFreq = EchoEffect(frequency = freq)(chunk)
+    resultFreq.left.value shouldBe a[AudioError.AudioEffectsError]
 
 end AudioEffectsTest

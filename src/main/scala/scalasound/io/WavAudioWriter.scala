@@ -6,14 +6,13 @@ import javax.sound.sampled.{AudioFileFormat, AudioFormat, AudioInputStream, Audi
 import scala.jdk.CollectionConverters.*
 import scala.util.{Try, Using}
 import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack}
+import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.io.AudioSaveError.*
 
 /** Saves tracks as WAV files in the file system, using the Java Sound API.
   *
   * Supported subset: PCM signed, 16 bit per sample, little-endian,
-  * mono. It is the same subset accepted by [[WavAudioReader]]
-  * (stereo export is added in a following change).
+  * mono or stereo. It is the same subset accepted by [[WavAudioReader]]
   *
   * A normalised sample `x` becomes `clamp(round(x * 32768), -32768, 32767)`,
   * that is the inverse of the reader's `s / 32768f`.
@@ -51,7 +50,8 @@ object WavAudioWriter extends AudioWriter:
 
   private def determineChannelCount(track: AudioTrack): Either[AudioSaveError, Int] = track match
     case _: MonoTrack => Right(1)
-    case other        => Left(InvalidTrack(s"unsupported track type: ${other.getClass.getSimpleName}"))
+    case _: StereoTrack => Right(2)
+    case other => Left(InvalidTrack(s"unsupported track type: ${other.getClass.getSimpleName}"))
 
   private def buildAudioFormat(channels: Int, sampleRate: Int): Either[AudioSaveError, AudioFormat] =
     Either.cond(
@@ -84,7 +84,7 @@ object WavAudioWriter extends AudioWriter:
 
   private def extractSamplesInFileOrder(chunk: AudioChunk): Vector[Float] = chunk match
     case MonoChunk(samples) => samples
-    case _: StereoChunk     => Vector.empty
+    case StereoChunk(left, right) => left.zip(right).flatMap { case (l, r) => Vector(l, r) }
 
   private[io] def encodeChunkToPcmBytes(chunk: AudioChunk): Array[Byte] =
     extractSamplesInFileOrder(chunk).flatMap { sample =>

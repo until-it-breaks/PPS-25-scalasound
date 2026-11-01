@@ -7,8 +7,8 @@ import java.nio.file.{Files, Path}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scalasound.domain.AudioChunk.MonoChunk
-import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack}
+import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.io.WavFixtures.*
 
 class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach:
@@ -29,10 +29,16 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
   private def monoTrack(rate: Int, chunks: Seq[Int]*): MonoTrack =
     MonoTrack(rate, chunks.map[MonoChunk](c => MonoChunk(toFloats(c))).toVector)
 
+  private def stereoTrack(rate: Int, chunks: (Seq[Int], Seq[Int])*): StereoTrack =
+    StereoTrack(rate, chunks.map[StereoChunk] { case (l, r) => StereoChunk(toFloats(l), toFloats(r)) }.toVector)
+
   private def exported(track: AudioTrack, name: String = "out.wav"): Array[Byte] =
     val path = tempDir.resolve(name)
     WavAudioWriter.save(track, path) shouldBe Right(())
     Files.readAllBytes(path)
+
+  private def interleave(left: Seq[Int], right: Seq[Int]): Seq[Int] =
+    left.zip(right).flatMap { case (l, r) => Seq(l, r) }
 
   private def ramp(frames: Int): Vector[Int] =
     Vector.tabulate(frames)(i => ((i * 13) % 20000) - 10000)
@@ -102,6 +108,56 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
 
       header.sampleRate shouldBe rate.toLong
       header.byteRate shouldBe rate.toLong * 2
+    }
+  }
+
+  "Exporting a stereo track" should "interleave the channels as (L0,R0,L1,R1,...)" in {
+    val left = Seq(1, 2, 3, 4)
+    val right = Seq(-1, -2, -3, -4)
+
+    exported(stereoTrack(44100, (left, right))) shouldBe pcm16Wav(44100, 2, Seq(1, -1, 2, -2, 3, -3, 4, -4))
+  }
+
+  it should "write a valid header with two channels and consistent sizes" in {
+    val bytes = exported(stereoTrack(48000, (ramp(500), ramp(500).reverse)))
+    val header = parseHeader(bytes)
+
+    header shouldBe Header("RIFF", 36L + 2000, "WAVE", "fmt ", 16, 1, 2, 48000, 48000L * 4, 4, 16, "data", 2000)
+    bytes.length shouldBe 44 + 2000
+  }
+
+  it should "not swap the left and right channels" in {
+    val data = exported(stereoTrack(44100, (Seq(1000, 1000), Seq(-2000, -2000)))).drop(44)
+
+    data shouldBe pcm16Data(Seq(1000, -2000, 1000, -2000))
+  }
+
+  it should "keep the frame order across chunks and count frames per channel" in {
+    val left = ramp(2500)
+    val right = left.map(-_)
+    val chunks = left.grouped(1024).zip(right.grouped(1024)).toSeq
+    val bytes = exported(stereoTrack(44100, chunks *))
+
+    bytes shouldBe pcm16Wav(44100, 2, interleave(left, right))
+    parseHeader(bytes).dataSize shouldBe 2500L * 4
+  }
+
+  it should "handle a single frame" in {
+    exported(stereoTrack(44100, (Seq(7), Seq(-7)))) shouldBe pcm16Wav(44100, 2, Seq(7, -7))
+  }
+
+  it should "produce a header-only file for an empty track" in {
+    exported(StereoTrack(44100, Vector.empty)) shouldBe pcm16Wav(44100, 2, Seq.empty)
+
+    exported(stereoTrack(44100, (Seq.empty, Seq.empty)), "empty-chunk.wav") shouldBe pcm16Wav(44100, 2, Seq.empty)
+  }
+
+  it should "preserve different sample rates and derive the byte rate from them" in {
+    Seq(8000, 44100, 96000).foreach { rate =>
+      val header = parseHeader(exported(stereoTrack(rate, (Seq(1), Seq(2))), s"rate-$rate.wav"))
+
+      header.sampleRate shouldBe rate.toLong
+      header.byteRate shouldBe rate.toLong * 4
     }
   }
 
@@ -175,6 +231,12 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
     }
   }
 
+  it should "reject a non-finite sample in the right channel of a stereo track" in {
+    val track = StereoTrack(44100, Vector(StereoChunk(Vector(0f, 0f), Vector(0f, Float.NaN))))
+
+    WavAudioWriter.save(track, tempDir.resolve("stereo-nan.wav")) should matchPattern { case Left(AudioSaveError.InvalidSample(_)) => }
+  }
+
   "Exporting to an unusable path" should "return WriteFailure when the parent directory does not exist" in {
     val path = tempDir.resolve("missing-dir").resolve("out.wav")
 
@@ -197,21 +259,27 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
 
   "The size limits" should "accept the largest data size Java Sound writes correctly (2^32 - 44 bytes)" in {
     WavAudioWriter.calculateDataSize(2147483626L, 1) shouldBe Right(4294967252L)
+    WavAudioWriter.calculateDataSize(1073741813L, 2) shouldBe Right(4294967252L)
   }
 
   it should "return FileTooLarge just above the limit and for huge frame counts" in {
     WavAudioWriter.calculateDataSize(2147483627L, 1) should matchPattern { case Left(AudioSaveError.FileTooLarge(_)) => }
-    WavAudioWriter.calculateDataSize(3000000000L, 1) should matchPattern { case Left(AudioSaveError.FileTooLarge(_)) => }
+    WavAudioWriter.calculateDataSize(1073741814L, 2) should matchPattern { case Left(AudioSaveError.FileTooLarge(_)) => }
+    WavAudioWriter.calculateDataSize(3000000000L, 2) should matchPattern { case Left(AudioSaveError.FileTooLarge(_)) => }
   }
 
   it should "return FileTooLarge instead of overflowing Long arithmetic" in {
     WavAudioWriter.calculateDataSize(Long.MaxValue, 1) should matchPattern { case Left(AudioSaveError.FileTooLarge(_)) => }
+    WavAudioWriter.calculateDataSize(Long.MaxValue, 2) should matchPattern { case Left(AudioSaveError.FileTooLarge(_)) => }
   }
 
   it should "reject a sample rate a float cannot represent exactly, and accept 2^24 Hz" in {
-    WavAudioWriter.save(MonoTrack(Int.MaxValue, Vector.empty), tempDir.resolve("fast.wav")) should matchPattern { case Left(AudioSaveError.InvalidTrack(_)) => }
-    WavAudioWriter.save(MonoTrack((1 << 24) + 1, Vector.empty), tempDir.resolve("fast2.wav")) should matchPattern { case Left(AudioSaveError.InvalidTrack(_)) => }
-    WavAudioWriter.save(MonoTrack(1 << 24, Vector.empty), tempDir.resolve("limit.wav")) shouldBe Right(())
+    val veryFast = StereoTrack(Int.MaxValue, Vector.empty)
+    val tooFast = StereoTrack((1 << 24) + 1, Vector.empty)
+
+    WavAudioWriter.save(veryFast, tempDir.resolve("fast.wav")) should matchPattern { case Left(AudioSaveError.InvalidTrack(_)) => }
+    WavAudioWriter.save(tooFast, tempDir.resolve("fast2.wav")) should matchPattern { case Left(AudioSaveError.InvalidTrack(_)) => }
+    WavAudioWriter.save(StereoTrack(1 << 24, Vector.empty), tempDir.resolve("limit.wav")) shouldBe Right(())
   }
 
   "Exporting an unknown track type" should "return InvalidTrack" in {

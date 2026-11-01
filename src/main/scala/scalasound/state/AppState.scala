@@ -1,83 +1,160 @@
 package scalasound.state
 
-import scalasound.domain.AudioTrack
+import scalasound.domain.{AudioChunk, AudioTrack}
 
-/** Represents the current lifecycle status of the [[AudioPlayer]]. */
-enum PlaybackStatus:
+/** Represents the current playback lifecycle status. */
+enum PlaybackState:
   case Stopped
   case Playing
   case Paused
 
-/**
- * Core application state for the [[AudioPlayer]].
+/** Represents the track import lifecycle status. */
+enum ImportState:
+  case Idle
+  case Importing
+  case Imported(track: AudioTrack)
+  case Failed(reason: String)
+
+/** Represents the track export lifecycle status. */
+enum ExportState:
+  case Idle
+  case Exporting
+  case Exported
+  case Failed(reason: String)
+
+/** Represents all discrete commands that can mutate application state. */
+enum Command:
+  case Play
+  case Pause
+  case Stop
+  case NextChunk
+  case SeekToSeconds(seconds: Double)
+  case SeekToIndex(index: Int)
+  case UpdateImport(state: ImportState)
+  case UpdateExport(state: ExportState)
+
+import PlaybackState.*
+import ExportState.*
+import ImportState.*
+import Command.*
+
+/** Core immutable application state and state machine for the audio system.
  *
- * @param status     state of the playback
- * @param track      the loaded track, if any
- * @param chunkIndex index of the next chunk to play
+ *   - Playback Control (`Play`, `Pause`, `Stop`): Playback can only transition to `Playing` if a
+ *     track is successfully loaded (`track = Some(...)`). Pausing works exclusively from a `Playing`
+ *     state. Stopping halts playback and resets the playhead (`chunkIndex = 0`).
+ *   - Position & Seeking (`SeekToIndex`, `SeekToSeconds`, `NextChunk`): The playhead position
+ *     (`chunkIndex`) is maintained as a top-level property, allowing seeking at any time (whether playing,
+ *     paused, or stopped). Index boundaries are automatically clamped between `0` and `track.chunks.length - 1`.
+ *   - Track Import (`UpdateImport`): When an audio track is successfully imported (`Imported(track)`),
+ *     the state automatically locks in the new track, resets playback to `Stopped`, and repositions the
+ *     playhead to `0`.
+ *   - Track Export (`UpdateExport`): Tracks the progress and lifecycle of
+ *     file export tasks independently of audio playback.
+ *
+ * @param playbackState current playback state (`Stopped`, `Playing`, `Paused`)
+ * @param importState   current track import state
+ * @param track         the successfully loaded audio track, if any
+ * @param chunkIndex    the current active audio chunk position (playhead index)
+ * @param exportState   current track export state
  */
 final case class AppState(
-  status: PlaybackStatus,
-  track: Option[AudioTrack],
-  chunkIndex: Int
-):
-  import PlaybackStatus.*
+                           playbackState: PlaybackState,
+                           importState: ImportState,
+                           track: Option[AudioTrack],
+                           chunkIndex: Int,
+                           exportState: ExportState
+                         ):
 
-  /** Loads a new track, resetting the chunk index to 0 and stopping playback.*/
-  def load(track: AudioTrack): AppState =
-    AppState(Stopped, Some(track), 0)
+  def handle(command: Command): AppState =
+    command match
+      case Play                 => handlePlay()
+      case Pause                => handlePause()
+      case Stop                 => handleStop()
+      case NextChunk            => handleNextChunk()
+      case SeekToSeconds(sec)   => handleSeek(sec)
+      case SeekToIndex(index)   => handleSeek(index)
+      case UpdateImport(state)  => handleImport(state)
+      case UpdateExport(state)  => handleExport(state)
 
-  /** Transitions to Playing if a track is loaded, does nothing otherwise. */
-  def play(): AppState =
+  /** Command router mapping a [[Command]] to designated state transitions. */
+  private def handlePlay(): AppState =
     track match
-      case None    => this
-      case Some(_) => copy(status = Playing)
+      case None => this
+      case Some(_) => copy(playbackState = Playing)
 
-  /** Transitions to [[Paused]] if currently playing, does nothing otherwise. */
-  def pause(): AppState =
-    status match
-      case Playing => copy(status = Paused)
-      case _       => this
+  private def handlePause(): AppState =
+    playbackState match
+      case Playing => copy(playbackState = Paused)
+      case _ => this
 
-  /** Stops playback and resets chunk index to 0, keeping the loaded track. */
-  def stop(): AppState =
-    copy(status = Stopped, chunkIndex = 0)
+  private def handleStop(): AppState =
+    copy(playbackState = Stopped, chunkIndex = 0)
 
-  /** Seeks to the specified chunk index if a track is loaded. */
-  def seek(index: Int): AppState =
+  private def handleNextChunk(): AppState =
+    playbackState match
+      case Playing => copy(chunkIndex = chunkIndex + 1)
+      case _ => this
+
+  private def handleSeek(index: Int): AppState =
     track match
-      case None    => this
-      case Some(_) => copy(chunkIndex = math.max(0, index))
+      case None => this
+      case Some(track) =>
+        val maxIndex = math.max(0, track.chunks.length - 1)
+        val clamped = math.max(0, math.min(index, maxIndex))
+        copy(chunkIndex = clamped)
 
-  /** Advances the chunk index by one. */
-  def nextChunk: AppState =
-    copy(chunkIndex = chunkIndex + 1)
-
-object AppState:
-  import PlaybackStatus.*
-  val initial: AppState = AppState(Stopped, None, 0)
-
-import cats.effect.IO
-import cats.effect.Ref
-
-/** Storage abstraction for managing [[AppState]]. */
-trait AppStateStore:
-  /** Retrieves a snapshot of the current application state. */
-  def current: IO[AppState]
-  /** Updates the [[AppState]] using the provided function. */
-  def update(f: AppState => AppState): IO[AppState]
-
-/** A simple state store using a mutable variable. NOT thread-safe for concurrent writes. */
-final class SimpleAppStateStore extends AppStateStore:
-  private var state: AppState = AppState.initial
-
-  def current: IO[AppState] = IO.pure(state)
-  def update(f: AppState => AppState): IO[AppState] =
-    IO {
-      state = f(state)
-      state
+  private def handleSeek(seconds: Double): AppState =
+    track.fold(this) { track =>
+      val targetFrame = math.max(0L, (seconds * track.sampleRate).toLong)
+      handleSeek(findChunkIndexForFrame(track.chunks, targetFrame))
     }
 
-/** A thread-safe, non-blocking state store backed by a [[Ref]]. */
-final class CatsRefAppStateStore private(ref: Ref[IO, AppState]) extends AppStateStore:
-  def current: IO[AppState] = ref.get
-  def update(f: AppState => AppState): IO[AppState] = ref.updateAndGet(f)
+  private def findChunkIndexForFrame(chunks: Vector[AudioChunk], targetFrame: Long): Int =
+    import scala.annotation.tailrec
+    @tailrec
+    def loop(index: Int, accumulatedFrames: Long): Int =
+      index >= chunks.length match
+        case true =>
+          math.max(0, chunks.length - 1)
+        case false =>
+          val chunk = chunks(index)
+          val nextAccumulated = accumulatedFrames + chunk.frameCount
+          targetFrame < nextAccumulated match
+            case true => index
+            case false => loop(index + 1, nextAccumulated)
+    loop(0, 0L)
+
+  def currentPositionSeconds: Double =
+    track.fold(0.0) { track =>
+      val framesBeforeCurrent = track.chunks.view
+        .take(chunkIndex)
+        .map(_.frameCount.toLong)
+        .sum
+      framesBeforeCurrent.toDouble / track.sampleRate
+    }
+
+  private def handleImport(state: ImportState): AppState =
+    state match
+      case Imported(track) =>
+        copy(
+          importState = state,
+          track = Some(track),
+          playbackState = Stopped,
+          chunkIndex = 0
+        )
+      case _ =>
+        copy(importState = state)
+
+  private def handleExport(state: ExportState): AppState =
+    copy(exportState = state)
+
+object AppState:
+  /** Initial application state. */
+  val initial: AppState = AppState(
+    playbackState = Stopped,
+    importState = ImportState.Idle,
+    track = None,
+    chunkIndex = 0,
+    exportState = ExportState.Idle
+  )

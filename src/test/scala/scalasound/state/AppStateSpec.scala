@@ -2,63 +2,127 @@ package scalasound.state
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import scalasound.domain.AudioChunk.MonoChunk
 import scalasound.domain.MonoTrack
+import scalasound.state.Command.*
+import scalasound.state.ImportState.Imported
+import scalasound.state.PlaybackState.*
 
 class AppStateSpec extends AnyFlatSpec with Matchers:
-  private val track = MonoTrack(44100, Vector.empty)
+  private val track = MonoTrack(
+    sampleRate = 44100,
+    chunks = Vector(
+      MonoChunk(Vector.fill(44100)(0f)),  // 0.0s to 1.0s chunk (Index 0)
+      MonoChunk(Vector.fill(44100)(0f)),  // 1.0s to 2.0s chunk (Index 1)
+      MonoChunk(Vector.fill(44100)(0f))   // 2.0s to 3.0s chunk (Index 2)
+    )
+  )
 
-  "AppState initial state" should "be Stopped with no track and chunk 0" in {
+  "initial state" should "have playback stopped, no track loaded, have chunkIndex at 0 and import/export in idle" in {
     val state = AppState.initial
-    state.status shouldBe PlaybackStatus.Stopped
+    state.playbackState shouldBe Stopped
+    state.importState shouldBe ImportState.Idle
     state.track shouldBe None
     state.chunkIndex shouldBe 0
+    state.exportState shouldBe ExportState.Idle
   }
 
-  "load track" should "reset to Stopped, set track, and reset chunkIndex to 0" in {
+  "loading a track" should "stop playback, set the track and set chunkIndex to 0" in {
     val state = AppState.initial
-      .copy(chunkIndex = 5)
-      .load(track)
-    state.status shouldBe PlaybackStatus.Stopped
+      .handle(UpdateImport(Imported(track)))
+    state.playbackState shouldBe Stopped
     state.track shouldBe Some(track)
     state.chunkIndex shouldBe 0
   }
 
-  "play transition" should "transition to Playing only if a track is loaded" in {
-    val noTrackState = AppState.initial.play()
-    noTrackState.status shouldBe PlaybackStatus.Stopped
-    val loadedState = AppState.initial.load(track).play()
-    loadedState.status shouldBe PlaybackStatus.Playing
+  "play" should "transition to playback to playing only if a track is loaded" in {
+    val noTrackState = AppState.initial.handle(Play)
+    noTrackState.playbackState shouldBe Stopped
+    val loadedState = AppState.initial
+      .handle(UpdateImport(Imported(track)))
+      .handle(Play)
+    loadedState.playbackState shouldBe Playing
   }
 
-  "pause transition" should "transition to Paused only if currently Playing" in {
-    val stoppedState = AppState.initial.load(track).pause()
-    stoppedState.status shouldBe PlaybackStatus.Stopped
-    val playingState = AppState.initial.load(track).play().pause()
-    playingState.status shouldBe PlaybackStatus.Paused
+  "pause" should "transition to playback to pause only if currently playing" in {
+    val base = AppState.initial.handle(UpdateImport(Imported(track)))
+    val stoppedState = base.handle(Pause)
+    stoppedState.playbackState shouldBe Stopped
+    val playingState = base.handle(Play).handle(Pause)
+    playingState.playbackState shouldBe Paused
   }
 
-  "stop transition" should "reset status to Stopped and chunkIndex to 0 while keeping track" in {
+  "stop" should "reset playback to stopped and chunkIndex to 0 while keeping the track" in {
     val state = AppState.initial
-      .load(track)
-      .play()
-      .nextChunk
-      .nextChunk
-      .stop()
-
-    state.status shouldBe PlaybackStatus.Stopped
+      .handle(UpdateImport(Imported(track)))
+      .handle(Play)
+      .handle(NextChunk)
+      .handle(NextChunk)
+      .handle(Stop)
+    state.playbackState shouldBe Stopped
     state.track shouldBe Some(track)
     state.chunkIndex shouldBe 0
   }
 
-  "seek" should "update chunkIndex if track is loaded and clamp negative values" in {
-    val stateWithTrack = AppState.initial.load(track)
-    stateWithTrack.seek(15).chunkIndex shouldBe 15
-    stateWithTrack.seek(-5).chunkIndex shouldBe 0
-    val stateNoTrack = AppState.initial.seek(10)
+  "seek by chunk index" should "update chunkIndex if a track is loaded and clamp bounds" in {
+    val stateWithTrack = AppState.initial.handle(UpdateImport(Imported(track)))
+    stateWithTrack.handle(SeekToIndex(2)).chunkIndex shouldBe 2
+    stateWithTrack.handle(SeekToIndex(10)).chunkIndex shouldBe 2
+    stateWithTrack.handle(SeekToIndex(-5)).chunkIndex shouldBe 0
+    val stateNoTrack = AppState.initial.handle(SeekToIndex(10))
     stateNoTrack.chunkIndex shouldBe 0
   }
 
-  "nextChunk" should "increment chunkIndex by 1" in {
-    val state = AppState.initial.nextChunk.nextChunk
+  "seek by seconds" should "correctly map time to chunk index" in {
+    val state = AppState.initial.handle(UpdateImport(Imported(track)))
+    state.handle(SeekToSeconds(0.0)).chunkIndex shouldBe 0
+    state.handle(SeekToSeconds(0.5)).chunkIndex shouldBe 0
+    state.handle(SeekToSeconds(1.2)).chunkIndex shouldBe 1
+    state.handle(SeekToSeconds(2.8)).chunkIndex shouldBe 2
+    state.handle(SeekToSeconds(-1.5)).chunkIndex shouldBe 0
+    state.handle(SeekToSeconds(10.0)).chunkIndex shouldBe 2
+    AppState.initial.handle(SeekToSeconds(1.5)).chunkIndex shouldBe 0
+  }
+
+  "nextChunk" should "increment chunkIndex by 1 when playing" in {
+    val state = AppState.initial
+      .handle(UpdateImport(Imported(track)))
+      .handle(Play)
+      .handle(NextChunk)
+      .handle(NextChunk)
     state.chunkIndex shouldBe 2
+  }
+
+  "nextChunk" should "do nothing if playback is paused or stopped" in {
+    val base = AppState.initial.handle(UpdateImport(Imported(track)))
+    val stoppedState = base.handle(NextChunk)
+    stoppedState.chunkIndex shouldBe 0
+    val pausedState = base.handle(Play).handle(Pause).handle(NextChunk)
+    pausedState.chunkIndex shouldBe 0
+  }
+
+  "currentPositionSeconds" should "calculate correct time based on active chunkIndex" in {
+    val state = AppState.initial.handle(UpdateImport(Imported(track)))
+    // Chunk 0 (0.0s)
+    state.currentPositionSeconds shouldBe 0.0 +- 0.001
+    // Chunk 1 (Starts at 1.0s)
+    state.handle(SeekToIndex(1)).currentPositionSeconds shouldBe 1.0 +- 0.001
+    // Chunk 2 (Starts at 2.0s)
+    state.handle(SeekToIndex(2)).currentPositionSeconds shouldBe 2.0 +- 0.001
+    // No track loaded should return 0.0
+    AppState.initial.currentPositionSeconds shouldBe 0.0
+  }
+
+  "import and export" should "handle intermediate and failure states without losing track" in {
+    val loaded = AppState.initial.handle(UpdateImport(Imported(track)))
+    val importingState = loaded.handle(UpdateImport(ImportState.Importing))
+    importingState.importState shouldBe ImportState.Importing
+    importingState.track shouldBe Some(track)
+    val failedImport = loaded.handle(UpdateImport(ImportState.Failed("Corrupt file")))
+    failedImport.importState shouldBe ImportState.Failed("Corrupt file")
+    failedImport.track shouldBe Some(track)
+    val exportingState = loaded.handle(UpdateExport(ExportState.Exporting))
+    exportingState.exportState shouldBe ExportState.Exporting
+    val exportedState = exportingState.handle(UpdateExport(ExportState.Exported))
+    exportedState.exportState shouldBe ExportState.Exported
   }

@@ -1,28 +1,28 @@
 package scalasound.io
 
+import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
+import scalasound.io.AudioSaveError.*
 import java.io.{ByteArrayInputStream, SequenceInputStream}
 import java.nio.file.Path
 import javax.sound.sampled.{AudioFileFormat, AudioFormat, AudioInputStream, AudioSystem}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Try, Using}
-import scalasound.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
-import scalasound.io.AudioSaveError.*
 
 /** Saves tracks as WAV files in the file system, using the Java Sound API.
-  *
-  * Supported subset: PCM signed, 16 bit per sample, little-endian,
-  * mono or stereo. It is the same subset accepted by [[WavAudioReader]]
-  *
-  * A normalised sample `x` becomes `clamp(round(x * 32768), -32768, 32767)`,
-  * that is the inverse of the reader's `s / 32768f`.
-  * So, `0.0 -> 0`, `-1.0 -> -32768` and `+1.0 -> 32767` (clipped). Values outside
-  * [-1.0, 1.0) (e.g. produced by effects) are clipped to the extremes.
-  * Samples that are NaN or infinite are rejected with [[AudioSaveError.InvalidSample]]
-  * before any byte is written.
-  *
-  * A file, that already exists in the destination path, will be overwritten.
-  */
+ *
+ *  Supported subset: PCM signed, 16 bit per sample, little-endian,
+ *  mono or stereo. It is the same subset accepted by [[WavAudioReader]]
+ *
+ *  A normalised sample `x` becomes `clamp(round(x * 32768), -32768, 32767)`,
+ *  that is the inverse of the reader's `s / 32768f`.
+ *  So, `0.0 -> 0`, `-1.0 -> -32768` and `+1.0 -> 32767` (clipped). Values outside
+ *  [-1.0, 1.0) (e.g. produced by effects) are clipped to the extremes.
+ *  Samples that are NaN or infinite are rejected with [[AudioSaveError.InvalidSample]]
+ *  before any byte is written.
+ *
+ *  A file, that already exists in the destination path, will be overwritten.
+ */
 object WavAudioWriter extends AudioWriter:
 
   private final val BitsPerSample = 16
@@ -30,15 +30,15 @@ object WavAudioWriter extends AudioWriter:
   private final val PcmMin = -32768L
   private final val PcmMax = 32767L
   private final val Scale = 32768.0
-  private[io] final val MaxSampleRateRepresentedByFloat = 1 << 24 // (2^24 Hz)
-  private[io] final val MaxDataSizeHandledByPCM = 0xffffffffL - 43 // (2^32 - 44) bytes
+  private final val MaxSampleRateRepresentedByFloat = 1 << 24 // (2^24 Hz)
+  private final val MaxDataSizeHandledByPCM = 0xffffffffL - 43 // (2^32 - 44) bytes
 
   /** Saves a track as a WAV file in the file system.
-    *
-    * @param track the audio track to save
-    * @param path the destination path of the WAV file; if it exists, it will be overwritten
-    * @return [[Right]] on success or [[Left]] with an error description on failure
-    */
+   *
+   *  @param track the audio track to save
+   *  @param path  the destination path of the WAV file; if it exists, it will be overwritten
+   *  @return [[Right]] on success or [[Left]] with an error description on failure
+   */
   override def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
     for
       channels <- determineChannelCount(track)
@@ -79,23 +79,23 @@ object WavAudioWriter extends AudioWriter:
       .find(sample => !java.lang.Float.isFinite(sample))
       .fold[Either[AudioSaveError, Unit]](Right(()))(bad => Left(InvalidSample(s"non-finite sample value: $bad")))
 
+  private def writeAudioToFile(path: Path, format: AudioFormat, frameCount: Long, chunks: Vector[AudioChunk]): Either[AudioSaveError, Unit] =
+    Using(AudioInputStream(createPcmInputStream(chunks), format, frameCount)) { stream =>
+      AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile)
+    }.toEither.map(_ => ()).left.map(e => WriteFailure(path, Option(e.getMessage).getOrElse(e.getClass.getSimpleName)))
+
+  private def createPcmInputStream(chunks: Vector[AudioChunk]): SequenceInputStream =
+    SequenceInputStream(chunks.iterator.map(chunk => ByteArrayInputStream(encodeChunkToPcmBytes(chunk))).asJavaEnumeration)
+
+  private def encodeChunkToPcmBytes(chunk: AudioChunk): Array[Byte] =
+    extractSamplesInFileOrder(chunk).flatMap { sample =>
+      val pcm = quantiseNormalisedSampleToPcm16(sample)
+      List(pcm.toByte, (pcm >> 8).toByte)
+    }.toArray
+
   private[io] def quantiseNormalisedSampleToPcm16(sample: Float): Short =
     math.round(sample.toDouble * Scale).max(PcmMin).min(PcmMax).toShort
 
   private def extractSamplesInFileOrder(chunk: AudioChunk): Vector[Float] = chunk match
     case MonoChunk(samples) => samples
     case StereoChunk(left, right) => left.zip(right).flatMap { case (l, r) => Vector(l, r) }
-
-  private[io] def encodeChunkToPcmBytes(chunk: AudioChunk): Array[Byte] =
-    extractSamplesInFileOrder(chunk).flatMap { sample =>
-      val pcm = quantiseNormalisedSampleToPcm16(sample)
-      List(pcm.toByte, (pcm >> 8).toByte)
-    }.toArray
-
-  private def createPcmInputStream(chunks: Vector[AudioChunk]): SequenceInputStream =
-    SequenceInputStream(chunks.iterator.map(chunk => ByteArrayInputStream(encodeChunkToPcmBytes(chunk))).asJavaEnumeration)
-
-  private def writeAudioToFile(path: Path, format: AudioFormat, frameCount: Long, chunks: Vector[AudioChunk]): Either[AudioSaveError, Unit] =
-    Using(AudioInputStream(createPcmInputStream(chunks), format, frameCount)) { stream =>
-      AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile)
-    }.toEither.map(_ => ()).left.map(e => WriteFailure(path, Option(e.getMessage).getOrElse(e.getClass.getSimpleName)))

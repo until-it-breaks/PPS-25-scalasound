@@ -145,4 +145,7 @@ object WavAudioReader extends AudioReader:
 
     def frameSize: Int = channels * BytesPerSample
 
-  private final case class ValidFormat(layout: ChannelLayout, sampleRate: Int)
+  private final case class ValidFormat(
+                                        layout: ChannelLayout,
+                                        sampleRate: Int
+                                      )

@@ -16,7 +16,7 @@ object PanEffect:
   private val DefaultPan: Float = 0.0f
   private val MinPan: Float = -1.0f
   private val MaxPan: Float = 1.0f
-
+  
   /*
    * Defined new method for the type float
    * to compute to corresponding radiant value.

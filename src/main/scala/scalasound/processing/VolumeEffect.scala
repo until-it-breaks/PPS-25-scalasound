@@ -14,6 +14,7 @@ object VolumeEffect:
   private val DefaultVolume: Float = 1.0f
   private val MinVolume: Float = 0.0f
   private val MaxVolume: Float = 1.0f
+  private val Name: String = "Volume"
 
 /*
  * Effect that applies the volume effect on the input audio chunk.

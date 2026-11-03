@@ -87,7 +87,7 @@ private[mainPanel] object DistortionPanBox:
       min = minVal
       max = maxVal
       value = defaultVal
-      prefWidth = 200
+      prefWidth = 300
 
     private val valueLabel = label(defaultVal.toString)
     valueLabel.text <== slider.value.map(v => f"${v.floatValue()}%.2f")
@@ -98,13 +98,11 @@ private[mainPanel] object DistortionPanBox:
       spacing = 10
       children = labels match
         case Some((left, right)) => Seq(label(left), slider, label(right))
-        case _ => Seq(valueLabel, slider, label(maxVal.toString))
+        case _ => Seq(label(minVal.toString), slider, label(maxVal.toString))
 
     alignment = Pos.Center
     spacing = 10
-    children = labels match
-      case Some((left, right)) => Seq(label(effectName), middle, valueLabel)
-      case _ => Seq(label(effectName), middle)
+    children = Seq(label(effectName), middle, valueLabel)
   end container
 
 end DistortionPanBox
@@ -122,7 +120,7 @@ private[mainPanel] final class DistortionPanBox extends VBox:
   private val distortionSwitch = switch(_selectedFilter)
   private val distFinalContainer = new VBox:
     alignment = Pos.Center
-    spacing = 5
+    spacing = 15
     children = Seq(distortionContainer, distortionSwitch)
 
   alignment = Pos.Center

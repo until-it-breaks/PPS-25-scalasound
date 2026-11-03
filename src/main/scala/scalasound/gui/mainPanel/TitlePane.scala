@@ -43,7 +43,7 @@ private[mainPanel] object TitlePane:
  * containing the Title and the Import button.
  */
 private[mainPanel] final class TitlePane(stage: PrimaryStage) extends BorderPane:
-  import TitlePane._
+  import TitlePane.*
 
   private val impButton = importButton
   

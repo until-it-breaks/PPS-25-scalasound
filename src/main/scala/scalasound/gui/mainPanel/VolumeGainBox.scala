@@ -6,12 +6,12 @@ import scalafx.scene.layout.{HBox, VBox}
 
 // TODO: AGGIUNGERE COMMENTI
 private[mainPanel] object VolumeGainBox:
-  
+
   private def label(label: String): Label = new Label(label):
     style = """
       -fx-font-size: 16px;
     """
-  
+
   private def container(text: String,
                         minVal: Float,
                         maxVal: Float,
@@ -38,13 +38,13 @@ private[mainPanel] object VolumeGainBox:
 /* Box for the Volume-Gain effects. */
 private[mainPanel] final class VolumeGainBox extends HBox:
   import VolumeGainBox.*
-  
+
   private val gain = container("Gain", 0, 0, 0) // TODO: CAPIRE COME COLLEGARLI AI COMPANION OBJECT
   private val volume = container("Volume", 0, 0, 0)
   
   alignment = Pos.Center
-  padding = Insets(10, 20, 10, 20)
-  spacing = 20
+  padding = Insets(10, 30, 10, 30)
+  spacing = 50
   style = """
         -fx-background-color: white;
         -fx-text-fill: black;

@@ -47,7 +47,7 @@ object AutopanEffect:
  * Implementation of the LFO (Low-Frequency-Oscillator) where frequency specifies
  * how fast the sound move from right to left channel.
  */
-case class AutopanEffect(frequency: Int = AutopanEffect.DefaultFrequency) extends TimeAudioEffect:
+private[processing] case class AutopanEffect(frequency: Int = AutopanEffect.DefaultFrequency) extends TimeAudioEffect:
   private val isFrequencyValid: Boolean = frequency > AutopanEffect.MinFrequency
   
   override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =

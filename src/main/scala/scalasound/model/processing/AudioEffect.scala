@@ -4,13 +4,12 @@ import scalasound.model.domain.AudioChunk.*
 import scalasound.model.domain.AudioChunk
 
 //TODO: Add DOCUMENTATION
-
 /**
  * Defines a contract that applies a transformation on an audio block.
  */
 trait AudioEffect:
   def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
-
+  
   /* Check whether the constraints for a given effect are met. */
   protected def checkConstraints(isValid: Boolean, msg: String): Option[AudioError] =
     if isValid then Option.empty
@@ -29,12 +28,12 @@ trait TimeAudioEffect extends AudioEffect:
 
 
 object AudioEffect:
-
+  
   /**
    * Defines the list of available effects.
    * @return the names of the available effects.
    */
-  def effects: List[String] =
+  def effectsNames: List[String] =
     this.getClass.
       getMethods.
       filter(_.getReturnType == classOf[AudioEffect]).

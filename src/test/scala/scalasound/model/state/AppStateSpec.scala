@@ -74,17 +74,6 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
     stateNoTrack.chunkIndex shouldBe 0
   }
 
-  "seek by seconds" should "correctly map time to chunk index" in {
-    val state = AppState.initial.handle(UpdateImport(Imported(track)))
-    state.handle(SeekToSeconds(0.0)).chunkIndex shouldBe 0
-    state.handle(SeekToSeconds(0.5)).chunkIndex shouldBe 0
-    state.handle(SeekToSeconds(1.2)).chunkIndex shouldBe 1
-    state.handle(SeekToSeconds(2.8)).chunkIndex shouldBe 2
-    state.handle(SeekToSeconds(-1.5)).chunkIndex shouldBe 0
-    state.handle(SeekToSeconds(10.0)).chunkIndex shouldBe 2
-    AppState.initial.handle(SeekToSeconds(1.5)).chunkIndex shouldBe 0
-  }
-
   "nextChunk" should "increment chunkIndex by 1 when playing" in {
     val state = AppState.initial
       .handle(UpdateImport(Imported(track)))

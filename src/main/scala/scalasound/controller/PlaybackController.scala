@@ -5,12 +5,35 @@ import scalasound.model.domain.AudioChunk
 import scalasound.model.state.{AppStateStore, Command}
 import scalasound.model.state.Command.{Pause, Play, Stop}
 
+/**
+ * The operations a user can perform on playback: play, pause, stop and seek.
+ */
 trait PlaybackController:
+  /**
+   * Starts or resumes playback.
+   */
   def play: IO[Unit]
+  /**
+   * Pauses playback, keeping the current position.
+   */
   def pause: IO[Unit]
+  /**
+   * Stops playback.
+   */
   def stop: IO[Unit]
+
+  /**
+   * Moves play head to the given position in the current track.
+   *
+   * @param positionSeconds the target position in seconds
+   */
   def seek(positionSeconds: Double): IO[Unit]
 
+/**
+ * A [[PlaybackController]] that carries out each request by dispatching a command to the [[AppStateStore]].
+ *
+ * @param store the [[AppStateStore]] that receives the playback commands
+ */
 class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
 
   def play: IO[Unit] =
@@ -39,13 +62,13 @@ class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
     import scala.annotation.tailrec
     @tailrec
     def loop(index: Int, accumulatedFrames: Long): Int =
-      if index >= chunks.length then
-        math.max(0, chunks.length - 1)
-      else
-        val nextAccumulated =
-          accumulatedFrames + chunks(index).frameCount
-        if targetFrame < nextAccumulated then
-          index
-        else
-          loop(index + 1, nextAccumulated)
+      chunks.lift(index) match
+        case None =>
+          math.max(0, chunks.length - 1)
+        case Some(chunk) =>
+          val nextAccumulated = accumulatedFrames + chunk.frameCount
+          targetFrame < nextAccumulated match
+            case true => index
+            case false => loop(index + 1, nextAccumulated)
+
     loop(0, 0L)

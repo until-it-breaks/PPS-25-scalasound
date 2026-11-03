@@ -3,9 +3,15 @@ scalaVersion := "3.9.0"
 lazy val root = rootProject
   .settings(
     name := "PPS-25-scalasound",
-    mainClass := Some("scalasound.main"),
+    mainClass := Some("scalasound.Main"),
     assembly / assemblyJarName := "app.jar",
     assembly / assemblyOutputPath := file("target/app.jar"),
+    assembly / assemblyMergeStrategy := {
+      case "module-info.class" => MergeStrategy.discard
+      case path =>
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
+        oldStrategy(path)
+    },
     libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % "3.2.20" % Test,
       "org.scalameta" %% "munit" % "1.3.6" % Test,

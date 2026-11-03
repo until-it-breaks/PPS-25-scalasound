@@ -1,10 +1,10 @@
 package scalasound
 
 import cats.effect.{IO, IOApp}
-import scalasound.io.WavAudioReader
-import scalasound.player.{AudioOutput, AudioPlayer}
-import scalasound.processing.SimpleAudioProcessor
-import scalasound.state.{AppStateStore, Command, ImportState, PlaybackState}
+import scalasound.model.io.WavAudioReader
+import scalasound.model.player.{AudioOutput, AudioPlayer}
+import scalasound.model.processing.SimpleAudioProcessor
+import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
 
 import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt

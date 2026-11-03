@@ -58,8 +58,8 @@ object AudioPlaybackDemo extends IOApp.Simple:
 
             _ <- printPosition(store, "Before Seek")
 
-            _ <- IO.println("[DEMO] -> Dispatching Command.SeekToSeconds(3.0)")
-            _ <- store.dispatch(Command.SeekToSeconds(3.0))
+            _ <- IO.println("[DEMO] -> Dispatching Command.SeekToIndex(150)")
+            _ <- store.dispatch(Command.SeekToIndex(150))
 
             _ <- printPosition(store, "After Seek")
 

@@ -1,4 +1,4 @@
 package scalasound
 
-@main def main(): Unit =
+@main def Main(): Unit =
   println("Hello world!")

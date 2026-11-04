@@ -18,7 +18,6 @@ lazy val root = rootProject
       "org.typelevel" %% "munit-cats-effect" % "2.2.1" % Test,
       "org.typelevel" %% "cats-effect" % "3.7.1",
       "co.fs2" %% "fs2-core" % "3.14.0",
-      "org.typelevel" %% "cats-effect" % "3.7.1",
       "org.scalafx" % "scalafx_3" % "27.0.0-R39"
     )
   )

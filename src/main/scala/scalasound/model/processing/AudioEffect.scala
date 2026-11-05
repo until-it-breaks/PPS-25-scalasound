@@ -5,28 +5,21 @@ import scalasound.model.domain.AudioChunk
 /**
  * Defines the available effects.
  * @param name the name of the effect in String.
+ * @param instance the correlated object containing the configuration.
  */
-enum AudioEffectType(val name: String):
-  case Identity extends AudioEffectType("Identity")
-  case Gain extends AudioEffectType("Gain")
-  case Distortion extends AudioEffectType("Distortion")
-  case Echo extends AudioEffectType("Echo")
-  case Pan extends AudioEffectType("Pan")
-  case Autopan extends AudioEffectType("Autopan")
-  case Volume extends AudioEffectType ("Volume")
-
-/**
- * Defines a container for the range of possible values of a specific parameter.
- * @param min minimum value.
- * @param max maximum value.
- * @param default default value.
+/*
+ * It is used the covariance so if IdentityEffect <: AudioEffect then
+ * AudioEffectType[IdentityEffect.type] <: AudioEffectType[AudioConfiguration]
+ * It maintains information about the original type.
  */
-final case class ParameterConfiguration(min: Float, max: Float, default: Float)
-
-/**
- * Defines a contract for all the objects (singleton) effects.
- */
-trait AudioConfiguration
+enum AudioEffectType[+T <: AudioConfiguration](val name: String, val instance: T):
+  case Identity   extends AudioEffectType("Identity",   IdentityEffect)
+  case Gain       extends AudioEffectType("Gain",       GainEffect)
+  case Distortion extends AudioEffectType("Distortion", DistortionEffect)
+  case Echo       extends AudioEffectType("Echo",       EchoEffect)
+  case Pan        extends AudioEffectType("Pan",        PanEffect)
+  case Autopan    extends AudioEffectType("Autopan",    AutopanEffect)
+  case Volume     extends AudioEffectType("Volume",     VolumeEffect)
 
 /**
  * Defines a contract that applies a transformation on an audio block.
@@ -66,22 +59,6 @@ object AudioEffect:
         map(_.getName).
         toList
      */
-
-  /**
-   * Returns the singleton related to the specific effect to extract information
-   * about the specific parameters requested by the effect itself.
-   * @param effectType the type of effect requested.
-   */
-  def effectConfig(effectType: AudioEffectType): AudioConfiguration =
-    effectType match
-      case AudioEffectType.Identity => IdentityEffect
-      case AudioEffectType.Gain => GainEffect
-      case AudioEffectType.Distortion => DistortionEffect
-      case AudioEffectType.Echo => EchoEffect
-      case AudioEffectType.Pan => PanEffect
-      case AudioEffectType.Autopan => AutopanEffect
-      case AudioEffectType.Volume => VolumeEffect
-    
     
   /**
    * Returns the Identity effect.

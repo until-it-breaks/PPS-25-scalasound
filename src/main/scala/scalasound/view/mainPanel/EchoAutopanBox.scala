@@ -7,6 +7,8 @@ import scalafx.scene.control.{Label, Slider, ToggleButton}
 import scalafx.scene.layout.{HBox, VBox}
 import scalafx.scene.{Cursor, Node}
 import EchoAutopanBox.{container, label, onOffSwitch}
+import scalasound.model.processing.AudioConfiguration
+import scalasound.model.processing.AudioEffectType.{Autopan, Echo}
 
 private[mainPanel] object EchoAutopanBox:
 
@@ -71,20 +73,31 @@ private[mainPanel] object EchoAutopanBox:
 //TODO: VISTO CHE I VARI PANNELLI HANNO STESSO O SIMILE STYLE DEFINIRE UN TRAIT?
 private[mainPanel] final class EchoAutopanBox extends VBox:
 
-  private val autopanSelected = BooleanProperty(false)
-  private val alphaValue: FloatProperty = FloatProperty(0)
-  private val delayValue: FloatProperty = FloatProperty(0)
+  private val _autopanSelected = BooleanProperty(false)
 
-  private val alphaContainer = container("Alpha", alphaValue, 0, 0, 0, "")
-  private val delayContainer = container("Delay", delayValue, 0, 0, 0, "ms")
+  private val echoConfig = AudioConfiguration.parameterConfiguration(Echo)
+  private val _alphaValue: FloatProperty = FloatProperty(echoConfig.alphaConfiguration.min)
+  private val alphaContainer = container("Alpha",
+    _alphaValue,
+    echoConfig.alphaConfiguration.min,
+    echoConfig.alphaConfiguration.max,
+    echoConfig.alphaConfiguration.default,
+    "")
+  private val _delayValue: FloatProperty = FloatProperty(echoConfig.delayConfiguration.min)
+  private val delayContainer = container("Delay",
+    _delayValue,
+    echoConfig.delayConfiguration.min,
+    echoConfig.delayConfiguration.max,
+    echoConfig.delayConfiguration.default,
+    "ms")
 
   private def effectContainer(nodes: Seq[Node]) = new VBox:
     alignment = Pos.Center
     spacing = 20
     children = nodes
 
-  private val echoContainer = effectContainer(Seq(label("Echo"), alphaContainer, delayContainer))
-  private val autopanContainer = effectContainer(Seq(label("Autopan"), onOffSwitch(autopanSelected)))
+  private val echoContainer = effectContainer(Seq(label(Echo.name), alphaContainer, delayContainer))
+  private val autopanContainer = effectContainer(Seq(label(Autopan.name), onOffSwitch(_autopanSelected)))
 
   alignment = Pos.Center
   padding = Insets(10, 20, 10, 20)
@@ -98,3 +111,18 @@ private[mainPanel] final class EchoAutopanBox extends VBox:
     -fx-alignment: center;
   """
   children = Seq(echoContainer, autopanContainer)
+
+  /**
+   * @return the observer on alpha value for the echo.
+   */
+  def alphaValue: FloatProperty = _alphaValue
+
+  /**
+   * @return the observer on delay value for the echo.
+   */
+  def delayValue: FloatProperty = _delayValue
+
+  /**
+   * @return the observer on the switch for the autopan value.
+   */
+  def autopanSelected: BooleanProperty = _autopanSelected

@@ -8,3 +8,5 @@ Nel dettaglio, l'applicazione supporta:
 * Caricamento delle tracce sorgente ed esportazione del file elaborato.
 * Applicazione di effetti *stateless* (quali **Gain** per l'amplificazione e **Panning** per la spazializzazione) ed effetti *stateful* complessi (quali **Autopan** ed **Eco**).
 * Controllo completo della riproduzione tramite funzioni di **Play**, **Pause**, **Stop** e **Seek** (per lo spostamento lungo la traccia), con un feedback acustico immediato alle modifiche dei parametri effettuate durante l'ascolto.
+
+\newpage

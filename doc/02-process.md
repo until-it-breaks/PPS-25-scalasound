@@ -43,3 +43,5 @@ L'infrastruttura è supportata da due workflow in **GitHub Actions**:
 2. **PDF & Release (`release.yml`):** Gestisce la documentazione e i rilasci in modalità automatizzata:
    * A ogni modifica tracciata nella cartella `doc/`, un container Docker (`pandoc/extra:latest`) con motore XeLaTeX compila automaticamente i file Markdown in un unico report PDF, salvandolo come artefatto scaricabile dall'interfaccia delle GitHub Actions.
    * Al rilascio di un tag di versione (es. `v1.0.0`), la pipeline compila contestualmente l'eseguibile `app.jar` e il report finale `relazione.pdf`, pubblicandoli automaticamente come release ufficiale su GitHub.
+
+\newpage

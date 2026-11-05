@@ -10,10 +10,17 @@ import scalasound.model.domain.AudioChunk
  * it contains variables (constants) only accessible
  * by the Distortion Effect case class.
  */
-object DistortionEffect:
+object DistortionEffect extends AudioConfiguration:
   private val DefaultDistortion: Float = 1.0f
   private val MinDistortion: Float = 0.0f
   private val MaxDistortion: Float = 2.0f
+
+  /**
+   * Extracts the information related to the distortion parameter.
+   * @return a ParameterConfiguration containing the distortion configuration.
+   */
+  def distortionConfiguration: ParameterConfiguration =
+    ParameterConfiguration(MinDistortion, MaxDistortion, DefaultDistortion)
 
 /*
  * Effect that applies the distortion effect on the input audio chunk.

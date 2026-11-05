@@ -10,10 +10,17 @@ import scalasound.model.domain.AudioChunk
  * it contains variables (constants) only accessible
  * by the Volume Effect case class.
  */
-object VolumeEffect:
+object VolumeEffect extends AudioConfiguration:
   private val DefaultVolume: Float = 1.0f
   private val MinVolume: Float = 0.0f
   private val MaxVolume: Float = 1.0f
+
+  /**
+   * Extracts the information related to the volume parameter.
+   * @return a ParameterConfiguration containing the volume configuration.
+   */
+  def volumeConfiguration: ParameterConfiguration =
+    ParameterConfiguration(MinVolume, MaxVolume, DefaultVolume)
 
 /*
  * Effect that applies the volume effect on the input audio chunk.

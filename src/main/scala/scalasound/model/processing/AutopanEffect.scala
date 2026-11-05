@@ -11,7 +11,7 @@ import scalasound.model.domain.AudioChunk
  * it contains variables (constants) only accessible
  * by the Autopan Effect case class.
  */
-object AutopanEffect:
+object AutopanEffect extends AudioConfiguration:
   private val DefaultFrequency: Int = 44100 //HZ
   private val MinFrequency: Int = 0
 
@@ -60,7 +60,7 @@ private[processing] case class AutopanEffect(frequency: Int = AutopanEffect.Defa
 
         /* The factor change in time so it varies for each sample. */
         val result = lch.indices.map { i =>
-          val panningFactor = panning(frequency, chunkIndex + i)
+          val panningFactor = panning(frequency.toFloat, chunkIndex + i)
           (lch(i) * panningFactor.left, rch(i) * panningFactor.right)
         }
 

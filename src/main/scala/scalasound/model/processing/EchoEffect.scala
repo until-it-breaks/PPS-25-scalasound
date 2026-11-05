@@ -10,7 +10,7 @@ import scalasound.model.domain.AudioChunk
  * it contains variables (constants) only accessible
  * by the Echo Effect case class.
  */
-object EchoEffect:
+object EchoEffect extends AudioConfiguration:
   private val DefaultDelay: Int = 100 //milliseconds
   private val MinDelay: Int = 50 //milliseconds
   private val MaxDelay: Int = 300 //milliseconds
@@ -19,6 +19,20 @@ object EchoEffect:
   private val DefaultAlpha: Float = 0.5f
   private val MinAlpha: Float = 0.0f
   private val MaxAlpha: Float = 1.0f
+
+  /**
+   * Extracts the information related to the delay parameter.
+   * @return a ParameterConfiguration containing the delay configuration.
+   */
+  def delayConfiguration: ParameterConfiguration =
+    ParameterConfiguration(MinDelay.toFloat, MaxDelay.toFloat, DefaultDelay.toFloat)
+
+  /**
+   * Extracts the information related to the alpha parameter.
+   * @return a ParameterConfiguration containing the alpha configuration.
+   */
+  def alphaConfiguration: ParameterConfiguration =
+    ParameterConfiguration(MinAlpha, MaxAlpha, DefaultAlpha)
 
 /*
  * Effect that applies the echo effect on the input audio chunk.

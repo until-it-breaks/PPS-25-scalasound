@@ -12,10 +12,17 @@ import scalasound.model.domain.AudioChunk
  * Also, a static method is defined to compute
  * the pan factor for both left and right channels.
  */
-object PanEffect:
+object PanEffect extends AudioConfiguration:
   private val DefaultPan: Float = 0.0f
   private val MinPan: Float = -1.0f
   private val MaxPan: Float = 1.0f
+
+  /**
+   * Extracts the information related to the pan parameter.
+   * @return a ParameterConfiguration containing the pan configuration.
+   */
+  def panConfiguration: ParameterConfiguration =
+    ParameterConfiguration(MinPan, MaxPan, DefaultPan)
 
   /*
    * Defined new method for the type float

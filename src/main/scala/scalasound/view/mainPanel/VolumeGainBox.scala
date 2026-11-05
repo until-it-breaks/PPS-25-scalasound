@@ -1,10 +1,12 @@
 package scalasound.view.mainPanel
 
+import scalafx.beans.property.FloatProperty
 import scalafx.geometry.{Insets, Orientation, Pos}
 import scalafx.scene.control.{Label, Slider}
 import scalafx.scene.layout.{HBox, VBox}
+import scalasound.model.processing.{AudioConfiguration, GainEffect}
+import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 
-// TODO: AGGIUNGERE COMMENTI
 private[mainPanel] object VolumeGainBox:
 
   private def label(label: String): Label = new Label(label):
@@ -13,22 +15,22 @@ private[mainPanel] object VolumeGainBox:
     """
 
   private def container(text: String,
+                        effectProperty: FloatProperty,
                         minVal: Float,
                         maxVal: Float,
                         defaultVal: Float): VBox = new VBox:
 
-    private val slider: Slider =
-      new Slider {
+    private val slider: Slider = new Slider:
         min = minVal
         max = maxVal
         value = defaultVal
         orientation = Orientation.Vertical
         prefHeight = 300
         prefWidth = 20
-      }
 
     private val valueLabel = label(defaultVal.toString)
     valueLabel.text <== slider.value.map(v => f"${v.floatValue()}%.2f")
+    effectProperty <== slider.value
 
     alignment = Pos.Center
     spacing = 10
@@ -39,8 +41,20 @@ private[mainPanel] object VolumeGainBox:
 private[mainPanel] final class VolumeGainBox extends HBox:
   import VolumeGainBox.*
 
-  private val gain = container("Gain", 0, 0, 0) // TODO: CAPIRE COME COLLEGARLI AI COMPANION OBJECT
-  private val volume = container("Volume", 0, 0, 0)
+  private val gainConfig = AudioConfiguration.parameterConfiguration(Gain)
+  private val _gainValue: FloatProperty = FloatProperty(gainConfig.gainConfiguration.min)
+  private val gain = container(Gain.name,
+    _gainValue,
+    gainConfig.gainConfiguration.min,
+    gainConfig.gainConfiguration.max,
+    gainConfig.gainConfiguration.default)
+  private val volumeConfig = AudioConfiguration.parameterConfiguration(Volume)
+  private val _volumeValue: FloatProperty = FloatProperty(volumeConfig.volumeConfiguration.default)
+  private val volume = container(Volume.name,
+    _volumeValue,
+    volumeConfig.volumeConfiguration.min,
+    volumeConfig.volumeConfiguration.max,
+    volumeConfig.volumeConfiguration.default)
   
   alignment = Pos.Center
   padding = Insets(10, 30, 10, 30)
@@ -57,3 +71,13 @@ private[mainPanel] final class VolumeGainBox extends HBox:
         -fx-alignment: center;
       """
   children = Seq(gain, volume)
+
+  /**
+   * @return the observer on gain value.
+   */
+  def gainValue: FloatProperty = _gainValue
+
+  /**
+   * @return the observer on volume value.
+   */
+  def volumeValue: FloatProperty = _volumeValue

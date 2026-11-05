@@ -30,7 +30,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     chunk should not be a [StereoChunk]
 
   "IdentityEffect" should "return the same initial chunk" in:
-    val resultChunk = IdentityEffect()(chunk)
+    val resultChunk = IdentityEffect(chunk)
     resultChunk.value shouldBe chunk
 
   "GainEffect" should "return a new chunk where values are clamped in [-1.0,1.0] interval" in:

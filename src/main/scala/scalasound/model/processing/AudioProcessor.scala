@@ -104,7 +104,7 @@ object AudioProcessorWithRules extends AudioProcessor:
 
   /* It defines the mechanism for ordering the various effects based on priority. */
   private def orderingByPriority(effect: AudioEffect): Int = effect match
-    case _: IdentityEffect => EffectPriority.IdentityEffect.ordinal
+    case IdentityEffect => EffectPriority.IdentityEffect.ordinal
     case _: GainEffect => EffectPriority.GainEffect.ordinal
     case _: DistortionEffect => EffectPriority.DistortionEffect.ordinal
     case _: EchoEffect => EffectPriority.EchoEffect.ordinal

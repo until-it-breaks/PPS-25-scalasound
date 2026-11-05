@@ -7,6 +7,8 @@ import scalafx.scene.Cursor
 import scalafx.scene.control.{Label, Slider, ToggleButton, ToggleGroup}
 import scalafx.scene.layout.{HBox, VBox}
 import DistortionEnum.Off
+import scalasound.model.processing.AudioConfiguration
+import scalasound.model.processing.AudioEffectType.{Distortion, Pan}
 
 /* Simplifies the management of the switch. */
 private[mainPanel] enum DistortionEnum(val text: String):
@@ -111,12 +113,22 @@ end DistortionPanBox
 private[mainPanel] final class DistortionPanBox extends VBox:
   import DistortionPanBox.*
 
-  private val _distortionValue: FloatProperty = FloatProperty(0)   // TODO: CAMBIARE
-  private val _panValue: FloatProperty = FloatProperty(0)
+  private val panConfig = AudioConfiguration.parameterConfiguration(Pan)
+  private val _panValue: FloatProperty = FloatProperty(panConfig.panConfiguration.min)
+  private val panContainer = container(Pan.name,
+    _panValue,
+    panConfig.panConfiguration.min,
+    panConfig.panConfiguration.max,
+    panConfig.panConfiguration.default,
+    Some("L", "R"))
+  private val distortionConfig = AudioConfiguration.parameterConfiguration(Distortion)
+  private val _distortionValue: FloatProperty = FloatProperty(distortionConfig.distortionConfiguration.min)
+  private val distortionContainer = container(Distortion.name,
+    _distortionValue,
+    distortionConfig.distortionConfiguration.min,
+    distortionConfig.distortionConfiguration.max,
+    distortionConfig.distortionConfiguration.default)
   private val _selectedFilter: ObjectProperty[DistortionEnum] = ObjectProperty(Off)
-
-  private val panContainer = container("Pan", _panValue, 0, 0, 0, Some("L", "R"))
-  private val distortionContainer = container("Distortion", _distortionValue, 0, 0, 0)
   private val distortionSwitch = switch(_selectedFilter)
   private val distFinalContainer = new VBox:
     alignment = Pos.Center

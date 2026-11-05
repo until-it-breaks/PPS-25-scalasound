@@ -1,9 +1,26 @@
 package scalasound.model.processing
 
-import scalasound.model.domain.AudioChunk.*
 import scalasound.model.domain.AudioChunk
 
-//TODO: Add DOCUMENTATION
+/**
+ * Defines the available effects.
+ * @param name the name of the effect in String.
+ * @param instance the correlated object containing the configuration.
+ */
+/*
+ * It is used the covariance so if IdentityEffect <: AudioEffect then
+ * AudioEffectType[IdentityEffect.type] <: AudioEffectType[AudioConfiguration]
+ * It maintains information about the original type.
+ */
+enum AudioEffectType[+T <: AudioConfiguration](val name: String, val instance: T):
+  case Identity   extends AudioEffectType("Identity",   IdentityEffect)
+  case Gain       extends AudioEffectType("Gain",       GainEffect)
+  case Distortion extends AudioEffectType("Distortion", DistortionEffect)
+  case Echo       extends AudioEffectType("Echo",       EchoEffect)
+  case Pan        extends AudioEffectType("Pan",        PanEffect)
+  case Autopan    extends AudioEffectType("Autopan",    AutopanEffect)
+  case Volume     extends AudioEffectType("Volume",     VolumeEffect)
+
 /**
  * Defines a contract that applies a transformation on an audio block.
  */
@@ -28,23 +45,26 @@ trait TimeAudioEffect extends AudioEffect:
 
 
 object AudioEffect:
-  
+
   /**
    * Defines the list of available effects.
    * @return the names of the available effects.
    */
   def effectsNames: List[String] =
-    this.getClass.
-      getMethods.
-      filter(_.getReturnType == classOf[AudioEffect]).
-      map(_.getName).
-      toList
-
+    AudioEffectType.values.map(_.name).toList
+    /*
+      this.getClass.
+        getMethods.
+        filter(_.getReturnType == classOf[AudioEffect]).
+        map(_.getName).
+        toList
+     */
+    
   /**
    * Returns the Identity effect.
    */
   def identity: AudioEffect =
-    IdentityEffect()
+    IdentityEffect
 
   /**
    * Returns the Gain effect.

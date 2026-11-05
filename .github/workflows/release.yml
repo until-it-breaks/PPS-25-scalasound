@@ -24,7 +24,7 @@ jobs:
         uses: docker://pandoc/extra:latest
         with:
           entrypoint: /bin/sh
-          args: -c "pandoc --output=relazione.pdf --pdf-engine=xelatex --toc --number-sections doc/*.md"
+          args: -c "pandoc --output=report.pdf --pdf-engine=xelatex doc/*.md"
 
       - name: Setup Java & SBT
         uses: actions/setup-java@v5
@@ -41,8 +41,8 @@ jobs:
       - name: Upload PDF Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: relazione-pdf
-          path: relazione.pdf
+          name: report-pdf
+          path: report.pdf
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -50,5 +50,5 @@ jobs:
         with:
           fail_on_unmatched_files: true
           files: |
-            relazione.pdf
+            report.pdf
             target/app.jar

@@ -1,69 +1,61 @@
 package scalasound.view.mainPanel
 
 import scalafx.beans.property.FloatProperty
-import scalafx.geometry.{Insets, Orientation, Pos}
+import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.control.{Label, Slider}
 import scalafx.scene.layout.{HBox, VBox}
-import scalasound.model.processing.{AudioConfiguration, GainEffect}
+import scalasound.model.processing.AudioConfiguration
 import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 
 private[mainPanel] object VolumeGainBox:
-
-  private def label(label: String): Label = new Label(label):
-    style = """
-      -fx-font-size: 16px;
-    """
 
   private def container(text: String,
                         effectProperty: FloatProperty,
                         minVal: Float,
                         maxVal: Float,
-                        defaultVal: Float): VBox = new VBox:
+                        defaultVal: Float,
+                        metrics: String): VBox = new VBox:
 
-    private val slider: Slider = new Slider:
-        min = minVal
-        max = maxVal
-        value = defaultVal
-        orientation = Orientation.Vertical
-        prefHeight = 300
-        prefWidth = 20
-
-    private val valueLabel = label(defaultVal.toString)
-    valueLabel.text <== slider.value.map(v => f"${v.floatValue()}%.2f")
+    private val slider: Slider = Utility.slider(minVal, maxVal, defaultVal, false)
+    private val valueLabel = Utility.label(defaultVal.toString)
+    valueLabel.text <== slider.value.map(v => if metrics.isEmpty then
+      f"${v.floatValue()}%.2f" else
+      f"${v.floatValue() * 100}%.2f" + metrics)
     effectProperty <== slider.value
 
     alignment = Pos.Center
     spacing = 10
-    children = Seq(label(text), slider, valueLabel)
-  end container
+    children = Seq(Utility.label(text, true, Utility.titleEffectSize), slider, valueLabel)
 
 /* Box for the Volume-Gain effects. */
 private[mainPanel] final class VolumeGainBox extends HBox:
   import VolumeGainBox.*
 
+  /* Importing of the Gain parameter values. */
   private val gainConfig = AudioConfiguration.parameterConfiguration(Gain)
   private val _gainValue: FloatProperty = FloatProperty(gainConfig.gainConfiguration.min)
   private val gain = container(Gain.name,
     _gainValue,
     gainConfig.gainConfiguration.min,
     gainConfig.gainConfiguration.max,
-    gainConfig.gainConfiguration.default)
+    gainConfig.gainConfiguration.default,
+    "")
+
+  /* Importing of the Volume parameter values. */
   private val volumeConfig = AudioConfiguration.parameterConfiguration(Volume)
   private val _volumeValue: FloatProperty = FloatProperty(volumeConfig.volumeConfiguration.default)
   private val volume = container(Volume.name,
     _volumeValue,
     volumeConfig.volumeConfiguration.min,
     volumeConfig.volumeConfiguration.max,
-    volumeConfig.volumeConfiguration.default)
+    volumeConfig.volumeConfiguration.default,
+    "%")
   
   alignment = Pos.Center
   padding = Insets(10, 30, 10, 30)
   spacing = 50
   style = """
         -fx-background-color: white;
-        -fx-text-fill: black;
-        -fx-font-size: 16px;
-        -fx-font-weight: bold;
         -fx-border-color: black;
         -fx-border-width: 2px;
         -fx-border-radius: 5px;

@@ -11,12 +11,12 @@ import scalasound.model.domain.AudioChunk
  * by the Echo Effect case class.
  */
 object EchoEffect extends AudioConfiguration:
-  private val DefaultDelay: Int = 100 //milliseconds
-  private val MinDelay: Int = 50 //milliseconds
+  private val DefaultDelay: Int = 0 //milliseconds Default 100?
+  private val MinDelay: Int = 0 //milliseconds
   private val MaxDelay: Int = 300 //milliseconds
   private val DefaultFrequency: Int = 44100
   private val MinFrequency: Int = 0
-  private val DefaultAlpha: Float = 0.5f
+  private val DefaultAlpha: Float = 0.0f  // Default 0.5f
   private val MinAlpha: Float = 0.0f
   private val MaxAlpha: Float = 1.0f
 

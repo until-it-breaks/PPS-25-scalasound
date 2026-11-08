@@ -29,3 +29,6 @@ enum AudioSaveError:
     * @param reason a description of the exceeded limit
     */
   case FileTooLarge(reason: String)
+
+  /** There is no track to export. */
+  case NoTrackLoaded

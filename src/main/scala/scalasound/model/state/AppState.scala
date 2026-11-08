@@ -1,6 +1,7 @@
 package scalasound.model.state
 
 import scalasound.model.domain.AudioTrack
+import scalasound.model.io.{AudioLoadError, AudioSaveError}
 
 /** Represents the current playback lifecycle status. */
 enum PlaybackState:
@@ -13,14 +14,14 @@ enum ImportState:
   case Idle
   case Importing
   case Imported(track: AudioTrack)
-  case Failed(reason: String)
+  case Failed(error: AudioLoadError)
 
 /** Represents the track export lifecycle status. */
 enum ExportState:
   case Idle
   case Exporting
   case Exported
-  case Failed(reason: String)
+  case Failed(error: AudioSaveError)
 
 /** Represents all discrete commands that can mutate application state. */
 enum Command:

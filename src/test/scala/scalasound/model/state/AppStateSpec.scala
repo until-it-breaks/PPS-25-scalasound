@@ -4,6 +4,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.MonoTrack
+import scalasound.model.io.{AudioLoadError, AudioSaveError}
 import scalasound.model.state.Command.*
 import scalasound.model.state.{AppState, ExportState, ImportState}
 import scalasound.model.state.ImportState.Imported
@@ -108,11 +109,22 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
     val importingState = loaded.handle(UpdateImport(ImportState.Importing))
     importingState.importState shouldBe ImportState.Importing
     importingState.track shouldBe Some(track)
-    val failedImport = loaded.handle(UpdateImport(ImportState.Failed("Corrupt file")))
-    failedImport.importState shouldBe ImportState.Failed("Corrupt file")
+    val loadError = AudioLoadError.CorruptedData("Corrupt file")
+    val failedImport = loaded.handle(UpdateImport(ImportState.Failed(loadError)))
+    failedImport.importState shouldBe ImportState.Failed(loadError)
     failedImport.track shouldBe Some(track)
     val exportingState = loaded.handle(UpdateExport(ExportState.Exporting))
     exportingState.exportState shouldBe ExportState.Exporting
     val exportedState = exportingState.handle(UpdateExport(ExportState.Exported))
     exportedState.exportState shouldBe ExportState.Exported
+  }
+
+  it should "return to Idle once a failure or a completed export is acknowledged" in {
+    val failedImport = AppState.initial.handle(UpdateImport(ImportState.Failed(AudioLoadError.FileNotFound("a.wav"))))
+    failedImport.handle(UpdateImport(ImportState.Idle)).importState shouldBe ImportState.Idle
+    val failedExport = AppState.initial.handle(UpdateExport(ExportState.Failed(AudioSaveError.NoTrackLoaded)))
+    failedExport.exportState shouldBe ExportState.Failed(AudioSaveError.NoTrackLoaded)
+    failedExport.handle(UpdateExport(ExportState.Idle)).exportState shouldBe ExportState.Idle
+    val exported = AppState.initial.handle(UpdateExport(ExportState.Exported))
+    exported.handle(UpdateExport(ExportState.Idle)).exportState shouldBe ExportState.Idle
   }

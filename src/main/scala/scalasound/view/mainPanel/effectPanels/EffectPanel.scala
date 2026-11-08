@@ -1,12 +1,11 @@
-package scalasound.view.mainPanel
+package scalasound.view.mainPanel.effectPanels
 
 import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.geometry.{Insets, Pos}
-import scalafx.scene.control.Label
-import scalafx.scene.layout.{BorderPane, HBox, VBox}
+import scalafx.scene.layout.{BorderPane, HBox}
 
 /* Container for all the effects that can be applied on the current track. */
-private[mainPanel] final class EffectPane(stage: PrimaryStage) extends BorderPane:
+final class EffectPanel(stage: PrimaryStage) extends BorderPane:
 
   private val volumeGainBox = new VolumeGainBox()
   private val distortionPanBox = new DistortionPanBox()

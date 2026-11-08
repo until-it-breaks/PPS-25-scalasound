@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel
+package scalasound.view.mainPanel.effectPanels
 
 import scalafx.geometry.Orientation
 import scalafx.scene.control.{Label, Slider}
@@ -7,16 +7,19 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 // TODO: DOC
-object Utility:
+private[effectPanels] object Utility:
 
   // TODO: Conviene lasciarla public?
   val BackgroundColor = "#4287f5"
-  val titleEffectSize = 20
+  val TitleEffectSize = 20
+
+  private val ThicknessThumb = 8
+  private val HeightThumb = ThicknessThumb * 3
 
   /* Converting it in Data URI valid for the Wrapper ScalaFx. */
-  private def StylesheetsDataUri(horizontal: Boolean): String =
-    val thicknessThumb = 8
-    val heightThumb = thicknessThumb * 3
+  private def sliderStyleDataUri(horizontal: Boolean): String =
+    val widthSlider = if horizontal then ThicknessThumb else HeightThumb
+    val heightSlider = if horizontal then HeightThumb else ThicknessThumb
     val customSlider = s"""
     .custom-slider .track {
       -fx-background-color: gray;
@@ -24,11 +27,14 @@ object Utility:
     }
     .custom-slider .thumb {
       -fx-background-color: red;
-      -fx-pref-width: ${if horizontal then thicknessThumb else heightThumb};
-      -fx-pref-height: ${if horizontal then heightThumb else thicknessThumb};
+      -fx-pref-width: ${widthSlider}px;
+      -fx-pref-height: ${heightSlider}px;
     }
   """
-    "data:text/css," + URLEncoder.encode(customSlider, StandardCharsets.UTF_8.name()).replace("+", "%20")
+    "data:text/css," + URLEncoder.encode(customSlider, StandardCharsets.UTF_8).replace("+", "%20")
+
+  private lazy val HorizontalSlider: String = sliderStyleDataUri(true)
+  private lazy val VerticalSlider: String = sliderStyleDataUri(false)
 
   /**
    * Constructor for Slider Control.
@@ -44,13 +50,14 @@ object Utility:
              defaultVal: Float,
              horizontal: Boolean = true,
              sliderSize: Int = 300): Slider = new Slider:
+    private val sliderStyle = if horizontal then HorizontalSlider else VerticalSlider
     min = minVal
     max = maxVal
     value = defaultVal
     /* Assigning the custom class to the slider. */
     styleClass += "custom-slider"
     /* Injection of the style on the stylesheets. */
-    stylesheets += StylesheetsDataUri(horizontal)
+    stylesheets += sliderStyle
     if horizontal then
       prefWidth = sliderSize
     else

@@ -11,7 +11,7 @@ import scalasound.model.domain.AudioChunk
  * by the Distortion Effect case class.
  */
 object DistortionEffect extends AudioConfiguration:
-  private val DefaultDistortion: Float = 1.0f
+  private val DefaultDistortion: Float = 0.0f
   private val MinDistortion: Float = 0.0f
   private val MaxDistortion: Float = 2.0f
 
@@ -26,14 +26,13 @@ object DistortionEffect extends AudioConfiguration:
  * Effect that applies the distortion effect on the input audio chunk.
  * Distortion defines the strength of the effect where values accepted are between [0.0f,2.0f].
  */
-private[processing] case class DistortionEffect(distortion: Float = DistortionEffect.DefaultDistortion, isSoftClipping: Boolean = true) extends AudioEffect:
+private[processing] final case class DistortionEffect(distortion: Float = DistortionEffect.DefaultDistortion, isSoftClipping: Boolean = true) extends AudioEffect:
   private val isDistortionValid: Boolean = distortion >= DistortionEffect.MinDistortion && distortion <= DistortionEffect.MaxDistortion
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkConstraints(isDistortionValid, "Exceeded the range [" + DistortionEffect.MinDistortion + "," + DistortionEffect.MaxDistortion + "]!").
-      toLeft({
+      toLeft:
         applyDistortion(chunk, if isSoftClipping then tanh else sinWave)
-    })
 
   /*
    * Hyperbolic-tangent based formula to apply the

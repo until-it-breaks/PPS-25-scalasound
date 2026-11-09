@@ -3,7 +3,7 @@ package scalasound.view.mainPanel
 import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Cursor
-import scalafx.scene.control.{Button, Label, Slider}
+import scalafx.scene.control.{Button, Label}
 import scalafx.scene.layout.BorderPane
 import scalafx.stage.FileChooser
 
@@ -60,5 +60,3 @@ private[mainPanel] final class TitlePane(stage: PrimaryStage) extends BorderPane
   right = importButton
   BorderPane.setAlignment(titleLabel, Pos.CenterLeft)
   BorderPane.setAlignment(importButton, Pos.CenterRight)
-
-end TitlePane

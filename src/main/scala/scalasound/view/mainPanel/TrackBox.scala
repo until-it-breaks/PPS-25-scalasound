@@ -5,7 +5,6 @@ import scalafx.geometry.Pos
 import scalafx.scene.Cursor
 import scalafx.scene.control.{Button, Label, Slider}
 import scalafx.scene.layout.{HBox, VBox}
-import scalasound.view.ViewApp.timeCursor
 
 private[mainPanel] object TrackBox:
 
@@ -46,8 +45,7 @@ private[mainPanel] final class TrackBox(stage: PrimaryStage, timeCursor: Slider)
 
   startTimeLabel.text <== timeCursor.value.map(v => formatTime(v.intValue()))
   endTimeLabel.text <== timeCursor.max.map(m => formatTime(m.intValue()))
-  
-  
+
   /* Box containing the slider for the track. */
   private val audioBox: HBox = new HBox:
       alignment = Pos.Center
@@ -76,11 +74,7 @@ private[mainPanel] final class TrackBox(stage: PrimaryStage, timeCursor: Slider)
         stopButton,
         playButton,
         saveButton)
-      
-  end audioButtonsBox
 
   alignment = Pos.Center
   spacing = 30
   children = Seq(audioBox, audioButtonsBox)
-  
-end TrackBox

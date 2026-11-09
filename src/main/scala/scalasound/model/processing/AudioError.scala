@@ -36,5 +36,3 @@ enum AudioError:
   def getContent: String = this match
     case AudioEffectsError(effect, msg) => s"${effectName(effect)} -> $msg"
     case AudioProcessorError(processor, msg) => s"${processorName(processor)} -> $msg"
-
-end AudioError

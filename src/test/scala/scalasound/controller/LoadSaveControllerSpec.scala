@@ -84,7 +84,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val reader = succeedingReader
     withController(reader, succeedingWriter) { (store, controller) =>
       for
-        _ <- controller.load(inputPath)
+        _ <- IO.blocking(controller.load(inputPath))
         state <- awaitImport(store)(isFinalImport)
         current <- store.current
       yield
@@ -98,7 +98,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val error = AudioLoadError.UnsupportedFormat("not a wav")
     withController(FakeReader(_ => Left(error)), succeedingWriter) { (store, controller) =>
       for
-        _ <- controller.load(inputPath)
+        _ <- IO.blocking(controller.load(inputPath))
         state <- awaitImport(store)(isFinalImport)
         current <- store.current
       yield
@@ -110,7 +110,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   test("load ends in state Failed when the reader throws an unexpected exception") {
     withController(FakeReader(_ => throw RuntimeException("error")), succeedingWriter) { (store, controller) =>
       for
-        _ <- controller.load(inputPath)
+        _ <- IO.blocking(controller.load(inputPath))
         state <- awaitImport(store)(isFinalImport)
       yield assertEquals(state, ImportState.Failed(AudioLoadError.ReadFailure("error")))
     }
@@ -125,7 +125,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(reader, succeedingWriter) { (store, controller) =>
       val scenario =
         for
-          _ <- controller.load(inputPath)
+          _ <- IO.blocking(controller.load(inputPath))
           importing <- awaitImport(store)(_ == ImportState.Importing)
           _ <- IO(gate.countDown())
           done <- awaitImport(store)(isFinalImport)
@@ -147,9 +147,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(reader, writer) { (store, controller) =>
       val scenario = for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- controller.save(outputPath)
+        _ <- IO.blocking(controller.save(outputPath))
         _ <- awaitExport(store)(_ == ExportState.Exporting)
-        _ <- controller.load(inputPath)
+        _ <- IO.blocking(controller.load(inputPath))
         importState <- awaitImport(store)(isFinalImport)
         _ <- IO(exportGate.countDown())
       yield assertEquals(importState, ImportState.Imported(trackA))
@@ -167,9 +167,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(reader, succeedingWriter) { (store, controller) =>
       val scenario =
         for
-          _ <- controller.load(inputPath)
+          _ <- IO.blocking(controller.load(inputPath))
           _ <- awaitImport(store)(_ == ImportState.Importing)
-          _ <- controller.load(Paths.get("other.wav"))
+          _ <- IO.blocking(controller.load(Paths.get("other.wav")))
           _ <- IO(gate.countDown())
           _ <- awaitImport(store)(isFinalImport)
         yield assertEquals(reader.loaded.get, Vector("in.wav"))
@@ -181,10 +181,12 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val reader = succeedingReader
     withController(reader, succeedingWriter) { (store, controller) =>
       for
-        _ <- controller.load(inputPath)
+        _ <- IO.blocking(controller.load(inputPath))
         _ <- awaitImport(store)(isFinalImport)
         // The controller is ready again just after the final state is published: retry until accepted.
-        _ <- retryUntilSuccess(controller.load(inputPath) *> IO(reader.loaded.get.size >= 2)).timeout(5.seconds)
+        _ <- retryUntilSuccess(
+               IO.blocking(controller.load(inputPath)) >> IO(reader.loaded.get.size >= 2)
+             ).timeout(5.seconds)
       yield ()
     }
   }
@@ -194,7 +196,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, writer) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- controller.save(outputPath)
+        _ <- IO.blocking(controller.save(outputPath))
         state <- awaitExport(store)(isFinalExport)
       yield
         assertEquals(state, ExportState.Exported)
@@ -207,7 +209,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, writer) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- controller.save(Paths.get("song"))
+        _ <- IO.blocking(controller.save(Paths.get("song")))
         _ <- awaitExport(store)(isFinalExport)
       yield assertEquals(writer.saved.get.map(_._2), Vector(Paths.get("song.wav")))
     }
@@ -218,7 +220,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, FakeWriter((_, _) => Left(error))) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- controller.save(outputPath)
+        _ <- IO.blocking(controller.save(outputPath))
         state <- awaitExport(store)(isFinalExport)
       yield assertEquals(state, ExportState.Failed(error))
     }
@@ -228,7 +230,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, FakeWriter((_, _) => throw RuntimeException("error"))) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- controller.save(outputPath)
+        _ <- IO.blocking(controller.save(outputPath))
         state <- awaitExport(store)(isFinalExport)
       yield assertEquals(state, ExportState.Failed(AudioSaveError.WriteFailure(outputPath, "error")))
     }
@@ -238,7 +240,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val writer = succeedingWriter
     withController(succeedingReader, writer) { (store, controller) =>
       for
-        _ <- controller.save(outputPath)
+        _ <- IO.blocking(controller.save(outputPath))
         state <- awaitExport(store)(isFinalExport)
       yield
         assertEquals(state, ExportState.Failed(AudioSaveError.NoTrackLoaded))
@@ -257,9 +259,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       val scenario =
         for
           _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-          _ <- controller.save(outputPath)
+          _ <- IO.blocking(controller.save(outputPath))
           _ <- awaitExport(store)(_ == ExportState.Exporting)
-          _ <- controller.load(inputPath)
+          _ <- IO.blocking(controller.load(inputPath))
           _ <- awaitImport(store)(_ == ImportState.Imported(trackB))
           _ <- IO(gate.countDown())
           state <- awaitExport(store)(isFinalExport)
@@ -276,7 +278,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
         _ <- store.dispatch(Command.UpdateImport(ImportState.Importing))
-        _ <- controller.save(outputPath)
+        _ <- IO.blocking(controller.save(outputPath))
         current <- store.current
       yield
         assertEquals(current.exportState, ExportState.Idle)
@@ -294,9 +296,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       val scenario =
         for
           _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-          _ <- controller.save(outputPath)
+          _ <- IO.blocking(controller.save(outputPath))
           _ <- awaitExport(store)(_ == ExportState.Exporting)
-          _ <- controller.save(Paths.get("other.wav"))
+          _ <- IO.blocking(controller.save(Paths.get("other.wav")))
           _ <- IO(gate.countDown())
           _ <- awaitExport(store)(isFinalExport)
         yield assertEquals(writer.saved.get.map(_._2), Vector(outputPath))
@@ -308,15 +310,15 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, succeedingWriter) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- controller.acknowledgeImport
-        afterImported <- store.current
+        _ <- IO.blocking(controller.acknowledgeImport)
+        afterImported <- awaitImport(store)(_ == ImportState.Idle)
 
         _ <- store.dispatch(Command.UpdateImport(ImportState.Failed(AudioLoadError.FileNotFound("x.wav"))))
-        _ <- controller.acknowledgeImport
-        afterFailed <- store.current
+        _ <- IO.blocking(controller.acknowledgeImport)
+        afterFailed <- awaitImport(store)(_ == ImportState.Idle)
       yield
-        assertEquals(afterImported.importState, ImportState.Idle)
-        assertEquals(afterFailed.importState, ImportState.Idle)
+        assertEquals(afterImported, ImportState.Idle)
+        assertEquals(afterFailed, ImportState.Idle)
     }
   }
 
@@ -324,9 +326,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, succeedingWriter) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateImport(ImportState.Importing))
-        _ <- controller.acknowledgeImport
-        current <- store.current
-      yield assertEquals(current.importState, ImportState.Importing)
+        _ <- IO.blocking(controller.acknowledgeImport)
+        current <- awaitImport(store)(_ == ImportState.Importing)
+      yield assertEquals(current, ImportState.Importing)
     }
   }
 
@@ -334,15 +336,15 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, succeedingWriter) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateExport(ExportState.Exported))
-        _ <- controller.acknowledgeExport
-        afterExported <- store.current
+        _ <- IO.blocking(controller.acknowledgeExport)
+        afterExported <- awaitExport(store)(_ == ExportState.Idle)
 
         _ <- store.dispatch(Command.UpdateExport(ExportState.Failed(AudioSaveError.NoTrackLoaded)))
-        _ <- controller.acknowledgeExport
-        afterFailed <- store.current
+        _ <- IO.blocking(controller.acknowledgeExport)
+        afterFailed <- awaitExport(store)(_ == ExportState.Idle)
       yield
-        assertEquals(afterExported.exportState, ExportState.Idle)
-        assertEquals(afterFailed.exportState, ExportState.Idle)
+        assertEquals(afterExported, ExportState.Idle)
+        assertEquals(afterFailed, ExportState.Idle)
     }
   }
 
@@ -350,9 +352,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     withController(succeedingReader, succeedingWriter) { (store, controller) =>
       for
         _ <- store.dispatch(Command.UpdateExport(ExportState.Exporting))
-        _ <- controller.acknowledgeExport
-        current <- store.current
-      yield assertEquals(current.exportState, ExportState.Exporting)
+        _ <- IO.blocking(controller.acknowledgeExport)
+        current <- awaitExport(store)(_ == ExportState.Exporting)
+      yield assertEquals(current, ExportState.Exporting)
     }
   }
 

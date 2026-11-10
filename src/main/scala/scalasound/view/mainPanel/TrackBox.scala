@@ -5,7 +5,6 @@ import scalafx.geometry.Pos
 import scalafx.scene.Cursor
 import scalafx.scene.control.{Button, Label, Slider}
 import scalafx.scene.layout.{HBox, VBox}
-import scalasound.view.ViewApp.timeCursor
 
 private[mainPanel] object TrackBox:
 
@@ -36,7 +35,7 @@ private[mainPanel] object TrackBox:
   
 /*
  * Container for the track and for the buttons that
- * manage the track itself (Restart, Stop, Play, Save).
+ * manage the track itself (Restart, Stop, Play).
  */
 private[mainPanel] final class TrackBox(stage: PrimaryStage, timeCursor: Slider) extends VBox:
   import TrackBox.*
@@ -66,16 +65,12 @@ private[mainPanel] final class TrackBox(stage: PrimaryStage, timeCursor: Slider)
       private val playButton = createAudioButton("▶")
       playButton.onAction = _ => println("Play")
 
-      private val saveButton = createAudioButton("\uD83D\uDCBE")
-      saveButton.onAction = _ => println("Save")
-
       alignment = Pos.Center
       spacing = 10
       children = Seq(
         restartButton,
         stopButton,
-        playButton,
-        saveButton)
+        playButton)
       
   end audioButtonsBox
 

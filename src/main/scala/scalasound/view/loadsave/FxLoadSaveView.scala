@@ -12,13 +12,13 @@ import scalasound.model.io.{AudioLoadError, AudioSaveError}
  *
  *  @param controller acknowledges the results once the user has seen them
  */
-class FxLoadSaveView(controller: IOController)(using IORuntime) extends LoadSaveView:
+private[view] final class FxLoadSaveView(controller: IOController)(using IORuntime) extends LoadSaveView:
 
-  private val importInProgress: BooleanProperty = BooleanProperty(false)
-  private val exportBlocked: BooleanProperty = BooleanProperty(false)
   private val exportInProgress: BooleanProperty = BooleanProperty(false)
-  private val operationStatusText: StringProperty = StringProperty("")
-  private val trackDurationSeconds: DoubleProperty = DoubleProperty(0.0)
+  val importInProgress: BooleanProperty = BooleanProperty(false)
+  val exportBlocked: BooleanProperty = BooleanProperty(false)
+  val operationStatusText: StringProperty = StringProperty("")
+  val trackDurationSeconds: DoubleProperty = DoubleProperty(0.0)
 
   override def importIdle(): Unit =
     setImportInProgress(false)

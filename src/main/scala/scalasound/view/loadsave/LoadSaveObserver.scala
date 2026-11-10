@@ -15,7 +15,8 @@ trait LoadSaveObserver:
 
 final class LoadSaveObserverImpl(
                                   appStateStore: AppStateStore,
-                                  loadSaveControls: LoadSaveControls
+                                  loadSaveControls: LoadSaveControls,
+                                  runOnFx: (=> Unit) => Unit = update => Platform.runLater(() => update)
                                 ) extends LoadSaveObserver:
 
   override def observe: IO[Unit] =
@@ -26,7 +27,7 @@ final class LoadSaveObserverImpl(
       .drain
 
   private def onFx(update: => Unit): IO[Unit] =
-    IO(Platform.runLater(() => update))
+    IO(runOnFx(update))
 
   private def showImport(importState: ImportState): Unit = importState match
     case ImportState.Idle            => loadSaveControls.importIdle()

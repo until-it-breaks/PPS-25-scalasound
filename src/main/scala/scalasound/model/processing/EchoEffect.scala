@@ -11,12 +11,12 @@ import scalasound.model.domain.AudioChunk
  * by the Echo Effect case class.
  */
 object EchoEffect extends AudioConfiguration:
-  private val DefaultDelay: Int = 100 //milliseconds
-  private val MinDelay: Int = 50 //milliseconds
+  private val DefaultDelay: Int = 0 //milliseconds Default 100?
+  private val MinDelay: Int = 0 //milliseconds
   private val MaxDelay: Int = 300 //milliseconds
   private val DefaultFrequency: Int = 44100
   private val MinFrequency: Int = 0
-  private val DefaultAlpha: Float = 0.5f
+  private val DefaultAlpha: Float = 0.0f  // Default 0.5f
   private val MinAlpha: Float = 0.0f
   private val MaxAlpha: Float = 1.0f
 
@@ -41,7 +41,7 @@ object EchoEffect extends AudioConfiguration:
  * - delay refers to the gap of the original sound plus the previous ones,
  * - frequency refers to the sampling rate in Hz.
  */
-private[processing] case class EchoEffect(
+private[processing] final case class EchoEffect(
                                            alpha: Float = EchoEffect.DefaultAlpha,
                                            delay: Int = EchoEffect.DefaultDelay,
                                            frequency: Int = EchoEffect.DefaultFrequency) extends TimeAudioEffect:
@@ -88,7 +88,7 @@ private[processing] case class EchoEffect(
       "Exceeded the range [" + EchoEffect.MinFrequency + ", ∞ )!")
     checkAlpha.orElse(checkSamples) match
       case Some(error) => Left(error)
-      case None => checkFrequency.toLeft({
+      case None => checkFrequency.toLeft:
         chunk match
           case MonoChunk(samples) =>
             val index = chunkIndex * chunk.frameCount
@@ -106,4 +106,3 @@ private[processing] case class EchoEffect(
             val leftCh = echoChunk(left, index, echoBufferLeft)
             val rightCh = echoChunk(right, index, echoBufferRight)
             StereoChunk(leftCh, rightCh)
-      })

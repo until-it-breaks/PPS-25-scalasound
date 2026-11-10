@@ -124,5 +124,3 @@ object AudioProcessorWithRules extends AudioProcessor:
 
   override protected def processTrack(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
     super.processTrack(track, effects.sorted)
-
-end AudioProcessorWithRules

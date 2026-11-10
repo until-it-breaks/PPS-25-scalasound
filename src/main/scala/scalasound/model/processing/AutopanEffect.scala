@@ -12,8 +12,17 @@ import scalasound.model.domain.AudioChunk
  * by the Autopan Effect case class.
  */
 object AutopanEffect extends AudioConfiguration:
-  private val DefaultFrequency: Int = 44100 //HZ
+  private val DefaultFrequency: Int = 0 //HZ for Oscillation Frequency
   private val MinFrequency: Int = 0
+  private val MaxFrequency: Int = 20
+
+  // TODO: Fare un solo valore di default?
+  /**
+   * Extracts the information related to the autopan parameter.
+   * @return a ParameterConfiguration containing the autopan configuration.
+   */
+  def autopanConfiguration: ParameterConfiguration =
+    ParameterConfiguration(MinFrequency, MaxFrequency, DefaultFrequency)
 
   /* Defines the panning factor both for left and right channels. */
   private def panning(frequency: Float, indexSample: Int): (left: Float, right: Float) =
@@ -47,9 +56,9 @@ object AutopanEffect extends AudioConfiguration:
  * Implementation of the LFO (Low-Frequency-Oscillator) where frequency specifies
  * how fast the sound move from right to left channel.
  */
-private[processing] case class AutopanEffect(frequency: Int = AutopanEffect.DefaultFrequency) extends TimeAudioEffect:
-  private val isFrequencyValid: Boolean = frequency > AutopanEffect.MinFrequency
-  
+private[processing] final case class AutopanEffect(frequency: Int = AutopanEffect.DefaultFrequency) extends TimeAudioEffect:
+  private val isFrequencyValid: Boolean = frequency > AutopanEffect.MinFrequency && frequency < AutopanEffect.MaxFrequency
+  // TODO: Il check constraint farlo fare al companion object?
   override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =
     checkConstraints(isFrequencyValid, "Exceeded the range [" + AutopanEffect.MinFrequency + ", ∞ )!").
       toLeft({
@@ -60,7 +69,7 @@ private[processing] case class AutopanEffect(frequency: Int = AutopanEffect.Defa
 
         /* The factor change in time so it varies for each sample. */
         val result = lch.indices.map { i =>
-          val panningFactor = panning(frequency.toFloat, chunkIndex + i)
+          val panningFactor = panning(frequency.toFloat, initialSampleIndex + i)
           (lch(i) * panningFactor.left, rch(i) * panningFactor.right)
         }
 

@@ -26,12 +26,12 @@ object VolumeEffect extends AudioConfiguration:
  * Effect that applies the volume effect on the input audio chunk.
  * Volume defines the strength of the effect where values accepted are between [0.0f,1.0f].
  */
-private[processing] case class VolumeEffect(volume: Float = VolumeEffect.DefaultVolume) extends AudioEffect:
+private[processing] final case class VolumeEffect(volume: Float = VolumeEffect.DefaultVolume) extends AudioEffect:
   private val isVolumeValid: Boolean = volume >= VolumeEffect.MinVolume && volume <= VolumeEffect.MaxVolume
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkConstraints(isVolumeValid, "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").
-      toLeft({
+      toLeft:
         if volume == VolumeEffect.DefaultVolume then chunk
         else
           chunk match
@@ -39,6 +39,3 @@ private[processing] case class VolumeEffect(volume: Float = VolumeEffect.Default
               MonoChunk(samples.map(x => x * volume))
             case StereoChunk(left, right) =>
               StereoChunk(left.map(l => l * volume), right.map(r => r * volume))
-      })
-
-end VolumeEffect

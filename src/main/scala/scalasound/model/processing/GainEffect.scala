@@ -12,7 +12,7 @@ import scalasound.model.domain.AudioChunk
  *
  */
 object GainEffect extends AudioConfiguration:
-  private val DefaultGain: Float = 1.0f
+  private val DefaultGain: Float = 0.0f
   private val MinGain: Float = 0.0f
   private val MaxGain: Float = 2.0f
 
@@ -27,7 +27,7 @@ object GainEffect extends AudioConfiguration:
  * Effect that applies the Gain effect on the input audio chunk.
  * Gain defines the strength of the gain where values are accepted between [0.0f,2.0f].
  */
-private[processing] case class GainEffect(gain: Float = GainEffect.DefaultGain) extends AudioEffect:
+private[processing] final case class GainEffect(gain: Float = GainEffect.DefaultGain) extends AudioEffect:
   private val isGainValid: Boolean = gain >= GainEffect.MinGain && gain <= GainEffect.MaxGain
 
   /*
@@ -40,13 +40,12 @@ private[processing] case class GainEffect(gain: Float = GainEffect.DefaultGain) 
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkConstraints(isGainValid, "Exceeded the range [" + GainEffect.MinGain + "," + GainEffect.MaxGain + "]!").
-      toLeft({
+      toLeft:
         chunk match
           case MonoChunk(samples) =>
             MonoChunk(samples.map(x => clamp(x * gain)))
           case StereoChunk(left, right) =>
             StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
-      })
 
   /*
    * toLeft is the same to:

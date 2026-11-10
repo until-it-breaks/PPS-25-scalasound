@@ -82,8 +82,10 @@ object AudioEffect:
    */
   def distortion(distortionValue: Option[Float], isSoftClipping: Option[Boolean]): AudioEffect =
     val distortion = DistortionEffect()
-    val withDis = distortionValue.fold(distortion)(dv => distortion.copy(distortion = dv))
-    isSoftClipping.fold(withDis)(sf => withDis.copy(isSoftClipping = sf))
+    DistortionEffect(
+      distortion = distortionValue.getOrElse(distortion.distortion),
+      isSoftClipping = isSoftClipping.getOrElse(distortion.isSoftClipping)
+    )
 
   /**
    * Returns the Echo effect.
@@ -93,9 +95,11 @@ object AudioEffect:
    */
   def echo(alpha: Option[Float], delay: Option[Int], sampleRate: Option[Int]): AudioEffect =
     val echo = EchoEffect()
-    val withAlpha = alpha.fold(echo)(alp => echo.copy(alpha = alp))
-    val withDelay = delay.fold(withAlpha)(del => withAlpha.copy(delay = del))
-    sampleRate.fold(withDelay)(sr => withDelay.copy(frequency = sr))
+    EchoEffect(
+      alpha = alpha.getOrElse(echo.alpha),
+      delay = delay.getOrElse(echo.delay),
+      frequency = sampleRate.getOrElse(echo.frequency)
+    )
 
   /**
    * Returns the Pan effect.

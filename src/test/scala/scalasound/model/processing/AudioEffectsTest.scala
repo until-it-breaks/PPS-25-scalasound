@@ -77,7 +77,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
 
   "DistortionEffect" should "return a new AudioChunk with the effect applied (tanh)" in:
     val resultValue = math.tanh(defaultValueChunk).toFloat
-    val resultChunk = DistortionEffect()(chunk)
+    val resultChunk = DistortionEffect(distortion = 1.0f)(chunk)
     resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(resultValue))
 
   it should "return an AudioError if the distortion is not in range [0.0f, 2.0f]" in:
@@ -87,7 +87,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
 
   "AutopanEffect" should "return a new StereoChunk where " +
     "for each sample is multiplied by a different factor" in:
-    val resultChunk = AutopanEffect()(chunk)
+    val resultChunk = AutopanEffect(frequency = 1)(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
   it should "return an AudioError if the frequency (sampleRate) is negative" in:
@@ -100,7 +100,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val alpha = 2.0f
     val resultAlpha = EchoEffect(alpha = alpha)(chunk)
     resultAlpha.left.value shouldBe a[AudioError.AudioEffectsError]
-    val delay = 10
+    val delay = 1000
     val resultDelay = EchoEffect(delay = delay)(chunk)
     resultDelay.left.value shouldBe a[AudioError.AudioEffectsError]
     val freq = -1

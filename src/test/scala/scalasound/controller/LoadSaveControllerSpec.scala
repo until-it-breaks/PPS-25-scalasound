@@ -1,6 +1,7 @@
 package scalasound.controller
 
-import cats.effect.IO
+import cats.effect.{Deferred, IO}
+import cats.effect.std.Dispatcher
 import munit.CatsEffectSuite
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.{AudioTrack, MonoTrack}
@@ -8,7 +9,6 @@ import scalasound.model.io.{AudioLoadError, AudioReader, AudioSaveError, AudioWr
 import scalasound.model.state.{AppStateStore, Command, ExportState, ImportState}
 
 import java.nio.file.{Path, Paths}
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.*
 
@@ -61,31 +61,26 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       .timeout(5.seconds)
 
   private def isFinalImport(state: ImportState): Boolean = state match
-    case ImportState.Imported(_) | ImportState.Failed(_) =>
-      true
-    case _ =>
-      false
+    case ImportState.Imported(_) | ImportState.Failed(_) => true
+    case _ => false
 
   private def isFinalExport(state: ExportState): Boolean = state match
-    case ExportState.Exported | ExportState.Failed(_) =>
-      true
-    case _ =>
-      false
+    case ExportState.Exported | ExportState.Failed(_) => true
+    case _ => false
 
   private def retryUntilSuccess(attempt: IO[Boolean]): IO[Unit] =
     attempt.flatMap {
-      case true =>
-        IO.unit
-      case false =>
-        IO.cede >> retryUntilSuccess(attempt)
+      case true => IO.unit
+      case false => IO.cede >> retryUntilSuccess(attempt)
     }
 
   test("load imports the track and ends in state Imported") {
     val reader = succeedingReader
     withController(reader, succeedingWriter) { (store, controller) =>
       for
-        _ <- IO.blocking(controller.load(inputPath))
-        state <- awaitImport(store)(isFinalImport)
+        fiber   <- awaitImport(store)(isFinalImport).start
+        _       <- IO.blocking(controller.load(inputPath))
+        state   <- fiber.joinWithNever
         current <- store.current
       yield
         assertEquals(state, ImportState.Imported(trackA))
@@ -98,8 +93,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val error = AudioLoadError.UnsupportedFormat("not a wav")
     withController(FakeReader(_ => Left(error)), succeedingWriter) { (store, controller) =>
       for
-        _ <- IO.blocking(controller.load(inputPath))
-        state <- awaitImport(store)(isFinalImport)
+        fiber   <- awaitImport(store)(isFinalImport).start
+        _       <- IO.blocking(controller.load(inputPath))
+        state   <- fiber.joinWithNever
         current <- store.current
       yield
         assertEquals(state, ImportState.Failed(error))
@@ -110,70 +106,82 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   test("load ends in state Failed when the reader throws an unexpected exception") {
     withController(FakeReader(_ => throw RuntimeException("error")), succeedingWriter) { (store, controller) =>
       for
-        _ <- IO.blocking(controller.load(inputPath))
-        state <- awaitImport(store)(isFinalImport)
+        fiber <- awaitImport(store)(isFinalImport).start
+        _     <- IO.blocking(controller.load(inputPath))
+        state <- fiber.joinWithNever
       yield assertEquals(state, ImportState.Failed(AudioLoadError.ReadFailure("error")))
     }
   }
 
   test("load reports the state Importing while the reader is working") {
-    val gate = CountDownLatch(1)
-    val reader = FakeReader { _ =>
-      gate.await()
-      Right(trackA)
-    }
-    withController(reader, succeedingWriter) { (store, controller) =>
-      val scenario =
-        for
-          _ <- IO.blocking(controller.load(inputPath))
-          importing <- awaitImport(store)(_ == ImportState.Importing)
-          _ <- IO(gate.countDown())
-          done <- awaitImport(store)(isFinalImport)
-        yield
-          assertEquals(importing, ImportState.Importing)
-          assertEquals(done, ImportState.Imported(trackA))
-      scenario.guarantee(IO(gate.countDown()))
+    Dispatcher.parallel[IO].use { dispatcher =>
+      for
+        importGate <- Deferred[IO, Unit]
+        reader = FakeReader { _ =>
+          dispatcher.unsafeRunSync(importGate.get)
+          Right(trackA)
+        }
+        _ <- withController(reader, succeedingWriter) { (store, controller) =>
+          for
+            importingFiber <- awaitImport(store)(_ == ImportState.Importing).start
+            doneFiber      <- awaitImport(store)(isFinalImport).start
+            _              <- IO.blocking(controller.load(inputPath))
+            importing      <- importingFiber.joinWithNever
+            _              <- importGate.complete(()).void
+            done           <- doneFiber.joinWithNever
+          yield
+            assertEquals(importing, ImportState.Importing)
+            assertEquals(done, ImportState.Imported(trackA))
+        }
+      yield ()
     }
   }
 
   test("load is accepted and runs while an export is currently in progress") {
-    val exportGate = CountDownLatch(1)
-    val writer = FakeWriter { (_, _) =>
-      exportGate.await()
-      Right(())
-    }
-    val reader = succeedingReader
-
-    withController(reader, writer) { (store, controller) =>
-      val scenario = for
-        _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- IO.blocking(controller.save(outputPath))
-        _ <- awaitExport(store)(_ == ExportState.Exporting)
-        _ <- IO.blocking(controller.load(inputPath))
-        importState <- awaitImport(store)(isFinalImport)
-        _ <- IO(exportGate.countDown())
-      yield assertEquals(importState, ImportState.Imported(trackA))
-
-      scenario.guarantee(IO(exportGate.countDown()))
+    Dispatcher.parallel[IO].use { dispatcher =>
+      for
+        exportGate <- Deferred[IO, Unit]
+        writer = FakeWriter { (_, _) =>
+          dispatcher.unsafeRunSync(exportGate.get)
+          Right(())
+        }
+        reader = succeedingReader
+        _ <- withController(reader, writer) { (store, controller) =>
+          for
+            _           <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+            exportFiber <- awaitExport(store)(_ == ExportState.Exporting).start
+            _           <- IO.blocking(controller.save(outputPath))
+            _           <- exportFiber.joinWithNever
+            importFiber <- awaitImport(store)(isFinalImport).start
+            _           <- IO.blocking(controller.load(inputPath))
+            importState <- importFiber.joinWithNever
+            _           <- exportGate.complete(()).void
+          yield assertEquals(importState, ImportState.Imported(trackA))
+        }
+      yield ()
     }
   }
 
   test("a second load is ignored while the first one is still running") {
-    val gate = CountDownLatch(1)
-    val reader = FakeReader { _ =>
-      gate.await()
-      Right(trackA)
-    }
-    withController(reader, succeedingWriter) { (store, controller) =>
-      val scenario =
-        for
-          _ <- IO.blocking(controller.load(inputPath))
-          _ <- awaitImport(store)(_ == ImportState.Importing)
-          _ <- IO.blocking(controller.load(Paths.get("other.wav")))
-          _ <- IO(gate.countDown())
-          _ <- awaitImport(store)(isFinalImport)
-        yield assertEquals(reader.loaded.get, Vector("in.wav"))
-      scenario.guarantee(IO(gate.countDown()))
+    Dispatcher.parallel[IO].use { dispatcher =>
+      for
+        importGate <- Deferred[IO, Unit]
+        reader = FakeReader { _ =>
+          dispatcher.unsafeRunSync(importGate.get)
+          Right(trackA)
+        }
+        _ <- withController(reader, succeedingWriter) { (store, controller) =>
+          for
+            importingFiber <- awaitImport(store)(_ == ImportState.Importing).start
+            doneFiber      <- awaitImport(store)(isFinalImport).start
+            _              <- IO.blocking(controller.load(inputPath))
+            _              <- importingFiber.joinWithNever
+            _              <- IO.blocking(controller.load(Paths.get("other.wav")))
+            _              <- importGate.complete(()).void
+            _              <- doneFiber.joinWithNever
+          yield assertEquals(reader.loaded.get, Vector("in.wav"))
+        }
+      yield ()
     }
   }
 
@@ -181,12 +189,12 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val reader = succeedingReader
     withController(reader, succeedingWriter) { (store, controller) =>
       for
-        _ <- IO.blocking(controller.load(inputPath))
-        _ <- awaitImport(store)(isFinalImport)
-        // The controller is ready again just after the final state is published: retry until accepted.
-        _ <- retryUntilSuccess(
-               IO.blocking(controller.load(inputPath)) >> IO(reader.loaded.get.size >= 2)
-             ).timeout(5.seconds)
+        firstFiber <- awaitImport(store)(isFinalImport).start
+        _          <- IO.blocking(controller.load(inputPath))
+        _          <- firstFiber.joinWithNever
+        _          <- retryUntilSuccess(IO.blocking(
+          controller.load(inputPath)) >> IO(reader.loaded.get.size >= 2)
+        ).timeout(5.seconds)
       yield ()
     }
   }
@@ -195,9 +203,10 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val writer = succeedingWriter
     withController(succeedingReader, writer) { (store, controller) =>
       for
-        _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- IO.blocking(controller.save(outputPath))
-        state <- awaitExport(store)(isFinalExport)
+        _     <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+        fiber <- awaitExport(store)(isFinalExport).start
+        _     <- IO.blocking(controller.save(outputPath))
+        state <- fiber.joinWithNever
       yield
         assertEquals(state, ExportState.Exported)
         assertEquals(writer.saved.get, Vector[(AudioTrack, Path)](trackA -> outputPath))
@@ -208,9 +217,10 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val writer = succeedingWriter
     withController(succeedingReader, writer) { (store, controller) =>
       for
-        _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- IO.blocking(controller.save(Paths.get("song")))
-        _ <- awaitExport(store)(isFinalExport)
+        _     <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+        fiber <- awaitExport(store)(isFinalExport).start
+        _     <- IO.blocking(controller.save(Paths.get("song")))
+        _     <- fiber.joinWithNever
       yield assertEquals(writer.saved.get.map(_._2), Vector(Paths.get("song.wav")))
     }
   }
@@ -219,9 +229,10 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val error = AudioSaveError.WriteFailure(outputPath, "disk full")
     withController(succeedingReader, FakeWriter((_, _) => Left(error))) { (store, controller) =>
       for
-        _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- IO.blocking(controller.save(outputPath))
-        state <- awaitExport(store)(isFinalExport)
+        _     <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+        fiber <- awaitExport(store)(isFinalExport).start
+        _     <- IO.blocking(controller.save(outputPath))
+        state <- fiber.joinWithNever
       yield assertEquals(state, ExportState.Failed(error))
     }
   }
@@ -229,9 +240,10 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   test("save ends in state Failed when the writer throws an unexpected exception") {
     withController(succeedingReader, FakeWriter((_, _) => throw RuntimeException("error"))) { (store, controller) =>
       for
-        _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- IO.blocking(controller.save(outputPath))
-        state <- awaitExport(store)(isFinalExport)
+        _     <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+        fiber <- awaitExport(store)(isFinalExport).start
+        _     <- IO.blocking(controller.save(outputPath))
+        state <- fiber.joinWithNever
       yield assertEquals(state, ExportState.Failed(AudioSaveError.WriteFailure(outputPath, "error")))
     }
   }
@@ -240,8 +252,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val writer = succeedingWriter
     withController(succeedingReader, writer) { (store, controller) =>
       for
-        _ <- IO.blocking(controller.save(outputPath))
-        state <- awaitExport(store)(isFinalExport)
+        fiber <- awaitExport(store)(isFinalExport).start
+        _     <- IO.blocking(controller.save(outputPath))
+        state <- fiber.joinWithNever
       yield
         assertEquals(state, ExportState.Failed(AudioSaveError.NoTrackLoaded))
         assertEquals(writer.saved.get, Vector.empty)
@@ -249,26 +262,31 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   }
 
   test("save exports the track loaded when it was requested, even if another one is loaded meanwhile") {
-    val gate = CountDownLatch(1)
-    val writer = FakeWriter { (_, _) =>
-      gate.await()
-      Right(())
-    }
-    val reader = FakeReader(_ => Right(trackB))
-    withController(reader, writer) { (store, controller) =>
-      val scenario =
-        for
-          _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-          _ <- IO.blocking(controller.save(outputPath))
-          _ <- awaitExport(store)(_ == ExportState.Exporting)
-          _ <- IO.blocking(controller.load(inputPath))
-          _ <- awaitImport(store)(_ == ImportState.Imported(trackB))
-          _ <- IO(gate.countDown())
-          state <- awaitExport(store)(isFinalExport)
-        yield
-          assertEquals(state, ExportState.Exported)
-          assertEquals(writer.saved.get.map(_._1), Vector[AudioTrack](trackA))
-      scenario.guarantee(IO(gate.countDown()))
+    Dispatcher.parallel[IO].use { dispatcher =>
+      for
+        exportGate <- Deferred[IO, Unit]
+        writer = FakeWriter { (_, _) =>
+          dispatcher.unsafeRunSync(exportGate.get)
+          Right(())
+        }
+        reader = FakeReader(_ => Right(trackB))
+        _ <- withController(reader, writer) { (store, controller) =>
+          for
+            _            <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+            exportingFib <- awaitExport(store)(_ == ExportState.Exporting).start
+            _            <- IO.blocking(controller.save(outputPath))
+            _            <- exportingFib.joinWithNever
+            importedFib  <- awaitImport(store)(_ == ImportState.Imported(trackB)).start
+            _            <- IO.blocking(controller.load(inputPath))
+            _            <- importedFib.joinWithNever
+            exportedFib  <- awaitExport(store)(isFinalExport).start
+            _            <- exportGate.complete(()).void
+            state        <- exportedFib.joinWithNever
+          yield
+            assertEquals(state, ExportState.Exported)
+            assertEquals(writer.saved.get.map(_._1), Vector[AudioTrack](trackA))
+        }
+      yield ()
     }
   }
 
@@ -276,9 +294,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
     val writer = succeedingWriter
     withController(succeedingReader, writer) { (store, controller) =>
       for
-        _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-        _ <- store.dispatch(Command.UpdateImport(ImportState.Importing))
-        _ <- IO.blocking(controller.save(outputPath))
+        _       <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+        _       <- store.dispatch(Command.UpdateImport(ImportState.Importing))
+        _       <- IO.blocking(controller.save(outputPath))
         current <- store.current
       yield
         assertEquals(current.exportState, ExportState.Idle)
@@ -287,22 +305,26 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   }
 
   test("a second save is ignored while the first one is still running") {
-    val gate = CountDownLatch(1)
-    val writer = FakeWriter { (_, _) =>
-      gate.await()
-      Right(())
-    }
-    withController(succeedingReader, writer) { (store, controller) =>
-      val scenario =
-        for
-          _ <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-          _ <- IO.blocking(controller.save(outputPath))
-          _ <- awaitExport(store)(_ == ExportState.Exporting)
-          _ <- IO.blocking(controller.save(Paths.get("other.wav")))
-          _ <- IO(gate.countDown())
-          _ <- awaitExport(store)(isFinalExport)
-        yield assertEquals(writer.saved.get.map(_._2), Vector(outputPath))
-      scenario.guarantee(IO(gate.countDown()))
+    Dispatcher.parallel[IO].use { dispatcher =>
+      for
+        exportGate <- Deferred[IO, Unit]
+        writer = FakeWriter { (_, _) =>
+          dispatcher.unsafeRunSync(exportGate.get)
+          Right(())
+        }
+        _ <- withController(succeedingReader, writer) { (store, controller) =>
+          for
+            _            <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+            exportingFib <- awaitExport(store)(_ == ExportState.Exporting).start
+            exportedFib  <- awaitExport(store)(isFinalExport).start
+            _            <- IO.blocking(controller.save(outputPath))
+            _            <- exportingFib.joinWithNever
+            _            <- IO.blocking(controller.save(Paths.get("other.wav")))
+            _            <- exportGate.complete(()).void
+            _            <- exportedFib.joinWithNever
+          yield assertEquals(writer.saved.get.map(_._2), Vector(outputPath))
+        }
+      yield ()
     }
   }
 

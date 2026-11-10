@@ -78,6 +78,36 @@ class AppStateStoreSpec extends CatsEffectSuite:
     }
   }
 
+  test("importStateChanges should drop repeated import states") {
+    val store = storeEmitting(
+      base,
+      base.copy(importState = ImportState.Importing),
+      base.copy(importState = ImportState.Importing, chunkIndex = 1),
+      base.copy(importState = ImportState.Imported(dummyTrack), track = Some(dummyTrack))
+    )
+    store.importStateChanges.compile.toList.map { result =>
+      assertEquals(
+        result,
+        List(ImportState.Idle, ImportState.Importing, ImportState.Imported(dummyTrack))
+      )
+    }
+  }
+
+  test("exportStateChanges should drop repeated export states") {
+    val store = storeEmitting(
+      base,
+      base.copy(exportState = ExportState.Exporting),
+      base.copy(exportState = ExportState.Exporting, playbackState = PlaybackState.Playing),
+      base.copy(exportState = ExportState.Exported)
+    )
+    store.exportStateChanges.compile.toList.map { result =>
+      assertEquals(
+        result,
+        List(ExportState.Idle, ExportState.Exporting, ExportState.Exported)
+      )
+    }
+  }
+
   /**
    * Runs `stream` in the background and pushes each emission into a queue.
    */

@@ -5,10 +5,16 @@ import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.scene.Scene
 import scalafx.scene.control.Slider
 import scalafx.scene.layout.BorderPane
+import scalasound.controller.LoadSaveController
+import scalasound.view.loadsave.LoadSaveControls
 import scalasound.view.mainPanel.Panels
 
-// TODO: Aggiungere Documentazione
-object ViewApp extends JFXApp3:
+// TODO: Add ScalaDoc comments to this class.
+class ViewApp(
+               loadSaveController: LoadSaveController,
+               loadSaveControls: LoadSaveControls,
+               onReady: () => Unit
+             ) extends JFXApp3:
 
   private val Width: Int = 1200
   private val Height: Int = 800
@@ -21,7 +27,12 @@ object ViewApp extends JFXApp3:
       height = Height
 
       scene = new Scene:
-        root = new BorderPane:
-          top = Panels.titlePane(stage)
-          center = Panels.trackBox(stage, timeCursor)
-          bottom = Panels.effectPane(stage)
+        root = BorderPane(
+          center = Panels.trackBox(stage, timeCursor),
+          top = Panels.titlePane(stage, loadSaveController, loadSaveControls),
+          bottom = Panels.effectPane(stage),
+          left = null,
+          right = null
+        )
+
+    onReady()

@@ -2,6 +2,8 @@ package scalasound.view.mainPanel
 
 import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.scene.control.Slider
+import scalasound.controller.LoadSaveController
+import scalasound.view.loadsave.LoadSaveControls
 import scalasound.view.mainPanel.effectPanels.EffectPanel
 import scalasound.view.mainPanel.{TitlePane, TrackBox}
 
@@ -16,8 +18,12 @@ object Panels:
    * @param stage the primary stage of the ScalaFx app.
    * @return the TitlePane.
    */
-  def titlePane(stage: PrimaryStage): TitlePane = 
-    new TitlePane(stage)
+  def titlePane(
+                 stage: PrimaryStage,
+                 loadSaveController: LoadSaveController,
+                 loadSaveControls: LoadSaveControls
+               ): TitlePane =
+    new TitlePane(stage, loadSaveController, loadSaveControls)
 
   /**
    * Gets the Box containing the middle section of the screen.

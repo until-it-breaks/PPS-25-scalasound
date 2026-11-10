@@ -31,6 +31,14 @@ trait AppStateStore:
   def trackChanges: Stream[IO, Option[AudioTrack]] =
     changes.map(_.track).changes
 
+  /** A dedicated stream for import state changes only. */
+  def importStateChanges: Stream[IO, ImportState] =
+    changes.map(_.importState).changes
+
+  /** A dedicated stream for export state changes only. */
+  def exportStateChanges: Stream[IO, ExportState] =
+    changes.map(_.exportState).changes
+
 object AppStateStore:
   /** Creates a new thread-safe app state store instance initialized to [[AppState.initial]]. */
   def make: IO[AppStateStore] =

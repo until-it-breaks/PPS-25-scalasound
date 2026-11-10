@@ -1,6 +1,7 @@
 package scalasound.view.loadsave
 
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import scalafx.application.Platform
 import scalasound.model.state.{AppStateStore, ExportState, ImportState}
 
@@ -12,11 +13,6 @@ trait LoadSaveObserver:
    *  @return an effect that completes when both state streams end
    */
   def observe: IO[Unit]
-
-object LoadSaveObserver:
-
-  def apply(store: AppStateStore, view: LoadSaveView): LoadSaveObserver =
-    LoadSaveObserverImpl(store, view, action => Platform.runLater(() => action()))
 
 /** Keeps a [[LoadSaveView]] in sync with the import and export states of the [[AppStateStore]].
  *
@@ -31,11 +27,11 @@ object LoadSaveObserver:
  *  @param view the view to update with the current import and export states
  *  @param runOnFx a function that runs the given action on the JavaFX thread
  */
-private[loadsave] final class LoadSaveObserverImpl(
-                        store: AppStateStore,
-                        view: LoadSaveView,
-                        runOnFx: (() => Unit) => Unit
-                      ) extends LoadSaveObserver:
+final class LoadSaveObserverImpl(
+                            store: AppStateStore,
+                            view: LoadSaveView,
+                            runOnFx: (() => Unit) => Unit
+                          )(using IORuntime) extends LoadSaveObserver:
 
   override def observe: IO[Unit] =
     store.importStateChanges

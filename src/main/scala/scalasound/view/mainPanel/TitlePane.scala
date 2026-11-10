@@ -1,14 +1,13 @@
 package scalasound.view.mainPanel
 
-import cats.effect.unsafe.IORuntime
 import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Cursor
-import scalafx.scene.control.{Button, Label, Slider}
+import scalafx.scene.control.{Button, Label}
 import scalafx.scene.layout.{BorderPane, HBox}
 import scalafx.stage.FileChooser
-import scalasound.controller.IOController
-import scalasound.view.loadsave.FxLoadSaveView
+import scalasound.controller.LoadSaveController
+import scalasound.view.loadsave.LoadSaveControls
 
 private[mainPanel] object TitlePane:
   private val BackgroundColor = "#4287f5"
@@ -43,13 +42,12 @@ private[mainPanel] object TitlePane:
     title = "Export as .wav file"
     initialFileName = "track.wav"
     extensionFilters.add(new FileChooser.ExtensionFilter("Audio Files", "*.wav"))
-  
-/*
- * Container for the upper panel of the GUI,
- * containing the Title, the Import button and the status of the import/export operations.
- */
-private[mainPanel] final class TitlePane(stage: PrimaryStage, controller: IOController, view: FxLoadSaveView)
-                                        (using IORuntime) extends BorderPane:
+
+private[mainPanel] final class TitlePane(
+                                          stage: PrimaryStage,
+                                          controller: LoadSaveController,
+                                          loadSaveControls: LoadSaveControls
+                                        ) extends BorderPane:
   import TitlePane.*
 
   private val statusLabel = new Label:
@@ -63,16 +61,20 @@ private[mainPanel] final class TitlePane(stage: PrimaryStage, controller: IOCont
     spacing = 10
     children = Seq(importButton, exportButton)
 
-  statusLabel.text <== view.operationStatusText
-  importButton.disable <== view.importInProgress
-  exportButton.disable <== view.exportBlocked
+  statusLabel.text <==
+    loadSaveControls.operationStatusText
+  importButton.disable <==
+    loadSaveControls.importInProgress
+  exportButton.disable <==
+    loadSaveControls.exportInProgress || loadSaveControls.exportBlocked
 
   importButton.onAction = _ =>
     Option(fileChooserConfig.showOpenDialog(stage))
-      .foreach(file => controller.load(file.toPath).unsafeRunAndForget())
+      .foreach(file => controller.load(file.toPath))
+
   exportButton.onAction = _ =>
     Option(saveChooserConfig.showSaveDialog(stage))
-      .foreach(file => controller.save(file.toPath).unsafeRunAndForget())
+      .foreach(file => controller.save(file.toPath))
 
   padding = Insets(25)
   style = s"-fx-background-color: ${BackgroundColor};"

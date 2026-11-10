@@ -1,24 +1,58 @@
 package scalasound.view.loadsave
 
-import cats.effect.unsafe.IORuntime
-import scalafx.beans.property.{BooleanProperty, DoubleProperty, StringProperty}
+import scalafx.beans.property.{BooleanProperty, StringProperty}
 import scalafx.scene.control.Alert
 import scalafx.scene.control.Alert.AlertType
-import scalasound.controller.IOController
+import scalasound.controller.LoadSaveController
 import scalasound.model.domain.AudioTrack
 import scalasound.model.io.{AudioLoadError, AudioSaveError}
 
-/** ScalaFX implementation of [[LoadSaveView]].
- *
- *  @param controller acknowledges the results once the user has seen them
- */
-private[view] final class FxLoadSaveView(controller: IOController)(using IORuntime) extends LoadSaveView:
+/** What the user sees of the import and export operations. */
+trait LoadSaveControls:
 
-  private val exportInProgress: BooleanProperty = BooleanProperty(false)
+  val exportInProgress: BooleanProperty = BooleanProperty(false)
   val importInProgress: BooleanProperty = BooleanProperty(false)
   val exportBlocked: BooleanProperty = BooleanProperty(false)
   val operationStatusText: StringProperty = StringProperty("")
-  val trackDurationSeconds: DoubleProperty = DoubleProperty(0.0)
+
+  /** No import is in progress. */
+  def importIdle(): Unit
+
+  /** An import has started. */
+  def importStarted(): Unit
+
+  /** An import has completed.
+   *
+   *  @param track the loaded track
+   */
+  def importCompleted(track: AudioTrack): Unit
+
+  /** An import has failed.
+   *
+   *  @param error the reason for the failure
+   */
+  def importFailed(error: AudioLoadError): Unit
+
+  /** No export is in progress. */
+  def exportIdle(): Unit
+
+  /** An export has started. */
+  def exportStarted(): Unit
+
+  /** An export has completed. */
+  def exportCompleted(): Unit
+
+  /** An export has failed.
+   *
+   *  @param error the reason for the failure
+   */
+  def exportFailed(error: AudioSaveError): Unit
+
+/** ScalaFX implementation of [[LoadSaveControls]].
+ *
+ *  @param controller acknowledges the results once the user has seen them
+ */
+final class LoadSaveControlsImpl(controller: LoadSaveController) extends LoadSaveControls:
 
   override def importIdle(): Unit =
     setImportInProgress(false)
@@ -30,14 +64,15 @@ private[view] final class FxLoadSaveView(controller: IOController)(using IORunti
 
   override def importCompleted(track: AudioTrack): Unit =
     setImportInProgress(false)
-    operationStatusText.value = f"Imported a track of ${track.durationInSeconds}%.1f s"
-    trackDurationSeconds.value = track.durationInSeconds
+    operationStatusText.value = ""
+    showAndWait(AlertType.Information, "Import completed", "The track has been imported.")
+    controller.acknowledgeImport
 
   override def importFailed(error: AudioLoadError): Unit =
     setImportInProgress(false)
     operationStatusText.value = ""
     showAndWait(AlertType.Error, "Import failed", ErrorMessages.describe(error))
-    controller.acknowledgeImport.unsafeRunAndForget()
+    controller.acknowledgeImport
 
   override def exportIdle(): Unit =
     setExportInProgress(false)
@@ -51,13 +86,13 @@ private[view] final class FxLoadSaveView(controller: IOController)(using IORunti
     setExportInProgress(false)
     operationStatusText.value = ""
     showAndWait(AlertType.Information, "Export completed", "The track has been exported.")
-    controller.acknowledgeExport.unsafeRunAndForget()
+    controller.acknowledgeExport
 
   override def exportFailed(error: AudioSaveError): Unit =
     setExportInProgress(false)
     operationStatusText.value = ""
     showAndWait(AlertType.Error, "Export failed", ErrorMessages.describe(error))
-    controller.acknowledgeExport.unsafeRunAndForget()
+    controller.acknowledgeExport
 
   private def setImportInProgress(value: Boolean): Unit =
     importInProgress.value = value

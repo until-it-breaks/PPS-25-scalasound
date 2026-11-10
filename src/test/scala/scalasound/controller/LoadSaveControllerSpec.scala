@@ -12,7 +12,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.*
 
-class IOControllerSpec extends CatsEffectSuite:
+class LoadSaveControllerSpec extends CatsEffectSuite:
 
   private val trackA = MonoTrack(44100, Vector(MonoChunk(Vector(0.5f))))
   private val trackB = MonoTrack(48000, Vector(MonoChunk(Vector(-0.25f))))
@@ -37,9 +37,9 @@ class IOControllerSpec extends CatsEffectSuite:
   private def succeedingWriter = FakeWriter((_, _) => Right(()))
 
   private def withController(reader: AudioReader, writer: AudioWriter)
-                            (test: (AppStateStore, IOController) => IO[Unit]): IO[Unit] =
+                            (test: (AppStateStore, LoadSaveController) => IO[Unit]): IO[Unit] =
     AppStateStore.make.flatMap { store =>
-      IOController.make(store, reader, writer).use(controller => test(store, controller))
+      LoadSaveController.make(store, reader, writer).use(controller => test(store, controller))
     }
 
   private def awaitImport(store: AppStateStore)(predicate: ImportState => Boolean): IO[ImportState] =
@@ -357,9 +357,9 @@ class IOControllerSpec extends CatsEffectSuite:
   }
 
   test("withWavExtension appends '.wav' only when it is missing") {
-    assertEquals(IOController.withWavExtension(Paths.get("track")), Paths.get("track.wav"))
-    assertEquals(IOController.withWavExtension(Paths.get("track.wav")), Paths.get("track.wav"))
-    assertEquals(IOController.withWavExtension(Paths.get("track.WAV")), Paths.get("track.WAV"))
-    assertEquals(IOController.withWavExtension(Paths.get("track.mp3")), Paths.get("track.mp3.wav"))
-    assertEquals(IOController.withWavExtension(Paths.get("dir", "track")), Paths.get("dir", "track.wav"))
+    assertEquals(LoadSaveController.withWavExtension(Paths.get("track")), Paths.get("track.wav"))
+    assertEquals(LoadSaveController.withWavExtension(Paths.get("track.wav")), Paths.get("track.wav"))
+    assertEquals(LoadSaveController.withWavExtension(Paths.get("track.WAV")), Paths.get("track.WAV"))
+    assertEquals(LoadSaveController.withWavExtension(Paths.get("track.mp3")), Paths.get("track.mp3.wav"))
+    assertEquals(LoadSaveController.withWavExtension(Paths.get("dir", "track")), Paths.get("dir", "track.wav"))
   }

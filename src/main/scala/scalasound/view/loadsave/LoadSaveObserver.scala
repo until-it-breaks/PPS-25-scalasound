@@ -1,11 +1,10 @@
 package scalasound.view.loadsave
 
 import cats.effect.IO
-import cats.effect.unsafe.IORuntime
 import scalafx.application.Platform
 import scalasound.model.state.{AppStateStore, ExportState, ImportState}
 
-/** Observes the import and export states of an [[AppStateStore]] and updates a [[LoadSaveView]] accordingly. */
+/** Observes the import and export states of an [[AppStateStore]] and updates a [[LoadSaveControls]] accordingly. */
 trait LoadSaveObserver:
 
   /** Subscribes to the import and export state changes and updates the view for each one.
@@ -14,45 +13,29 @@ trait LoadSaveObserver:
    */
   def observe: IO[Unit]
 
-/** Keeps a [[LoadSaveView]] in sync with the import and export states of the [[AppStateStore]].
- *
- *  Every change of the import or export state is translated into a call
- *  on the view on its thread.
- *
- *  The store is the source of truth: only the current state is observed, so a state
- *  that is replaced by another, before it can be read, may be skipped: this is not a problem,
- *  because `Exported` and `Failed` are saved until they are acknowledged.
- *
- *  @param store source of the import and export [[AppState]] changes
- *  @param view the view to update with the current import and export states
- *  @param runOnFx a function that runs the given action on the JavaFX thread
- */
 final class LoadSaveObserverImpl(
-                            store: AppStateStore,
-                            view: LoadSaveView,
-                            runOnFx: (() => Unit) => Unit
-                          )(using IORuntime) extends LoadSaveObserver:
+                                  appStateStore: AppStateStore,
+                                  loadSaveControls: LoadSaveControls
+                                ) extends LoadSaveObserver:
 
   override def observe: IO[Unit] =
-    store.importStateChanges
+    appStateStore.importStateChanges
       .evalMap(state => onFx(showImport(state)))
-      .merge(store.exportStateChanges.evalMap(state => onFx(showExport(state))))
+      .merge(appStateStore.exportStateChanges.evalMap(state => onFx(showExport(state))))
       .compile
       .drain
 
   private def onFx(update: => Unit): IO[Unit] =
-    IO(runOnFx(() => update))
+    IO(Platform.runLater(() => update))
 
-  private def showImport(state: ImportState): Unit =
-    state match
-      case ImportState.Idle => view.importIdle()
-      case ImportState.Importing => view.importStarted()
-      case ImportState.Imported(track) => view.importCompleted(track)
-      case ImportState.Failed(error) => view.importFailed(error)
+  private def showImport(importState: ImportState): Unit = importState match
+    case ImportState.Idle            => loadSaveControls.importIdle()
+    case ImportState.Importing       => loadSaveControls.importStarted()
+    case ImportState.Imported(track) => loadSaveControls.importCompleted(track)
+    case ImportState.Failed(error)   => loadSaveControls.importFailed(error)
 
-  private def showExport(state: ExportState): Unit =
-    state match
-      case ExportState.Idle => view.exportIdle()
-      case ExportState.Exporting => view.exportStarted()
-      case ExportState.Exported => view.exportCompleted()
-      case ExportState.Failed(error) => view.exportFailed(error)
+  private def showExport(exportState: ExportState): Unit = exportState match
+    case ExportState.Idle          => loadSaveControls.exportIdle()
+    case ExportState.Exporting     => loadSaveControls.exportStarted()
+    case ExportState.Exported      => loadSaveControls.exportCompleted()
+    case ExportState.Failed(error) => loadSaveControls.exportFailed(error)

@@ -11,12 +11,12 @@ import scalasound.model.domain.AudioChunk
  * by the Echo Effect case class.
  */
 object EchoEffect extends AudioConfiguration:
-  private val DefaultDelay: Int = 0 //milliseconds Default 100?
+  private val DefaultDelay: Int = 100 //milliseconds Default 100?
   private val MinDelay: Int = 0 //milliseconds
   private val MaxDelay: Int = 300 //milliseconds
-  private val DefaultFrequency: Int = 44100
-  private val MinFrequency: Int = 0
-  private val DefaultAlpha: Float = 0.0f  // Default 0.5f
+  private val DefaultSampleRate: Int = 44100
+  private val MinSampleRate: Int = 0
+  private val DefaultAlpha: Float = 0.5f
   private val MinAlpha: Float = 0.0f
   private val MaxAlpha: Float = 1.0f
 
@@ -34,23 +34,30 @@ object EchoEffect extends AudioConfiguration:
   def alphaConfiguration: ParameterConfiguration =
     ParameterConfiguration(MinAlpha, MaxAlpha, DefaultAlpha)
 
+  private def isAlphaValid(alpha: Float): Boolean =
+    alpha >= EchoEffect.MinAlpha &&
+      alpha <= EchoEffect.MaxAlpha
+
+  private def isDelayValid(delay: Int): Boolean =
+    delay > EchoEffect.MinDelay &&
+      delay <= EchoEffect.MaxDelay
+
+  private def isSampleRateValid(sampleRate: Float): Boolean =
+    sampleRate > EchoEffect.MinSampleRate
+
 /*
  * Effect that applies the echo effect on the input audio chunk.
  * Implementation of the Infinite Impulse Response (IIR) where
  * - alpha is the parameter for attenuation of the echo response,
  * - delay refers to the gap of the original sound plus the previous ones,
- * - frequency refers to the sampling rate in Hz.
+ * - sampleRate refers to the sampling rate in Hz.
  */
-private[processing] final case class EchoEffect(
-                                           alpha: Float = EchoEffect.DefaultAlpha,
-                                           delay: Int = EchoEffect.DefaultDelay,
-                                           frequency: Int = EchoEffect.DefaultFrequency) extends TimeAudioEffect:
-  private val isAlphaValid: Boolean = alpha >= EchoEffect.MinAlpha && alpha <= EchoEffect.MaxAlpha
-  private val isSamplesValid: Boolean = delay >= EchoEffect.MinDelay && delay <= EchoEffect.MaxDelay
-  private val isFrequencyValid: Boolean = frequency >= EchoEffect.MinFrequency
+private[processing] final case class EchoEffect(alpha: Float,
+                                                delay: Int,
+                                                sampleRate: Float) extends TimeAudioEffect:
 
   /* Number of samples = Delay (in milliseconds) * Frequency (in Hz) */
-  private val nSamples: Int = ((delay.toFloat / 1000.0f) * frequency).toInt
+  private val nSamples: Int = math.max(1, ((delay.toFloat / 1000.0f) * sampleRate).toInt)
 
   /* Buffers for containing the previous echo effects both for left and right channels. */
   private val echoBufferLeft: Array[Float] = Array.fill(nSamples)(0.0f)
@@ -68,41 +75,38 @@ private[processing] final case class EchoEffect(
    * Applies the echo on the input vector of samples.
    * y(n) = x(n) + alpha * y(n - N)
    */
-  private def echoChunk(samples: Vector[Float], chunkIndex: Int, echoBuffer: Array[Float]): Vector[Float] =
-    var index = chunkIndex % nSamples
-    for
-      x <- samples
-    yield
-      val echo = echoBuffer(index)
-      val output = x + alpha * echo
-      echoBuffer(index) = output
-      index = (index + 1) % nSamples
-      clamp(output)
+  private def echoEffectOnChunk(samples: Vector[Float],
+                        chunkIndex: Int,
+                        echoBuffer: Array[Float]): Vector[Float] =
+    val startingIndex = chunkIndex % nSamples
+    val (resultList, _) = samples.foldLeft((List.empty[Float], startingIndex)) {
+      case ((accumulator, currentIndex), x) =>
+        val echo = echoBuffer(currentIndex)
+        val output = clamp(x + alpha * echo)
+        echoBuffer(currentIndex) = output
+        val nextIndex = (currentIndex + 1) % nSamples
+        (output :: accumulator, nextIndex) // Prepend
+    }
+    // It is necessary to reverse since the first sample is now the last in the list.
+    resultList.reverse.toVector
 
   override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =
-    val checkAlpha = checkConstraints(isAlphaValid,
+    val checkAlpha = checkConstraints(EchoEffect.isAlphaValid(alpha),
       "Exceeded the range [" + EchoEffect.MinAlpha + "," + EchoEffect.MaxAlpha + "]!")
-    val checkSamples = checkConstraints(isSamplesValid,
+    val checkSamples = checkConstraints(EchoEffect.isDelayValid(delay),
       "Exceeded the range [" + EchoEffect.MinDelay + "," + EchoEffect.MaxDelay + "]!")
-    val checkFrequency = checkConstraints(isFrequencyValid,
-      "Exceeded the range [" + EchoEffect.MinFrequency + ", ∞ )!")
-    checkAlpha.orElse(checkSamples) match
+    val checkFrequency = checkConstraints(EchoEffect.isSampleRateValid(sampleRate),
+      "Exceeded the range [" + EchoEffect.MinSampleRate + ", ∞ )!")
+    checkAlpha.orElse(checkSamples).orElse(checkFrequency) match
       case Some(error) => Left(error)
-      case None => checkFrequency.toLeft:
-        chunk match
-          case MonoChunk(samples) =>
-            val index = chunkIndex * chunk.frameCount
-            val result = echoChunk(samples, index, echoBufferLeft)
-              /*samples.map { x =>
-              val echo = echoBufferLeft(index)
-              val output = x + alpha * echo
-              echoBufferLeft(index) = output
-              index = (index + 1) % nSamples
-              output
-              }*/
-            MonoChunk(result)
-          case StereoChunk(left, right) =>
-            val index = chunkIndex * chunk.frameCount
-            val leftCh = echoChunk(left, index, echoBufferLeft)
-            val rightCh = echoChunk(right, index, echoBufferRight)
-            StereoChunk(leftCh, rightCh)
+      case None => Right(resultChunk(chunk, chunkIndex * chunk.frameCount))
+
+  private def resultChunk(chunk: AudioChunk, index: Int): AudioChunk =
+    chunk match
+      case MonoChunk(samples) =>
+        val result = echoEffectOnChunk(samples, index, echoBufferLeft)
+        MonoChunk(result)
+      case StereoChunk(left, right) =>
+        val leftCh = echoEffectOnChunk(left, index, echoBufferLeft)
+        val rightCh = echoEffectOnChunk(right, index, echoBufferRight)
+        StereoChunk(leftCh, rightCh)

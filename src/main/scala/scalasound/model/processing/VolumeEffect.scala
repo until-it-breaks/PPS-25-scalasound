@@ -22,15 +22,19 @@ object VolumeEffect extends AudioConfiguration:
   def volumeConfiguration: ParameterConfiguration =
     ParameterConfiguration(MinVolume, MaxVolume, DefaultVolume)
 
+  private def isVolumeValid(volume: Float): Boolean = 
+    volume >= VolumeEffect.MinVolume && 
+      volume <= VolumeEffect.MaxVolume
+
 /*
  * Effect that applies the volume effect on the input audio chunk.
  * Volume defines the strength of the effect where values accepted are between [0.0f,1.0f].
  */
-private[processing] final case class VolumeEffect(volume: Float = VolumeEffect.DefaultVolume) extends AudioEffect:
-  private val isVolumeValid: Boolean = volume >= VolumeEffect.MinVolume && volume <= VolumeEffect.MaxVolume
+private[processing] final case class VolumeEffect(volume: Float) extends AudioEffect:
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(isVolumeValid, "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").
+    checkConstraints(VolumeEffect.isVolumeValid(volume), 
+      "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").
       toLeft:
         if volume == VolumeEffect.DefaultVolume then chunk
         else

@@ -11,9 +11,9 @@ import scalasound.model.domain.AudioChunk
  * by the Distortion Effect case class.
  */
 object DistortionEffect extends AudioConfiguration:
-  private val DefaultDistortion: Float = 0.0f
+  private val DefaultDistortion: Float = 1.0f
   private val MinDistortion: Float = 0.0f
-  private val MaxDistortion: Float = 2.0f
+  private val MaxDistortion: Float = 3.0f
 
   /**
    * Extracts the information related to the distortion parameter.
@@ -22,15 +22,19 @@ object DistortionEffect extends AudioConfiguration:
   def distortionConfiguration: ParameterConfiguration =
     ParameterConfiguration(MinDistortion, MaxDistortion, DefaultDistortion)
 
+  private def isDistortionValid(distortion: Float): Boolean =
+    distortion >= DistortionEffect.MinDistortion &&
+      distortion <= DistortionEffect.MaxDistortion
+
 /*
  * Effect that applies the distortion effect on the input audio chunk.
  * Distortion defines the strength of the effect where values accepted are between [0.0f,2.0f].
  */
-private[processing] final case class DistortionEffect(distortion: Float = DistortionEffect.DefaultDistortion, isSoftClipping: Boolean = true) extends AudioEffect:
-  private val isDistortionValid: Boolean = distortion >= DistortionEffect.MinDistortion && distortion <= DistortionEffect.MaxDistortion
+private[processing] final case class DistortionEffect(distortion: Float, isSoftClipping: Boolean) extends AudioEffect:
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(isDistortionValid, "Exceeded the range [" + DistortionEffect.MinDistortion + "," + DistortionEffect.MaxDistortion + "]!").
+    checkConstraints(DistortionEffect.isDistortionValid(distortion),
+      "Exceeded the range [" + DistortionEffect.MinDistortion + "," + DistortionEffect.MaxDistortion + "]!").
       toLeft:
         applyDistortion(chunk, if isSoftClipping then tanh else sinWave)
 

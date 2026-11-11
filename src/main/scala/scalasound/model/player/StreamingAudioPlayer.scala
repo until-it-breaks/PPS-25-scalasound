@@ -50,7 +50,7 @@ final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOutput) ex
       yield (track, chunk)
     current match
       case Some((track, chunk)) =>
-        val processed = processor.apply(chunk, List()).getOrElse(chunk) // TODO pass the actual list of effects when available in the AppState
+        val processed = processor.apply(chunk, List(), state.chunkIndex).getOrElse(chunk) // TODO pass the actual list of effects when available in the AppState
         for
           _ <- out.write(processed, track.sampleRate)
           _ <- store.dispatch(Command.NextChunk)

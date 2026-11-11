@@ -1,6 +1,7 @@
 package scalasound.model.processing
 
 import scalasound.model.domain.AudioChunk
+import scalasound.model.processing.AudioError.AudioEffectsError
 
 /**
  * Defines the available effects.
@@ -41,8 +42,7 @@ trait TimeAudioEffect extends AudioEffect:
 
   /* If the index is not present then every chunk is the first one. */
   final override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    apply(chunk, 0)
-
+    Left(AudioEffectsError(this, "An index is needed!"))
 
 object AudioEffect:
 
@@ -68,24 +68,18 @@ object AudioEffect:
 
   /**
    * Returns the Gain effect.
-   * @param gainValue if the value is not present the Gain effect will be
-   *                  applied with the default value.
+   * @param gainValue the value of the gain.
    */
-  def gain(gainValue: Option[Float]): AudioEffect =
-    gainValue.fold(GainEffect())(GainEffect(_))
+  def gain(gainValue: Float): AudioEffect =
+    GainEffect(gainValue)
 
   /**
    * Returns the Distortion effect.
-   * @param distortionValue if the value is not present the Distortion effect will be
-   *                        applied with the default value.
+   * @param distortionValue the strength of the distortion.
    * @param isSoftClipping if [[true]] applies a tanh transformation else a sin-based effect.
    */
-  def distortion(distortionValue: Option[Float], isSoftClipping: Option[Boolean]): AudioEffect =
-    val distortion = DistortionEffect()
-    DistortionEffect(
-      distortion = distortionValue.getOrElse(distortion.distortion),
-      isSoftClipping = isSoftClipping.getOrElse(distortion.isSoftClipping)
-    )
+  def distortion(distortionValue: Float, isSoftClipping: Boolean = true): AudioEffect =
+    DistortionEffect(distortionValue, isSoftClipping)
 
   /**
    * Returns the Echo effect.
@@ -93,35 +87,27 @@ object AudioEffect:
    * @param delay expressed in milliseconds defines the delay of the echo effect.
    * @param sampleRate the sampling rate in Hz.
    */
-  def echo(alpha: Option[Float], delay: Option[Int], sampleRate: Option[Int]): AudioEffect =
-    val echo = EchoEffect()
-    EchoEffect(
-      alpha = alpha.getOrElse(echo.alpha),
-      delay = delay.getOrElse(echo.delay),
-      frequency = sampleRate.getOrElse(echo.frequency)
-    )
+  def echo(alpha: Float, delay: Int, sampleRate: Float): AudioEffect =
+    EchoEffect(alpha, delay, sampleRate)
 
   /**
    * Returns the Pan effect.
-   * @param panValue if the value is not present the Pan effect will be
-   *                 applied with the default value.
+   * @param panValue the strength of the pan effect.
    */
-  def pan(panValue: Option[Float]): AudioEffect =
-    panValue.fold(PanEffect())(PanEffect(_))
+  def pan(panValue: Float): AudioEffect =
+    PanEffect(panValue)
 
   /**
    * Returns the AutoPan effect.
-   * @param autopanValue if the value is not present the AutoPan effect will be
-   *                     applied with the default value.
-   *                     It's the frequency or the sampling rate in Hz.
+   * @param autopanValue it's the frequency in Hz from switching left to right.
+   * @param sampleRate it's the frequency of sampling the chunks.
    */
-  def autopan(autopanValue: Option[Int]): AudioEffect =
-    autopanValue.fold(AutopanEffect())(AutopanEffect(_))
+  def autopan(autopanValue: Float, sampleRate: Float): AudioEffect =
+    AutopanEffect(autopanValue, sampleRate)
 
   /**
    * Returns the Volume effect.
-   * @param volumeValue if the value is not present the Volume effect will be
-   *                    applied with the default value.
+   * @param volumeValue the strength of the volume.
    */
-  def volume(volumeValue: Option[Float]): AudioEffect =
-    volumeValue.fold(VolumeEffect())(VolumeEffect(_))
+  def volume(volumeValue: Float): AudioEffect =
+    VolumeEffect(volumeValue)

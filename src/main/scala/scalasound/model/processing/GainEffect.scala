@@ -12,7 +12,7 @@ import scalasound.model.domain.AudioChunk
  *
  */
 object GainEffect extends AudioConfiguration:
-  private val DefaultGain: Float = 0.0f
+  private val DefaultGain: Float = 1.0f
   private val MinGain: Float = 0.0f
   private val MaxGain: Float = 2.0f
 
@@ -23,13 +23,14 @@ object GainEffect extends AudioConfiguration:
   def gainConfiguration: ParameterConfiguration =
     ParameterConfiguration(MinGain, MaxGain, DefaultGain)
 
+  private def isGainValid(gain: Float): Boolean = 
+    gain >= GainEffect.MinGain && gain <= GainEffect.MaxGain
+
 /*
  * Effect that applies the Gain effect on the input audio chunk.
  * Gain defines the strength of the gain where values are accepted between [0.0f,2.0f].
  */
-private[processing] final case class GainEffect(gain: Float = GainEffect.DefaultGain) extends AudioEffect:
-  private val isGainValid: Boolean = gain >= GainEffect.MinGain && gain <= GainEffect.MaxGain
-
+private[processing] final case class GainEffect(gain: Float) extends AudioEffect:
   /*
    * Defines the "clamp" logic necessary to maintain
    * the values inside the domain of the chunk,
@@ -37,15 +38,6 @@ private[processing] final case class GainEffect(gain: Float = GainEffect.Default
    */
   private inline def clamp(value: Float): Float =
     math.max(-1.0f, math.min(1.0f, value))
-
-  override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(isGainValid, "Exceeded the range [" + GainEffect.MinGain + "," + GainEffect.MaxGain + "]!").
-      toLeft:
-        chunk match
-          case MonoChunk(samples) =>
-            MonoChunk(samples.map(x => clamp(x * gain)))
-          case StereoChunk(left, right) =>
-            StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
 
   /*
    * toLeft is the same to:
@@ -56,6 +48,12 @@ private[processing] final case class GainEffect(gain: Float = GainEffect.Default
    * If the Option of the checkConstraints
    * is empty then do something.
    */
-  end apply
-
-end GainEffect
+  override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
+    checkConstraints(GainEffect.isGainValid(gain), 
+      "Exceeded the range [" + GainEffect.MinGain + "," + GainEffect.MaxGain + "]!").
+      toLeft:
+        chunk match
+          case MonoChunk(samples) =>
+            MonoChunk(samples.map(x => clamp(x * gain)))
+          case StereoChunk(left, right) =>
+            StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))

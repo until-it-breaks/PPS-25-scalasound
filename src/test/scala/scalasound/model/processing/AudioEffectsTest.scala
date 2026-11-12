@@ -1,14 +1,11 @@
 package scalasound.model.processing
 
-import org.scalatest.{BeforeAndAfter, EitherValues}
+import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
-import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Identity, Pan, Volume}
-import scalasound.model.processing.{AudioEffect, AudioError, AutopanEffect, DistortionEffect, EchoEffect, GainEffect, IdentityEffect, PanEffect, VolumeEffect}
-
-import scala.util.Random
+import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Pan, Volume}
 
 /**
  * Test class containing all the checks for the effects applied on an audio chunk.
@@ -32,8 +29,8 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
   private val minValueChunk: Float = -1.0f
   private val defaultValueChunk: Float = 0.5f
   private val maxValueChunk: Float = 1.0f
-  private val sampleRateStandard = 44100
-  private val chunk: AudioChunk = MonoChunk(Vector.fill(sizeChunk)(defaultValueChunk)) //MonoChunk(Vector.empty)
+  private val sampleRateStandard = 44100.0f
+  private val chunk: AudioChunk = MonoChunk(Vector.fill(sizeChunk)(defaultValueChunk))
 
   "Chunk" should "not be empty" in:
     chunk.getVectors should not be empty
@@ -48,7 +45,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
     resultChunk.value shouldBe chunk
 
   "GainEffect" should "return a new chunk where values are clamped in [-1.0,1.0] interval" in:
-    val gain = Random().between(Config.GainConfig.min, Config.GainConfig.max)
+    val gain = (Config.GainConfig.min + Config.GainConfig.max) / 2
     val resultChunk = GainEffect(gain)(chunk)
     resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(defaultValueChunk * gain))
 
@@ -61,7 +58,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
     resultChunkMin.left.value shouldBe a[AudioError.AudioEffectsError]
 
   "PanEffect" should "return a new StereoChunk" in:
-    val pan = Random().between(Config.PanConfig.min, Config.PanConfig.max)
+    val pan = (Config.PanConfig.min + Config.PanConfig.max) / 2
     val resultChunk = PanEffect(pan)(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
@@ -88,7 +85,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
     val rightValue = -defaultValueChunk / 2.0f
     val rightChunk = Vector.fill(sizeChunk)(rightValue)
     val stereoChunk = StereoChunk(leftChunk, rightChunk)
-    val volume = Random().between(Config.VolumeConfig.min, Config.VolumeConfig.max)
+    val volume = (Config.VolumeConfig.min + Config.VolumeConfig.max) / 2
     val resultChunk = VolumeEffect(volume)(stereoChunk)
     resultChunk.value shouldBe StereoChunk(
       Vector.fill(sizeChunk)(leftValue * volume), 
@@ -104,7 +101,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
 
   "DistortionEffect" should "return a new AudioChunk with " +
     "the desired effect applied: tanh or sin" in:
-    val distortion = Random().between(Config.DistortionConfig.min, Config.DistortionConfig.max)
+    val distortion = (Config.DistortionConfig.min + Config.DistortionConfig.max) / 2
 
     // Test with Soft Clipping (Tanh)
     val resultChunkTanh = DistortionEffect(distortion, isSoftClipping = true)(chunk)
@@ -127,7 +124,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
 
   "AutopanEffect" should "return a new StereoChunk where " +
     "for each sample is multiplied by a different factor" in:
-    val frequency = Random().between(Config.AutopanConfig.min, Config.AutopanConfig.max)
+    val frequency = (Config.AutopanConfig.min + Config.AutopanConfig.max) / 2
     val resultChunk = AutopanEffect(frequency, sampleRateStandard)(chunk, chunkIndex = 0)
     resultChunk.value shouldBe a [StereoChunk]
 
@@ -137,7 +134,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
 
   it should "return an AudioError if no chunk index is specified" in:
-    val frequency = Random().between(Config.AutopanConfig.min, Config.AutopanConfig.max)
+    val frequency = (Config.AutopanConfig.min + Config.AutopanConfig.max) / 2
     val resultChunk = AutopanEffect(frequency, sampleRateStandard)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
 
@@ -157,7 +154,7 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
       sampleRateStandard)(chunk, chunkIndex = 0)
     resultChunkDelay.left.value shouldBe a[AudioError.AudioEffectsError]
 
-    val invalidSampleRate = 0
+    val invalidSampleRate = 0.0f
     val resultChunkSampleRate = EchoEffect(alphaStandard, delayStandard, invalidSampleRate)(chunk, chunkIndex = 0)
     resultChunkSampleRate.left.value shouldBe a[AudioError.AudioEffectsError]
     
@@ -165,9 +162,9 @@ class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
     // Since the size of the defaultChunk is 10, to guarantee a correct verification
     // of the IIR approach it used a sample rate of 1000Hz and a delay of 10ms.
     // So, for 10 samples is necessary a 10ms delay.
-    val sampleRate = 1000 //Hz
+    val sampleRate = 1000.0f //Hz
     val delay = 10 //ms
-    val alpha = Random().between(Config.AlphaConfig.min, Config.AlphaConfig.max)
+    val alpha = (Config.AlphaConfig.min + Config.AlphaConfig.max) / 2
 
     val echoEffect = EchoEffect(alpha, delay, sampleRate)
     val firstChunk = echoEffect(chunk, chunkIndex = 0)

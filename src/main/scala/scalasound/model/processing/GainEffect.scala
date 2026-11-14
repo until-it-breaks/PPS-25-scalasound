@@ -11,7 +11,7 @@ import scalasound.model.domain.AudioChunk
  * by the Gain Effect case class.
  *
  */
-object GainEffect extends AudioConfiguration:
+private[processing] object GainEffect extends AudioConfiguration:
   private val DefaultGain: Float = 1.0f
   private val MinGain: Float = 0.0f
   private val MaxGain: Float = 2.0f

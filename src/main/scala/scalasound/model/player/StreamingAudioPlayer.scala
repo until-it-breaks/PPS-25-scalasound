@@ -3,7 +3,7 @@ package scalasound.model.player
 import cats.effect.IO
 import cats.kernel.Eq
 import fs2.Stream
-import scalasound.model.processing.AudioProcessor
+import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.state.{AppState, AppStateStore, Command, PlaybackState}
 
 /**
@@ -50,7 +50,7 @@ final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOutput) ex
       yield (track, chunk)
     current match
       case Some((track, chunk)) =>
-        val processed = processor.apply(chunk, List(), state.chunkIndex).getOrElse(chunk) // TODO pass the actual list of effects when available in the AppState
+        val processed = processor.apply(chunk, state.effects, state.chunkIndex).getOrElse(chunk) // TODO pass the actual list of effects when available in the AppState
         for
           _ <- out.write(processed, track.sampleRate)
           _ <- store.dispatch(Command.NextChunk)

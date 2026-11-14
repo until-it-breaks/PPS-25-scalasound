@@ -11,7 +11,7 @@ import scalasound.model.domain.AudioChunk
  * it contains variables (constants) only accessible
  * by the Autopan Effect case class.
  */
-object AutopanEffect extends AudioConfiguration:
+private[processing] object AutopanEffect extends AudioConfiguration:
   private val DefaultFrequency: Float = 1.0f //HZ for Oscillation Frequency
   private val MinFrequency: Float = 0.0f
   private val MaxFrequency: Float = 20.0f

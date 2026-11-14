@@ -10,7 +10,7 @@ import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, G
 /**
  * Test class containing all the checks for the effects applied on an audio chunk.
  */
-class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
+final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues:
 
   private enum Config(parameters: ParameterConfiguration):
     def min: Float = parameters.min

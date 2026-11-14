@@ -11,7 +11,7 @@ import scalasound.model.processing.AudioEffectType.{Autopan, Gain, Pan, Volume}
  * Test class containing all the checks for the different audio processors
  * by verifying the behavior in different situations.
  */
-class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValues:
+final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValues:
 
   private val SizeChunk: Int = 10
   private val SizeTrack: Int = 3

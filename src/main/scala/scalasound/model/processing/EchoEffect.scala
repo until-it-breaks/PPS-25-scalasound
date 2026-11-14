@@ -10,15 +10,15 @@ import scalasound.model.domain.AudioChunk
  * it contains variables (constants) only accessible
  * by the Echo Effect case class.
  */
-object EchoEffect extends AudioConfiguration:
-  private val DefaultDelay: Int = 100 //milliseconds Default 100?
-  private val MinDelay: Int = 0 //milliseconds
-  private val MaxDelay: Int = 300 //milliseconds
+private[processing] object EchoEffect extends AudioConfiguration:
+  private val DefaultDelay: Int = 100 //milliseconds
+  private val MinDelay: Int = 10 //milliseconds
+  private val MaxDelay: Int = 600 //milliseconds
   private val DefaultSampleRate: Int = 44100
   private val MinSampleRate: Int = 0
   private val DefaultAlpha: Float = 0.5f
   private val MinAlpha: Float = 0.0f
-  private val MaxAlpha: Float = 1.0f
+  private val MaxAlpha: Float = 0.9f
 
   /**
    * Extracts the information related to the delay parameter.
@@ -56,6 +56,13 @@ private[processing] final case class EchoEffect(alpha: Float,
                                                 delay: Int,
                                                 sampleRate: Float) extends TimeAudioEffect:
 
+  private val checkAlpha = checkConstraints(EchoEffect.isAlphaValid(alpha),
+    "Exceeded the range [" + EchoEffect.MinAlpha + "," + EchoEffect.MaxAlpha + "]!")
+  private val checkSamples = checkConstraints(EchoEffect.isDelayValid(delay),
+    "Exceeded the range [" + EchoEffect.MinDelay + "," + EchoEffect.MaxDelay + "]!")
+  private val checkFrequency = checkConstraints(EchoEffect.isSampleRateValid(sampleRate),
+    "Exceeded the range [" + EchoEffect.MinSampleRate + ", ∞ )!")
+
   /* Number of samples = Delay (in milliseconds) * Frequency (in Hz) */
   private val nSamples: Int = math.max(1, ((delay.toFloat / 1000.0f) * sampleRate).toInt)
 
@@ -91,12 +98,6 @@ private[processing] final case class EchoEffect(alpha: Float,
     resultList.reverse.toVector
 
   override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =
-    val checkAlpha = checkConstraints(EchoEffect.isAlphaValid(alpha),
-      "Exceeded the range [" + EchoEffect.MinAlpha + "," + EchoEffect.MaxAlpha + "]!")
-    val checkSamples = checkConstraints(EchoEffect.isDelayValid(delay),
-      "Exceeded the range [" + EchoEffect.MinDelay + "," + EchoEffect.MaxDelay + "]!")
-    val checkFrequency = checkConstraints(EchoEffect.isSampleRateValid(sampleRate),
-      "Exceeded the range [" + EchoEffect.MinSampleRate + ", ∞ )!")
     checkAlpha.orElse(checkSamples).orElse(checkFrequency) match
       case Some(error) => Left(error)
       case None => Right(resultChunk(chunk, chunkIndex * chunk.frameCount))

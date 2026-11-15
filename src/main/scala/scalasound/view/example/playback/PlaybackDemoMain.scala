@@ -47,7 +47,7 @@ object PlaybackDemoMain:
     yield ()
 
   private def startPlayer(store: AppStateStore): IO[Unit] =
-    AudioPlayer.streaming(SimpleAudioProcessor, AudioOutput.speakers)
+    AudioPlayer.streaming(SimpleAudioProcessor, AudioOutput.speakers)   // TODO: Applicare di default il processor with rules?
       .run(store)
       .compile
       .drain

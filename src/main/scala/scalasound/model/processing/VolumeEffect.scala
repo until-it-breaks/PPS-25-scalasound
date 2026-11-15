@@ -10,7 +10,7 @@ import scalasound.model.domain.AudioChunk
  * it contains variables (constants) only accessible
  * by the Volume Effect case class.
  */
-object VolumeEffect extends AudioConfiguration:
+private[processing] object VolumeEffect extends AudioConfiguration:
   private val DefaultVolume: Float = 1.0f
   private val MinVolume: Float = 0.0f
   private val MaxVolume: Float = 1.0f
@@ -22,15 +22,19 @@ object VolumeEffect extends AudioConfiguration:
   def volumeConfiguration: ParameterConfiguration =
     ParameterConfiguration(MinVolume, MaxVolume, DefaultVolume)
 
+  private def isVolumeValid(volume: Float): Boolean = 
+    volume >= VolumeEffect.MinVolume && 
+      volume <= VolumeEffect.MaxVolume
+
 /*
  * Effect that applies the volume effect on the input audio chunk.
  * Volume defines the strength of the effect where values accepted are between [0.0f,1.0f].
  */
-private[processing] final case class VolumeEffect(volume: Float = VolumeEffect.DefaultVolume) extends AudioEffect:
-  private val isVolumeValid: Boolean = volume >= VolumeEffect.MinVolume && volume <= VolumeEffect.MaxVolume
+private[processing] final case class VolumeEffect(volume: Float) extends AudioEffect:
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(isVolumeValid, "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").
+    checkConstraints(VolumeEffect.isVolumeValid(volume), 
+      "Exceeded the range [" + VolumeEffect.MinVolume + "," + VolumeEffect.MaxVolume + "]!").
       toLeft:
         if volume == VolumeEffect.DefaultVolume then chunk
         else

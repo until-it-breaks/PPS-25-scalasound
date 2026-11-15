@@ -13,7 +13,7 @@ import scalasound.model.domain.AudioChunk
 private[processing] object EchoEffect extends AudioConfiguration:
   private val DefaultDelay: Int = 100 //milliseconds
   private val MinDelay: Int = 10 //milliseconds
-  private val MaxDelay: Int = 600 //milliseconds
+  private val MaxDelay: Int = 1000 //milliseconds
   private val DefaultSampleRate: Int = 44100
   private val MinSampleRate: Int = 0
   private val DefaultAlpha: Float = 0.5f
@@ -39,7 +39,7 @@ private[processing] object EchoEffect extends AudioConfiguration:
       alpha <= EchoEffect.MaxAlpha
 
   private def isDelayValid(delay: Int): Boolean =
-    delay > EchoEffect.MinDelay &&
+    delay >= EchoEffect.MinDelay &&
       delay <= EchoEffect.MaxDelay
 
   private def isSampleRateValid(sampleRate: Float): Boolean =

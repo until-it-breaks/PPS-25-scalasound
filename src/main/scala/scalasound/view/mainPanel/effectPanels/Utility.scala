@@ -1,12 +1,15 @@
 package scalasound.view.mainPanel.effectPanels
 
-import scalafx.geometry.Orientation
+import scalafx.geometry.{Orientation, Pos}
+import scalafx.scene.Node
 import scalafx.scene.control.{Label, Slider}
+import scalafx.scene.layout.{HBox, VBox}
+import scalasound.model.processing.ParameterConfiguration
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-// TODO: DOC
+/* Utility class that contains common method used in different effect panels. */
 private[effectPanels] object Utility:
 
   // TODO: Conviene lasciarla public?
@@ -36,24 +39,15 @@ private[effectPanels] object Utility:
   private lazy val HorizontalSlider: String = sliderStyleDataUri(true)
   private lazy val VerticalSlider: String = sliderStyleDataUri(false)
 
-  /**
-   * Constructor for Slider Control.
-   * @param minVal minimum value for the slider.
-   * @param maxVal maximum value for the slider.
-   * @param defaultVal default value for the slider.
-   * @param horizontal true if horizontal slider is needed false otherwise.
-   * @param sliderSize size of the slider, with a default size.
-   * @return a new Slider.
-   */
-  def slider(minVal: Float,
-             maxVal: Float,
-             defaultVal: Float,
-             horizontal: Boolean = true,
-             sliderSize: Int = 300): Slider = new Slider:
+  /* Constructor for Slider Control. */
+  private def slider(config: ParameterConfiguration,
+             horizontal: Boolean,
+             sliderSize: Int = 300,
+             onUpdate: Float => Unit = _ -> ()): Slider = new Slider:
     private val sliderStyle = if horizontal then HorizontalSlider else VerticalSlider
-    min = minVal
-    max = maxVal
-    value = defaultVal
+    min = config.min
+    max = config.max
+    value = config.default
     /* Assigning the custom class to the slider. */
     styleClass += "custom-slider"
     /* Injection of the style on the stylesheets. */
@@ -64,6 +58,52 @@ private[effectPanels] object Utility:
       orientation = Orientation.Vertical
       prefHeight = sliderSize
 
+    valueChanging.onChange { (_, wasChanging, isChanging) =>
+      if wasChanging && !isChanging then onUpdate(value.value.toFloat)
+    }
+    onMouseReleased = _ =>
+      if !valueChanging.value then onUpdate(value.value.toFloat)
+  
+  /**
+   * Constructor for container of the effect in the GUI.
+   * @param title the title of the container.
+   * @param config the parameter configuration for the specific effect.
+   * @param onUpdate the action to be done once the slider changes.
+   * @param metrics the metric used for the specific parameter.
+   * @param isHorizontal horizontal slider or vertical if it's set to false.
+   * @param titleSize the size of the title container.
+   * @param boldTitle the boldness of the font.
+   * @param labels the labels that are at the sides of the slider.
+   * @return a PanelComponents that contains the actual container and the slider.
+   */
+  def effectContainer(title: String,
+                      config: ParameterConfiguration,
+                      onUpdate: Float => Unit,
+                      metrics: Float => String,
+                      isHorizontal: Boolean = true,
+                      titleSize: Int = TitleEffectSize,
+                      boldTitle: Boolean = true,
+                      labels: Option[(String, String)] = None): PanelComponents =
+    val slide = slider(config, horizontal = isHorizontal, onUpdate = onUpdate)
+    val valueLabel = label(metrics(config.default))
+    valueLabel.text <== slide.value.map(v => metrics(v.floatValue()))
+
+    val middle: Node =
+      if isHorizontal then
+        val (leftText, rightText) = labels.getOrElse((metrics(config.min), metrics(config.max)))
+        new HBox:
+          alignment = Pos.Center
+          spacing = 10
+          children = Seq(label(leftText), slide, label(rightText))
+      else slide
+
+    val vbox = new VBox:
+      alignment = Pos.Center
+      spacing = if boldTitle then 10 else 5
+      children = Seq(label(title, boldTitle, titleSize), middle, valueLabel)
+
+    PanelComponents(vbox, slide)
+  
   /**
    * Constructor for the label component.
    * @param label the text.

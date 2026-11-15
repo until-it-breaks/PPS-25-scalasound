@@ -7,7 +7,7 @@ import scalasound.model.state.Command.{AddEffect, RemoveAll}
 
 /**
  * The operations that the user can perform to
- * interact with the track and modify it are: add and removeAll.
+ * interact with the track and modify it are: add and removeAll effects.
  */
 trait EffectsController:
 

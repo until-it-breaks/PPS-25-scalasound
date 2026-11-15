@@ -1,13 +1,13 @@
 # Introduzione
 
-Il presente documento descrive la progettazione e lo sviluppo di **ScalaSound**, un'applicazione software sviluppata nell'ambito del corso di Programmazione e Progettazione del Software (PPS).
+Il presente documento descrive la progettazione, l'architettura e lo sviluppo di **ScalaSound**, un'applicazione software realizzata nell'ambito del corso di Programmazione e Progettazione del Software (PPS).
 
-**ScalaSound** è un sistema interattivo dedicato all'elaborazione e alla manipolazione audio in tempo reale. L'applicazione consente all'utente di importare file audio (nei formati Mono e Stereo), applicare una sequenza di effetti sonori e ascoltare un'anteprima immediata del risultato prima di procedere al salvataggio della traccia finale su disco.
+**ScalaSound** si configura come un ambiente interattivo desktop dedicato alla riproduzione e all'elaborazione digitale del segnale audio in tempo reale (DSP). L'applicazione nasce per offrire agli utenti un sistema per l'ascolto e la modifica di file audio locali, permettendo di importare una traccia, configurare una catena di effetti personalizzati, e infine esportare il risultato elaborato su disco.
 
-Nel dettaglio, l'applicazione supporta:
+Dal punto di vista funzionale e strutturale, il sistema è progettato per gestire flussi audio sia monofonici che stereofonici. Nel dettaglio, le capacità centrali dell'applicativo comprendono:
 
-* Caricamento delle tracce sorgente ed esportazione del file elaborato.
-* Applicazione di effetti *stateless* (quali **Gain** per l'amplificazione e **Panning** per la spazializzazione) ed effetti *stateful* complessi (quali **Autopan** ed **Eco**).
-* Controllo completo della riproduzione tramite funzioni di **Play**, **Pause**, **Stop** e **Seek** (per lo spostamento lungo la traccia), con un feedback acustico immediato alle modifiche dei parametri effettuate durante l'ascolto.
+- L'importazione e la decodifica di flussi audio dal file system e la successiva esportazione del brano elaborato.
+- L'applicazione in tempo reale di una libreria di trasformazioni ed effetti audio componibili, tra cui regolazioni di guadagno e volume, distorsioni non lineari, echi temporali e gestione della spazialità stereofonica.
+- Un controllo completo della riproduzione audio attraverso le funzioni di avvio, pausa, arresto e posizionamento temporale.
 
 \newpage

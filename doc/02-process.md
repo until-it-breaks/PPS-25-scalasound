@@ -5,8 +5,8 @@ Come metodologia di sviluppo, è stata adottata la metodologia SCRUM, proposta d
 
 ## Ruoli
 - **Jiekai Sun** - Domain Expert / Developer
-- **Nome Studente 2** - Product Owner / Developer
-- **Nome Studente 3** - Developer
+- **Simon Carpi** - Product Owner / Developer
+- **Martin Tomassi** - Developer
 
 Tutti i membri ricoprono il ruolo di Developer e contribuiscono in modo equo all'implementazione del progetto.
 

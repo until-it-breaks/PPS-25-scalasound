@@ -1,0 +1,63 @@
+package scalasound.view.mainPanel.playback
+
+import scalafx.geometry.Pos
+import scalafx.scene.Cursor
+import scalafx.scene.control.{Button, Label, Slider}
+import scalafx.scene.layout.{HBox, VBox}
+
+private[mainPanel] object TrackBox:
+
+  /** Text shown in the time labels when no track is loaded. */
+  val EmptyTime: String = "--:--"
+  /** Slider range when no track is loaded. */
+  val EmptyDuration: Double = 1.0
+  /** Slider position when no track is loaded. */
+  val EmptyPosition: Double = 0.0
+
+  private def createTimeLabel: Label = new Label(EmptyTime):
+    style = """
+       -fx-font-size: 20px;
+    """
+
+  private def createAudioButton(text: String): Button = new Button(text):
+    cursor = Cursor.Hand
+    prefWidth = 70
+    prefHeight = 40
+    style = """
+      -fx-background-color: #3c6382;
+      -fx-text-fill: white;
+      -fx-font-size: 20px;
+      -fx-font-weight: bold;
+      -fx-border-color: #60a3bc;
+      -fx-border-width: 2px;
+      -fx-border-radius: 5px;
+      -fx-background-radius: 5px;
+      -fx-alignment: center;
+    """
+
+/**
+ * Container for the timeline of the track and the buttons that manage the playback (Play, Pause, Stop).
+ */
+private[mainPanel] final class TrackBox extends VBox:
+  import TrackBox.*
+
+  val timeLine: Slider = new Slider(0, EmptyDuration, EmptyPosition) { prefWidth = 500 }
+  val startTimeLabel: Label = createTimeLabel
+  val endTimeLabel: Label = createTimeLabel
+  val playButton: Button = createAudioButton("▶")
+  val pauseButton: Button = createAudioButton("❚❚")
+  val stopButton: Button = createAudioButton("⏹")
+
+  private val timelineBox = new HBox:
+    alignment = Pos.Center
+    spacing = 10
+    children = Seq(startTimeLabel, timeLine, endTimeLabel)
+
+  private val buttonsBox = new HBox:
+    alignment = Pos.Center
+    spacing = 10
+    children = Seq(playButton, pauseButton, stopButton)
+
+  alignment = Pos.Center
+  spacing = 30
+  children = Seq(timelineBox, buttonsBox)

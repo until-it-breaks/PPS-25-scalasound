@@ -4,13 +4,10 @@ lazy val root = rootProject
   .settings(
     name := "PPS-25-scalasound",
     mainClass := Some("scalasound.Main"),
-    coverageExcludedPackages := Seq(
-      """scalasound\.view\..*""",
-      """scalasound\.[A-Za-z0-9_$]+"""
-    ).mkString(";"),
+    coverageExcludedPackages := """scalasound\.(?!model|controller).*""",
     coverageDataDir := (Compile / classDirectory).value,
-    assembly / assemblyJarName := "app.jar",
-    assembly / assemblyOutputPath := file("target/app.jar"),
+    assembly / assemblyJarName := "scalasound.jar",
+    assembly / assemblyOutputPath := file("target/scalasound.jar"),
     assembly / assemblyMergeStrategy := {
       case "module-info.class" => MergeStrategy.discard
       case path =>

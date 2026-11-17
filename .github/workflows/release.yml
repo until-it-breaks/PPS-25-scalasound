@@ -51,4 +51,4 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             report.pdf
-            target/app.jar
+            target/scalasound.jar

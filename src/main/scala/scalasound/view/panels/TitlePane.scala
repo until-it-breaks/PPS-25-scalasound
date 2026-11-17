@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel
+package scalasound.view.panels
 
 import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.geometry.{Insets, Pos}
@@ -9,7 +9,7 @@ import scalafx.stage.FileChooser
 import scalasound.controller.LoadSaveController
 import scalasound.view.loadsave.LoadSaveControls
 
-private[mainPanel] object TitlePane:
+private[panels] object TitlePane:
   private val BackgroundColor = "#4287f5"
 
   private def titleLabel = new Label("ScalaSound"):
@@ -43,7 +43,7 @@ private[mainPanel] object TitlePane:
     initialFileName = "track.wav"
     extensionFilters.add(new FileChooser.ExtensionFilter("Audio Files", "*.wav"))
 
-private[mainPanel] final class TitlePane(
+private[panels] final class TitlePane(
                                           stage: PrimaryStage,
                                           controller: LoadSaveController,
                                           loadSaveControls: LoadSaveControls

@@ -1,11 +1,11 @@
-package scalasound.view.mainPanel.playback
+package scalasound.view.panels.playback
 
 import scalafx.geometry.Pos
 import scalafx.scene.Cursor
 import scalafx.scene.control.{Button, Label, Slider}
 import scalafx.scene.layout.{HBox, VBox}
 
-private[mainPanel] object TrackBox:
+private[panels] object TrackBox:
 
   /** Text shown in the time labels when no track is loaded. */
   val EmptyTime: String = "--:--"
@@ -38,7 +38,7 @@ private[mainPanel] object TrackBox:
 /**
  * Container for the timeline of the track and the buttons that manage the playback (Play, Pause, Stop).
  */
-private[mainPanel] final class TrackBox extends VBox:
+private[panels] final class TrackBox extends VBox:
   import TrackBox.*
 
   val timeLine: Slider = new Slider(0, EmptyDuration, EmptyPosition) { prefWidth = 500 }

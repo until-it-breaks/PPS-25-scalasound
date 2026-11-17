@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.playback
+package scalasound.view.panels.playback
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime

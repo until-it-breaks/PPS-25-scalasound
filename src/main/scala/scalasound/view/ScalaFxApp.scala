@@ -4,7 +4,7 @@ import scalafx.application.JFXApp3
 import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.scene.Scene
 import scalafx.scene.layout.BorderPane
-import scalasound.view.mainPanel.Panels
+import scalasound.view.panels.Panels
 
 class ScalaFxApp(dependencies: AppDependencies, onReady: () => Unit) extends JFXApp3:
 
@@ -14,6 +14,9 @@ class ScalaFxApp(dependencies: AppDependencies, onReady: () => Unit) extends JFX
   override def start(): Unit =
     val trackBox = Panels.trackBox()
     dependencies.trackBoxLogic.attach(trackBox)
+    val effectsPanel = Panels.effectsPanel()
+    dependencies.effectsLogic.attach(effectsPanel)
+    
     stage = new PrimaryStage:
       title = "ScalaSound"
       width = Width
@@ -22,6 +25,6 @@ class ScalaFxApp(dependencies: AppDependencies, onReady: () => Unit) extends JFX
         root = new BorderPane:
           center = trackBox
           top = Panels.titlePane(stage, dependencies.loadSaveController, dependencies.loadSaveControls)
-          bottom = Panels.effectPane(stage, dependencies.effectsControls)
+          bottom = effectsPanel
 
     onReady()

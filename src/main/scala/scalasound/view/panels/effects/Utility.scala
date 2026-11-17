@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 import scalafx.geometry.{Orientation, Pos}
 import scalafx.scene.Node
@@ -10,7 +10,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 /* Utility class that contains common method used in different effect panels. */
-private[effectPanels] object Utility:
+private[effects] object Utility:
 
   // TODO: Conviene lasciarla public?
   val BackgroundColor = "#4287f5"
@@ -40,10 +40,9 @@ private[effectPanels] object Utility:
   private lazy val VerticalSlider: String = sliderStyleDataUri(false)
 
   /* Constructor for Slider Control. */
-  private def slider(config: ParameterConfiguration,
-             horizontal: Boolean,
-             sliderSize: Int = 300,
-             onUpdate: Float => Unit = _ -> ()): Slider = new Slider:
+  private def slider(config: ParameterConfiguration, 
+                     horizontal: Boolean, 
+                     sliderSize: Int = 300): Slider = new Slider:
     private val sliderStyle = if horizontal then HorizontalSlider else VerticalSlider
     min = config.min
     max = config.max
@@ -57,18 +56,11 @@ private[effectPanels] object Utility:
     else
       orientation = Orientation.Vertical
       prefHeight = sliderSize
-
-    valueChanging.onChange { (_, wasChanging, isChanging) =>
-      if wasChanging && !isChanging then onUpdate(value.value.toFloat)
-    }
-    onMouseReleased = _ =>
-      if !valueChanging.value then onUpdate(value.value.toFloat)
   
   /**
    * Constructor for container of the effect in the GUI.
    * @param title the title of the container.
    * @param config the parameter configuration for the specific effect.
-   * @param onUpdate the action to be done once the slider changes.
    * @param metrics the metric used for the specific parameter.
    * @param isHorizontal horizontal slider or vertical if it's set to false.
    * @param titleSize the size of the title container.
@@ -78,13 +70,12 @@ private[effectPanels] object Utility:
    */
   def effectContainer(title: String,
                       config: ParameterConfiguration,
-                      onUpdate: Float => Unit,
                       metrics: Float => String,
                       isHorizontal: Boolean = true,
                       titleSize: Int = TitleEffectSize,
                       boldTitle: Boolean = true,
                       labels: Option[(String, String)] = None): PanelComponents =
-    val slide = slider(config, horizontal = isHorizontal, onUpdate = onUpdate)
+    val slide = slider(config, horizontal = isHorizontal)
     val valueLabel = label(metrics(config.default))
     valueLabel.text <== slide.value.map(v => metrics(v.floatValue()))
 

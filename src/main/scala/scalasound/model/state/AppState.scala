@@ -114,8 +114,9 @@ final case class AppState(
    */
   private def handleAddEffect(effect: AudioEffect): AppState =
     val isSameType = AudioEffect.checkEqualEffectType(_, effect)
-    val (firstHalf, secondHalf) = effects.span(!isSameType(_))
-    copy(effects = firstHalf ++ (effect :: secondHalf.filterNot(isSameType(_))))
+    //val (firstHalf, secondHalf) = effects.span(!isSameType(_))
+    //copy(effects = firstHalf ++ (effect :: secondHalf.filterNot(isSameType(_))))
+    copy(effects = effect :: effects.filterNot(isSameType(_)))
 
   private def handleSeek(index: Int): AppState =
     track match

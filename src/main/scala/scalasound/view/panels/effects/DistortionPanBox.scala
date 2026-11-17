@@ -1,20 +1,20 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
-import scalafx.beans.property.ObjectProperty
+import scalafx.beans.property.{ObjectProperty, ReadOnlyObjectProperty}
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Cursor
-import scalafx.scene.control.{ToggleButton, ToggleGroup}
+import scalafx.scene.control.{Slider, ToggleButton, ToggleGroup}
 import scalafx.scene.layout.{HBox, VBox}
 import scalasound.model.processing.{AudioConfiguration, AudioEffect}
 import scalasound.model.processing.AudioEffectType.{Distortion, Pan}
 
 /* Simplifies the management of the switch. */
-private[effectPanels] enum DistortionEnum(val text: String):
+private[effects] enum DistortionEnum(val text: String):
   case Tanh extends DistortionEnum("Tanh")
   case Sin extends DistortionEnum("Sin")
 
 /* Companion Object containing constants and utility methods. */
-private[effectPanels] object DistortionPanBox:
+private[effects] object DistortionPanBox:
 
   /* Constants for styling. */
   private val BackgroundColor = Utility.BackgroundColor
@@ -69,51 +69,54 @@ private[effectPanels] object DistortionPanBox:
     children = buttons.toSeq
 
 /* Box for the Distortion-Pan effects. */
-private[effectPanels] final class DistortionPanBox(using effectControls: EffectsControls) extends VBox with EffectPane:
+private[effects] final class DistortionPanBox extends VBox with EffectPane:
   import DistortionEnum.*
   import DistortionPanBox.*
 
-  /* Importing of the Pan parameter values. */
+  /* Importing of the Pan and Distortion parameter values. */
   private val panConfig = AudioConfiguration.parameterConfiguration(Pan)
-  private val pan = Utility.effectContainer(Pan.name,
+  private val distortionConfig = AudioConfiguration.parameterConfiguration(Distortion)
+  
+  /* Initialization of the switch for the distortion effect to be applied. */
+  private val defaultSwitchValue = Tanh
+  private val _distortionFilter: ObjectProperty[DistortionEnum] = ObjectProperty(defaultSwitchValue)
+  private val distortionSwitch = switch(_distortionFilter)
+  
+  private val panContainer = Utility.effectContainer(Pan.name,
     panConfig.panConfiguration,
-    v => effectControls.setEffect(AudioEffect.pan(v)),
     v => f"$v%.2f",
     labels = Some("L", "R"))
-
-  private val defaultSwitchValue = Tanh
-  /* Initialization of the switch for the distortion effect to be applied. */
-  private val _selectedFilter: ObjectProperty[DistortionEnum] = ObjectProperty(defaultSwitchValue)
-  private val distortionSwitch = switch(_selectedFilter)
-
-  /* Importing of the Distortion parameter values. */
-  private val distortionConfig = AudioConfiguration.parameterConfiguration(Distortion)
-  private val distortion = Utility.effectContainer(Distortion.name,
+  
+  private val distortionContainer = Utility.effectContainer(Distortion.name,
     distortionConfig.distortionConfiguration,
-    v => updateDistortion(v, _selectedFilter.value),
     v => f"$v%.2f")
 
-  _selectedFilter.onChange { (_, _, newFilter) =>
-    updateDistortion(distortion.slider.value.value.toFloat, newFilter)
-  }
-
-  private def updateDistortion(value: Float, filter: DistortionEnum): Unit =
-    val isSoft = filter match
-      case Tanh => true
-      case Sin => false
-    effectControls.setEffect(AudioEffect.distortion(value, isSoftClipping = isSoft))
-
-  private val distortionContainer = new VBox:
+  private val finalBoxDistortion = new VBox:
     alignment = Pos.Center
     spacing = 15
-    children = Seq(distortion.panel, distortionSwitch)
+    children = Seq(distortionContainer.panel, distortionSwitch)
 
   alignment = Pos.Center
   padding = Insets(10, 20, 10, 20)
   spacing = 50
-  children = Seq(pan.panel, distortionContainer)
+  children = Seq(panContainer.panel, finalBoxDistortion)
 
   override def resetSlidersAndValues(): Unit =
-    pan.slider.value = panConfig.panConfiguration.default
-    distortion.slider.value = distortionConfig.distortionConfiguration.default
-    _selectedFilter.value = defaultSwitchValue
+    panContainer.slider.value = panConfig.panConfiguration.default
+    distortionContainer.slider.value = distortionConfig.distortionConfiguration.default
+    _distortionFilter.value = defaultSwitchValue
+
+  /**
+   * @return the slider of Pan parameter.
+   */
+  def panSlider: Slider = panContainer.slider
+
+  /**
+   * @return the slider of Distortion parameter.
+   */
+  def distortionSlider: Slider = distortionContainer.slider
+
+  /**
+   * @return value of the filter for Distortion effect.
+   */
+  def distortionFilter: ReadOnlyObjectProperty[DistortionEnum] = _distortionFilter

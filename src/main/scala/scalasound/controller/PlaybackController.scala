@@ -1,9 +1,11 @@
 package scalasound.controller
 
 import cats.effect.IO
-import scalasound.model.domain.AudioChunk
-import scalasound.model.state.{AppStateStore, Command}
-import scalasound.model.state.Command.{Pause, Play, Stop}
+import scalasound.model.domain.AudioTrack
+import scalasound.model.state.AppStateStore
+import scalasound.model.state.Command.{Pause, Play, SeekToIndex, Stop}
+
+import scala.annotation.tailrec
 
 /**
  * The operations a user can perform on playback: play, pause, stop and seek.
@@ -36,39 +38,35 @@ trait PlaybackController:
  */
 class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
 
-  def play: IO[Unit] =
-    store.dispatch(Play).void
+  def play: IO[Unit] = store.dispatch(Play).void
 
-  def pause: IO[Unit] =
-    store.dispatch(Pause).void
+  def pause: IO[Unit] = store.dispatch(Pause).void
 
-  def stop: IO[Unit] =
-    store.dispatch(Stop).void
+  def stop: IO[Unit] = store.dispatch(Stop).void
 
   def seek(positionSeconds: Double): IO[Unit] =
-    store.current.flatMap { state =>
-      state.track match
-        case None =>
-          IO.unit
-        case Some(track) =>
-          val targetFrame =
-            math.max(0L, (positionSeconds * track.sampleRate).toLong)
-          val index =
-            findChunkIndexForFrame(track.chunks, targetFrame)
-          store.dispatch(Command.SeekToIndex(index)).void
-    }
+    for
+      state <- store.current
+      _     <- state.track match
+        case None        => IO.unit
+        case Some(track) => store.dispatch(SeekToIndex(track.chunkIndexAt(positionSeconds))).void
+    yield ()
 
-  private def findChunkIndexForFrame(chunks: Vector[AudioChunk], targetFrame: Long): Int =
-    import scala.annotation.tailrec
-    @tailrec
-    def loop(index: Int, accumulatedFrames: Long): Int =
-      chunks.lift(index) match
-        case None =>
-          math.max(0, chunks.length - 1)
-        case Some(chunk) =>
-          val nextAccumulated = accumulatedFrames + chunk.frameCount
-          targetFrame < nextAccumulated match
-            case true => index
-            case false => loop(index + 1, nextAccumulated)
+  extension (track: AudioTrack)
+    /**
+     * Index of the chunk that corresponds to the given position in seconds. Positions before the start go to
+     * the first chunk, positions past the end go to the last one.
+     */
+    private def chunkIndexAt(positionSeconds: Double): Int =
+      val targetFrame = (positionSeconds * track.sampleRate).toLong.max(0L)
+      @tailrec
+      def loop(index: Int, framesBefore: Long): Int =
+        track.chunks.lift(index) match
+          case None =>
+            (track.chunks.length - 1).max(0)
+          case Some(chunk) if targetFrame < framesBefore + chunk.frameCount =>
+            index
+          case Some(chunk) =>
+            loop(index + 1, framesBefore + chunk.frameCount)
 
-    loop(0, 0L)
+      loop(0, 0L)

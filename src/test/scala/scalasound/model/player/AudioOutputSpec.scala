@@ -1,53 +1,71 @@
 package scalasound.model.player
 
+import cats.syntax.foldable.*
 import cats.effect.IO
 import munit.CatsEffectSuite
 import scalasound.model.domain.AudioChunk
 import scalasound.model.player.AudioOutput
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.*
 
 class AudioOutputSpec extends CatsEffectSuite:
-  test("ConsoleAudioOutput writes successfully without error") {
-    val output = AudioOutput.console
-    val chunk = AudioChunk.MonoChunk(Vector.fill(100)(0.0f))
-    // Assert that writing a single chunk completes successfully
-    assertIO(output.write(chunk, 44100), ())
+
+  private val sampleRate: Int = 44100
+
+  private def mono(frames: Int): AudioChunk =
+    AudioChunk.MonoChunk(Vector.fill(frames)(0.0f))
+
+  private def stereo(frames: Int): AudioChunk =
+    AudioChunk.StereoChunk(Vector.fill(frames)(0.0f), Vector.fill(frames)(0.0f))
+
+  private def elapsed(io: IO[Unit]): IO[FiniteDuration] =
+    for
+      start <- IO.monotonic
+      _ <- io
+      end <- IO.monotonic
+    yield end - start
+
+  private def assertWaitedAtLeast(actual: FiniteDuration, expected: FiniteDuration): Unit =
+    val slack = 5.millis
+    assert(
+      actual >= expected - slack,
+      s"Expected at least ${expected.toMillis}ms, but took ${actual.toMillis}ms"
+    )
+
+  test("console writes a mono chunk without error") {
+    assertIO(AudioOutput.console.write(mono(100), sampleRate), ())
   }
 
-  test("BlockingConsoleAudioOutput correctly paces a chunk being played") {
-    val output = AudioOutput.blockingConsole
-    val sampleRate = 44100
-    // 4410 frames at 44100 Hz = exactly 0.1 seconds (100 ms)
-    val chunk = AudioChunk.MonoChunk(Vector.fill(4410)(0.0f))
-    val elapsedIO: IO[FiniteDuration] =
-      for
-        start <- IO.monotonic
-        _     <- output.write(chunk, sampleRate)
-        end   <- IO.monotonic
-      yield end - start
-    elapsedIO.map { elapsed =>
-      // Verify it blocked for at least 90ms
-      assert(elapsed >= 90.millis, s"Expected at least 90ms, but took ${elapsed.toMillis}ms")
-    }
+  test("console writes a stereo chunk without error") {
+    assertIO(AudioOutput.console.write(stereo(100), sampleRate), ())
   }
 
-  test("BlockingConsoleAudioOutput correctly paces multiple sequential chunks being played") {
-    val output = AudioOutput.blockingConsole
-    val sampleRate = 44100
-    // 4410 frames per chunk at 44100 Hz = 0.1 seconds per chunk (totaling 300ms for 3 chunks)
-    val chunks = Vector.fill(3)(AudioChunk.MonoChunk(Vector.fill(4410)(0.0f)))
-    val elapsedIO: IO[FiniteDuration] =
-      for
-        start <- IO.monotonic
-        _ <- chunks.foldLeft(IO.unit) { (acc, chunk) =>
-          acc *> output.write(chunk, sampleRate)
-        }
-        end <- IO.monotonic
-      yield end - start
+  test("console does not wait") {
+    // a 100 ms chunk is being played here
+    elapsed(AudioOutput.console.write(mono(4410), sampleRate)).map: e =>
+      assert(e < 50.millis, s"Expected no pacing, but took ${e.toMillis}ms")
+  }
 
-    elapsedIO.map { elapsed =>
-      // Verify it blocked for at least 270ms
-      assert(elapsed >= 270.millis, s"Expected at least 270ms for 3 chunks, but took ${elapsed.toMillis}ms")
-    }
+  List(8000 -> 120.millis, 16000 -> 60.millis, 48000 -> 20.millis, 96000 -> 10.millis)
+    .foreach: (rate, expected) =>
+      test(s"paced waits at least $expected for 960 frames at $rate Hz") {
+        elapsed(AudioOutput.console.paced.write(mono(960), rate))
+          .map(assertWaitedAtLeast(_, expected))
+      }
+
+  test("paced waits the total duration of sequential chunks") {
+    // 3 chunks of 100 ms each
+    val chunks = Vector.fill(3)(mono(4410))
+    elapsed(chunks.traverse_(AudioOutput.console.paced.write(_, sampleRate)))
+      .map(assertWaitedAtLeast(_, 300.millis))
+  }
+
+  test("paced duration depends on frames, so stereo waits as long as mono") {
+    elapsed(AudioOutput.console.paced.write(stereo(4410), sampleRate))
+      .map(assertWaitedAtLeast(_, 100.millis))
+  }
+
+  test("paced does not wait for an empty chunk") {
+    elapsed(AudioOutput.console.paced.write(mono(0), sampleRate)).map: e =>
+      assert(e < 50.millis, s"Expected no wait, but took ${e.toMillis}ms")
   }

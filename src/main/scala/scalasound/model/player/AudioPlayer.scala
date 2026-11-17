@@ -17,6 +17,8 @@ trait AudioPlayer:
   /**
    * Starts listening to the [[AppStateStore]] and playing audio accordingly.
    *
+   * A failure while playing a chunk stops playback, but the player is kept alive so that playback can be started again.
+   *
    * @param store the [[AppStateStore]] to watch for [[AppState]] changes and to dispatch play head updates to.
    * @return a stream that never completes on its own; cancel it to stop the player
    */
@@ -25,9 +27,9 @@ trait AudioPlayer:
 object AudioPlayer:
 
   /**
-   * An [[AudioPlayer]] that plays one chunk at a time, processing each chunk just before writing it.
+   * An [[AudioPlayer]] that plays one chunk at a time, processing each chunk just before playing it.
    *
-   * @param processor used to apply [[AudioEffect]]s to each [[AudioChunk]] just before it is written
+   * @param processor used to apply [[AudioEffect]]s to each [[AudioChunk]] just before it is played
    * @param out where the processed chunks are written (e.g. the speakers)
    * @return a player that is idle until [[AudioPlayer.run]] is called
    */

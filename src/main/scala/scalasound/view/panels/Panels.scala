@@ -3,7 +3,7 @@ package scalasound.view.panels
 import scalafx.application.JFXApp3.PrimaryStage
 import scalasound.controller.LoadSaveController
 import scalasound.view.loadsave.LoadSaveControls
-import scalasound.view.panels.effects.{EffectsPanelContainer, EffectsControls}
+import scalasound.view.panels.effects.EffectsPanelContainer
 import scalasound.view.panels.TitlePane
 import scalasound.view.panels.playback.TrackBox
 
@@ -35,9 +35,6 @@ object Panels:
 
   /**
    * Gets the Pane containing the lower section of the screen.
-   * @param stage the primary stage of the ScalaFx app.
-   * @param effectsControls handler that manages the operations on track.
    * @return the EffectsPanel.
    */
-  def effectsPanel(stage: PrimaryStage, effectsControls: EffectsControls): EffectsPanelContainer =
-    new EffectsPanelContainer(stage, effectsControls)
+  def effectsPanel(): EffectsPanelContainer = EffectsPanelContainer()

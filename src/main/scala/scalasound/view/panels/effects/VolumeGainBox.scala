@@ -1,34 +1,43 @@
 package scalasound.view.panels.effects
 
 import scalafx.geometry.{Insets, Pos}
+import scalafx.scene.control.Slider
 import scalafx.scene.layout.HBox
 import scalasound.model.processing.{AudioConfiguration, AudioEffect}
 import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 
 /* Box for the Volume-Gain effects. */
-private[effects] final class VolumeGainBox(using effectControls: EffectsControls) extends HBox with EffectPane:
+private[effects] final class VolumeGainBox extends HBox with EffectPane:
 
-  /* Importing of the Gain parameter values. */
+  /* Importing of the Gain and Volume parameter values. */
   private val gainConfig = AudioConfiguration.parameterConfiguration(Gain)
-  private val gain = Utility.effectContainer(Gain.name,
+  private val volumeConfig = AudioConfiguration.parameterConfiguration(Volume)
+
+  private val gainContainer = Utility.effectContainer(Gain.name,
     gainConfig.gainConfiguration,
-    v => effectControls.setEffect(AudioEffect.gain(v)),
     v => f"${v}%.2f",
     isHorizontal = false)
 
-  /* Importing of the Volume parameter values. */
-  private val volumeConfig = AudioConfiguration.parameterConfiguration(Volume)
-  private val volume = Utility.effectContainer(Volume.name,
+  private val volumeContainer = Utility.effectContainer(Volume.name,
     volumeConfig.volumeConfiguration,
-    v => effectControls.setEffect(AudioEffect.volume(v)),
     v => f"${v * 100}%.2f%%",
     isHorizontal = false)
 
   alignment = Pos.Center
   padding = Insets(10, 30, 10, 30)
   spacing = 50
-  children = Seq(gain.panel, volume.panel)
+  children = Seq(gainContainer.panel, volumeContainer.panel)
 
   override def resetSlidersAndValues(): Unit =
-    gain.slider.value = gainConfig.gainConfiguration.default
-    volume.slider.value = volumeConfig.volumeConfiguration.default
+    gainContainer.slider.value = gainConfig.gainConfiguration.default
+    volumeContainer.slider.value = volumeConfig.volumeConfiguration.default
+
+  /**
+    * @return the slider of Gain parameter.
+    */
+  def gainSlider: Slider = gainContainer.slider
+
+  /**
+   * @return the slider of Volume parameter.
+   */
+  def volumeSlider: Slider = volumeContainer.slider

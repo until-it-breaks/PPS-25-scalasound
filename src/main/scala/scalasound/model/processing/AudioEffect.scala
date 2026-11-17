@@ -113,7 +113,7 @@ object AudioEffect:
    * @param delay expressed in milliseconds defines the delay of the echo effect.
    * @param sampleRate the sampling rate in Hz.
    */
-  def echo(alpha: Float, delay: Int, sampleRate: Float): AudioEffect =
+  def echo(alpha: Float, delay: Int, sampleRate: Float = 44100f): AudioEffect =
     EchoEffect(alpha, delay, sampleRate)
 
   /**
@@ -128,7 +128,7 @@ object AudioEffect:
    * @param autopanValue it's the frequency in Hz from switching left to right.
    * @param sampleRate it's the frequency of sampling the chunks.
    */
-  def autopan(autopanValue: Float, sampleRate: Float): AudioEffect =
+  def autopan(autopanValue: Float, sampleRate: Float = 44100f): AudioEffect =
     AutopanEffect(autopanValue, sampleRate)
 
   /**

@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 import scalafx.beans.property.ObjectProperty
 import scalafx.geometry.{Insets, Pos}
@@ -9,12 +9,12 @@ import scalasound.model.processing.{AudioConfiguration, AudioEffect}
 import scalasound.model.processing.AudioEffectType.{Distortion, Pan}
 
 /* Simplifies the management of the switch. */
-private[effectPanels] enum DistortionEnum(val text: String):
+private[effects] enum DistortionEnum(val text: String):
   case Tanh extends DistortionEnum("Tanh")
   case Sin extends DistortionEnum("Sin")
 
 /* Companion Object containing constants and utility methods. */
-private[effectPanels] object DistortionPanBox:
+private[effects] object DistortionPanBox:
 
   /* Constants for styling. */
   private val BackgroundColor = Utility.BackgroundColor
@@ -69,7 +69,7 @@ private[effectPanels] object DistortionPanBox:
     children = buttons.toSeq
 
 /* Box for the Distortion-Pan effects. */
-private[effectPanels] final class DistortionPanBox(using effectControls: EffectsControls) extends VBox with EffectPane:
+private[effects] final class DistortionPanBox(using effectControls: EffectsControls) extends VBox with EffectPane:
   import DistortionEnum.*
   import DistortionPanBox.*
 

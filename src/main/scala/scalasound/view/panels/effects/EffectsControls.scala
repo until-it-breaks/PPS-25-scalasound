@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 import cats.effect.unsafe.IORuntime
 import scalasound.controller.EffectsController

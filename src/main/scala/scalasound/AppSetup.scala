@@ -10,8 +10,8 @@ import scalasound.model.processing.AudioProcessorWithRules
 import scalasound.model.state.AppStateStore
 import scalasound.view.AppDependencies
 import scalasound.view.loadsave.{LoadSaveControlsImpl, LoadSaveObserverImpl}
-import scalasound.view.mainPanel.effectPanels.EffectsControlsImpl
-import scalasound.view.mainPanel.playback.TrackBoxLogic
+import scalasound.view.panels.effects.EffectsControlsImpl
+import scalasound.view.panels.playback.TrackBoxLogic
 
 object AppSetup:
   def make(ready: IO[Unit])(using IORuntime): Resource[IO, AppDependencies] =

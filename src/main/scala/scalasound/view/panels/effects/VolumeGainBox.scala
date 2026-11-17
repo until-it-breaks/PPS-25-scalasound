@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.layout.HBox
@@ -6,7 +6,7 @@ import scalasound.model.processing.{AudioConfiguration, AudioEffect}
 import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 
 /* Box for the Volume-Gain effects. */
-private[effectPanels] final class VolumeGainBox(using effectControls: EffectsControls) extends HBox with EffectPane:
+private[effects] final class VolumeGainBox(using effectControls: EffectsControls) extends HBox with EffectPane:
 
   /* Importing of the Gain parameter values. */
   private val gainConfig = AudioConfiguration.parameterConfiguration(Gain)

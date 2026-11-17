@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 
 import scalafx.geometry.{Insets, Pos}
@@ -7,7 +7,7 @@ import scalasound.model.processing.{AudioConfiguration, AudioEffect}
 import scalasound.model.processing.AudioEffectType.{Autopan, Echo}
 
 /* Box fot the Echo-Autopan effects. */
-private[effectPanels] final class EchoAutopanBox(using effectControls: EffectsControls) extends VBox with EffectPane:
+private[effects] final class EchoAutopanBox(using effectControls: EffectsControls) extends VBox with EffectPane:
 
   private val FontSizeParameter = 18
   private val DefaultSampleRate = 44100f

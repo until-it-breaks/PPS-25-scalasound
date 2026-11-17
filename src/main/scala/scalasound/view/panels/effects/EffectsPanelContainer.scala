@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.geometry.{Insets, Pos}
@@ -7,7 +7,7 @@ import scalafx.scene.control.Button
 import scalafx.scene.layout.{BorderPane, HBox}
 import scalasound.controller.EffectsController
 
-object EffectPanel:
+object EffectsPanelContainer:
 
   private val resetAllButton = new Button("Reset All"):
     cursor = Cursor.Hand
@@ -33,9 +33,9 @@ object EffectPanel:
 /**
  * Container for all the effects that can be applied on the current track.
  */
-final class EffectPanel(stage: PrimaryStage,
+final class EffectsPanelContainer(stage: PrimaryStage,
                         effectsControls: EffectsControls) extends BorderPane:
-  import EffectPanel.*
+  import EffectsPanelContainer.*
   
   private given EffectsControls = effectsControls
   private val volumeGainBox = VolumeGainBox()

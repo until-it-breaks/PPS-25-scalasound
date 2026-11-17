@@ -2,8 +2,8 @@ package scalasound.view
 
 import scalasound.controller.LoadSaveController
 import scalasound.view.loadsave.LoadSaveControls
-import scalasound.view.mainPanel.effectPanels.EffectsControls
-import scalasound.view.mainPanel.playback.TrackBoxLogic
+import scalasound.view.panels.effects.EffectsControls
+import scalasound.view.panels.playback.TrackBoxLogic
 
 /**
  * Everything the user interface needs from the rest of the application.

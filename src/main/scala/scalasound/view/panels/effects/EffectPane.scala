@@ -1,12 +1,12 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 import scalafx.scene.control.Slider
 import scalafx.scene.layout.Pane
 
 /* Container for each effect. */
-private[effectPanels] final case class PanelComponents(panel: Pane, slider: Slider)
+private[effects] final case class PanelComponents(panel: Pane, slider: Slider)
 
-private[effectPanels] trait EffectPane extends Pane:
+private[effects] trait EffectPane extends Pane:
   style = """
     -fx-background-color: white;
     -fx-border-color: black;

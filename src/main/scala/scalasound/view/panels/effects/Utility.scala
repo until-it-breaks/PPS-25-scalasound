@@ -1,4 +1,4 @@
-package scalasound.view.mainPanel.effectPanels
+package scalasound.view.panels.effects
 
 import scalafx.geometry.{Orientation, Pos}
 import scalafx.scene.Node
@@ -10,7 +10,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 /* Utility class that contains common method used in different effect panels. */
-private[effectPanels] object Utility:
+private[effects] object Utility:
 
   // TODO: Conviene lasciarla public?
   val BackgroundColor = "#4287f5"
@@ -58,6 +58,7 @@ private[effectPanels] object Utility:
       orientation = Orientation.Vertical
       prefHeight = sliderSize
 
+    // TODO TOGLIERE QUESTI LISTENER E METTERLI IN UN METODO PRIVATO IN LOGIC
     valueChanging.onChange { (_, wasChanging, isChanging) =>
       if wasChanging && !isChanging then onUpdate(value.value.toFloat)
     }

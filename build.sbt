@@ -8,6 +8,7 @@ lazy val root = rootProject
       """scalasound\.view\..*""",
       """scalasound\.[A-Za-z0-9_$]+"""
     ).mkString(";"),
+    coverageDataDir := (Compile / classDirectory).value,
     assembly / assemblyJarName := "app.jar",
     assembly / assemblyOutputPath := file("target/app.jar"),
     assembly / assemblyMergeStrategy := {

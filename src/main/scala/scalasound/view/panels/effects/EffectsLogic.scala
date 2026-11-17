@@ -52,7 +52,7 @@ final class EffectsLogic(controller: EffectsController)(using IORuntime):
     val echoAutopanBox = effectPanel.echoAutopanBox
 
     effectPanel.resetAllButton.onAction = _ =>
-      controller.removeAll()
+      removeAll()
       volumeGainBox.resetSlidersAndValues()
       distortionPanBox.resetSlidersAndValues()
       echoAutopanBox.resetSlidersAndValues()

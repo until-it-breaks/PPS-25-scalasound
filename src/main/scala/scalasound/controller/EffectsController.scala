@@ -25,10 +25,20 @@ trait EffectsController:
   def removeAll(): IO[Unit]
 
 /**
- * A [[EffectsController]] that carries out each request by dispatching a command to the [[AppStateStore]].
- * @param store the [[AppStateStore]] that receives the playback commands.
+ * A [[EffectsController]] that carries out each request by 
+ * dispatching a command to the [[AppStateStore]].
  */
-final class EffectsControllerImpl(store: AppStateStore) extends EffectsController:
+object EffectsController:
+
+  /**
+   * @param store the [[AppStateStore]] that receives the playback commands.
+   * @return a new EffectsController.
+   */
+  def apply(store: AppStateStore): EffectsController =
+    EffectsControllerImpl(store)
+
+/* Hidden implementation of EffectsController. */
+private final class EffectsControllerImpl(store: AppStateStore) extends EffectsController:
 
   override def addEffect(effect: AudioEffect): IO[Unit] =
     store.dispatch(AddEffect(effect)).void

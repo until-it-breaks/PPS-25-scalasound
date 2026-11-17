@@ -3,7 +3,7 @@ package scalasound
 import cats.Applicative.ops.toAllApplicativeOps
 import cats.effect.{IO, Resource}
 import cats.effect.unsafe.IORuntime
-import scalasound.controller.{EffectsControllerImpl, LoadSaveController, PlaybackControllerImpl}
+import scalasound.controller.{EffectsController, LoadSaveController, PlaybackControllerImpl}
 import scalasound.model.io.{WavAudioReader, WavAudioWriter}
 import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.AudioProcessorWithRules
@@ -20,7 +20,7 @@ object AppSetup:
       loadSaveController <- LoadSaveController.make(store, WavAudioReader, WavAudioWriter)
       loadSaveControls    = LoadSaveControlsImpl(loadSaveController)
       trackBoxLogic       = TrackBoxLogic(store, PlaybackControllerImpl(store))
-      effectsLogic        = EffectsLogic(EffectsControllerImpl(store))
+      effectsLogic        = EffectsLogic(EffectsController(store))
       _                  <- startPlayer(store)
       _                  <- (ready >> LoadSaveObserverImpl(store, loadSaveControls).observe).background
       _                  <- (ready >> trackBoxLogic.observe).background

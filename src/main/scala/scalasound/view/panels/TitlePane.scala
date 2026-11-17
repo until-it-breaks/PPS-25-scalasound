@@ -77,12 +77,10 @@ private[panels] final class TitlePane(
       .foreach(file => controller.save(file.toPath))
 
   padding = Insets(25)
-  style = s"-fx-background-color: ${BackgroundColor};"
+  style = s"-fx-background-color: $BackgroundColor;"
   left = titleLabel
   center = statusLabel
   right = buttonContainer
   BorderPane.setAlignment(titleLabel, Pos.CenterLeft)
   BorderPane.setAlignment(statusLabel, Pos.Center)
   BorderPane.setAlignment(buttonContainer, Pos.CenterRight)
-
-end TitlePane

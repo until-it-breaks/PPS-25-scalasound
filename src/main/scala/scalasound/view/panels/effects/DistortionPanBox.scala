@@ -5,7 +5,7 @@ import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Cursor
 import scalafx.scene.control.{Slider, ToggleButton, ToggleGroup}
 import scalafx.scene.layout.{HBox, VBox}
-import scalasound.model.processing.{AudioConfiguration, AudioEffect}
+import scalasound.model.processing.AudioConfiguration
 import scalasound.model.processing.AudioEffectType.{Distortion, Pan}
 
 /* Simplifies the management of the switch. */

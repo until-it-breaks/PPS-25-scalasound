@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets
 /* Utility class that contains common method used in different effect panels. */
 private[effects] object Utility:
 
-  // TODO: Conviene lasciarla public?
   val BackgroundColor = "#4287f5"
   val TitleEffectSize = 20
 
@@ -110,6 +109,6 @@ private[effects] object Utility:
     private val boldStyle = if boldFont then "-fx-font-weight: bold;" else ""
     style = s"""
       -fx-font-size: ${fontSize}px;
-      -fx-text-fill: ${color};
-      ${boldStyle}
+      -fx-text-fill: $color;
+      $boldStyle
     """

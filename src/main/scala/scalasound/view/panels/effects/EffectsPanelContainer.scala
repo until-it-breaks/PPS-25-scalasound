@@ -1,11 +1,9 @@
 package scalasound.view.panels.effects
 
-import scalafx.application.JFXApp3.PrimaryStage
-import scalafx.geometry.{Insets, Pos}
+import scalafx.geometry.Insets
 import scalafx.scene.Cursor
 import scalafx.scene.control.Button
-import scalafx.scene.layout.{BorderPane, HBox}
-import scalasound.controller.EffectsController
+import scalafx.scene.layout.BorderPane
 
 object EffectsPanelContainer:
 

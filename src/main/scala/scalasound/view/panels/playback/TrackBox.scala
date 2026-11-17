@@ -21,7 +21,7 @@ private[panels] object TrackBox:
 
   private def createAudioButton(text: String): Button = new Button(text):
     cursor = Cursor.Hand
-    prefWidth = 70
+    prefWidth = 75
     prefHeight = 40
     style = """
       -fx-background-color: #3c6382;

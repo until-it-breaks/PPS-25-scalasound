@@ -5,6 +5,8 @@ import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.MonoTrack
 import scalasound.model.io.{AudioLoadError, AudioSaveError}
+import scalasound.model.processing.AudioEffect
+import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 import scalasound.model.state.Command.*
 import scalasound.model.state.{AppState, ExportState, ImportState}
 import scalasound.model.state.ImportState.Imported
@@ -20,12 +22,14 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
     )
   )
 
-  "initial state" should "have playback stopped, no track loaded, have chunkIndex at 0 and import/export in idle" in {
+  "initial state" should "have playback stopped, no track loaded, have chunkIndex at 0, " +
+    "effects list empty and import/export in idle" in {
     val state = AppState.initial
     state.playbackState shouldBe Stopped
     state.importState shouldBe ImportState.Idle
     state.track shouldBe None
     state.chunkIndex shouldBe 0
+    state.effects shouldBe List.empty
     state.exportState shouldBe ExportState.Idle
   }
 
@@ -91,6 +95,46 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
     val pausedState = base.handle(Play).handle(Pause).handle(NextChunk)
     pausedState.chunkIndex shouldBe 0
   }
+
+  "removeAll" should "clear the list even if no element is inside" in:
+    val base = AppState.initial
+    base.effects shouldBe List.empty
+    base.handle(RemoveAll).effects shouldBe List.empty
+
+  it should "remove all the effects contained in the effects list" in:
+    val effects = Seq(AudioEffect.volume(1.0f), AudioEffect.gain(1.0f))
+    val base = effects.foldLeft(AppState.initial) {
+      (accumulator, x) => accumulator.handle(AddEffect(x))
+    }
+    base.effects should not be List.empty
+    base.effects.length shouldBe effects.length
+    base.handle(RemoveAll).effects shouldBe List.empty
+
+  "addEffect" should "add a new effect to the effects list" in:
+    val base = AppState.initial
+    base.effects shouldBe List.empty
+    val effects = Seq(AudioEffect.volume(1.0f), AudioEffect.gain(1.0f))
+    val full = effects.foldLeft(base) {
+      (accumulator, x) => accumulator.handle(AddEffect(x))
+    }
+    full.effects should not be List.empty
+    full.effects.length shouldBe effects.length
+    full.effects shouldBe effects.reverse.toList
+
+  it should "replace an existing type effect with a new one as the head of the list" in:
+    val volume1 = AudioEffect.volume(1.0f)
+    val gain = AudioEffect.gain(1.0f)
+    val effects = Seq(volume1, gain)
+    val base = effects.foldLeft(AppState.initial) {
+      (accumulator, x) => accumulator.handle(AddEffect(x))
+    }
+    // The new effect is added to the front of the list.
+    base.effects.head.effectType shouldBe Gain
+    val volume2 = AudioEffect.volume(0.5f)
+    val newBase = base.handle(AddEffect(volume2))
+    newBase.effects.length shouldBe effects.length
+    newBase.effects.head.effectType shouldBe Volume
+    newBase.effects shouldBe List(volume2, gain)
 
   "currentPositionSeconds" should "calculate correct time based on active chunkIndex" in {
     val state = AppState.initial.handle(UpdateImport(Imported(track)))

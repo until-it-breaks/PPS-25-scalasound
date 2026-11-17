@@ -5,7 +5,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.model.processing.AudioEffectType.{Autopan, Gain, Pan, Volume}
+import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Pan, Volume}
 
 /**
  * Test class containing all the checks for the different audio processors
@@ -22,10 +22,18 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
   private val gainConfig = AudioConfiguration.parameterConfiguration(Gain).gainConfiguration
   private val volumeConfig = AudioConfiguration.parameterConfiguration(Volume).volumeConfiguration
   private val panConfig = AudioConfiguration.parameterConfiguration(Pan).panConfiguration
+  private val distortionConfig = AudioConfiguration.parameterConfiguration(Distortion).distortionConfiguration
+  private val echoAlphaConfig = AudioConfiguration.parameterConfiguration(Echo).alphaConfiguration
+  private val echoDelayConfig = AudioConfiguration.parameterConfiguration(Echo).delayConfiguration
+  private val autopanConfig = AudioConfiguration.parameterConfiguration(Autopan).autopanConfiguration
 
-  private val gain = GainEffect(gainConfig.default)
-  private val volume = VolumeEffect(volumeConfig.default)
-  private val pan = PanEffect(panConfig.default)
+  private val identity = AudioEffect.identity
+  private val gain = AudioEffect.gain(gainConfig.default)
+  private val volume = AudioEffect.volume(volumeConfig.default)
+  private val pan = AudioEffect.pan(panConfig.default)
+  private val distortion = AudioEffect.distortion(distortionConfig.default)
+  private val echo = AudioEffect.echo(echoAlphaConfig.default, echoDelayConfig.default.toInt)
+  private val autopan = AudioEffect.autopan(autopanConfig.default)
 
   private val simpleEffectsList: List[AudioEffect] = List(gain, volume, pan)
   private val orderedEffects = List(gain, pan, volume)
@@ -61,23 +69,29 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     val emptyChunk: AudioChunk = MonoChunk(Vector.empty)
     val resultChunk = SimpleAudioProcessor(emptyChunk, simpleEffectsList, StartingIndex)
     resultChunk.left.value shouldBe a [AudioError.AudioProcessorError]
+    resultChunk.left.value.getContent should include("SimpleAudioProcessor")
 
   it should "return an AudioError when the track is empty" in:
     val emptyTrack = MonoTrack(SampleRate, Vector.empty)
     val resultTrack = SimpleAudioProcessor(emptyTrack, simpleEffectsList)
     resultTrack.left.value shouldBe a [AudioError.AudioProcessorError]
 
-  it should "identify if an error is present in the effects" in:
+  it should "identify if an error is present in the effects and " +
+    "return an error containing the name of the effect failed" in:
     val invalidValue = AudioConfiguration.parameterConfiguration(Gain).gainConfiguration.min - 1.0f
     val invalidGain = GainEffect(invalidValue)
     val invalidEffectsList = List(invalidGain, volume, pan)
     val resultChunk = SimpleAudioProcessor(chunk, invalidEffectsList, StartingIndex)
     resultChunk.left.value shouldBe a [AudioError]
+    resultChunk.left.value.getContent should include(AudioEffectType.Gain.name)
 
   it should "identify the lack of the effects" in:
     val emptyEffects: List[AudioEffect] = List.empty
     val resultChunk = SimpleAudioProcessor(chunk, emptyEffects, StartingIndex)
     resultChunk.value shouldBe chunk
+    val track = createTrack
+    val resultTrack = SimpleAudioProcessor(track, emptyEffects)
+    resultTrack.value shouldBe track
 
   "SimpleAudioProcessor" should "apply the effects in the same order " +
     "in which they were added to the list" in:
@@ -112,6 +126,11 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     val resultTrackLonger = SimpleAudioProcessor(track, simpleEffectsList)
     resultTrackLonger.value shouldBe a [StereoTrack]
 
+  it should "maintain the MonoTrack when no effect produces StereoChunks" in:
+    val track = createTrack
+    val resultTrack = SimpleAudioProcessor(track, List(gain, volume))
+    resultTrack.value shouldBe a [MonoTrack]
+
   "AudioProcessorWithRules" should "apply the effects in a specific order: [Gain, Pan, Volume]" in:
     val resultChunk = AudioProcessorWithRules(chunk, simpleEffectsList, StartingIndex)
     resultChunk.value shouldBe pipeline(orderedEffects, chunk, StartingIndex).value
@@ -128,3 +147,13 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     val orderedList = List(gain, pan, volume, NewEffect)
     val resultChunk = AudioProcessorWithRules(chunk, unorderedList, StartingIndex)
     resultChunk.value shouldBe pipeline(orderedList, chunk, StartingIndex).value
+
+  it should "apply the effects in the correct order when all " +
+    "the type of effects are included in the effects list" in:
+    val completeList = List(gain, volume, pan, distortion, echo, autopan, identity)
+    val newEcho = AudioEffect.echo(echoAlphaConfig.default, echoDelayConfig.default.toInt)
+    val newAutopan = AudioEffect.autopan(autopanConfig.default)
+    val orderedList = List(identity, gain, distortion, newEcho, pan, newAutopan, volume)
+    val resultChunk = AudioProcessorWithRules(chunk, completeList, StartingIndex)
+    val pipe = pipeline(orderedList, chunk, StartingIndex)
+    resultChunk.value shouldBe pipe.value

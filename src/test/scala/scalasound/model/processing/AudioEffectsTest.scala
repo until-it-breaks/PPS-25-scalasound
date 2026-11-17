@@ -32,6 +32,9 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
   private val sampleRateStandard = 44100.0f
   private val chunk: AudioChunk = MonoChunk(Vector.fill(sizeChunk)(defaultValueChunk))
 
+  "Available effects" should "be the ones contained in the AudioEffectType enum" in:
+    AudioEffect.effectsNames.length shouldBe AudioEffectType.values.length
+
   "Chunk" should "not be empty" in:
     chunk.getVectors should not be empty
     chunk.getVectors.head.size shouldEqual sizeChunk
@@ -41,43 +44,44 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     chunk should not be a [StereoChunk]
 
   "IdentityEffect" should "return the same initial chunk" in:
-    val resultChunk = IdentityEffect(chunk)
+    val resultChunk = AudioEffect.identity(chunk)
     resultChunk.value shouldBe chunk
 
   "GainEffect" should "return a new chunk where values are clamped in [-1.0,1.0] interval" in:
     val gain = (Config.GainConfig.min + Config.GainConfig.max) / 2
-    val resultChunk = GainEffect(gain)(chunk)
+    val resultChunk = AudioEffect.gain(gain)(chunk)
     resultChunk.value shouldBe MonoChunk(Vector.fill(sizeChunk)(defaultValueChunk * gain))
 
   it should "return an AudioError if the gain out of bounds" in:
     val invalidGainMax = Config.GainConfig.max + 1.0f
-    val resultChunkMax = GainEffect(invalidGainMax)(chunk)
+    val resultChunkMax = AudioEffect.gain(invalidGainMax)(chunk)
     resultChunkMax.left.value shouldBe a [AudioError.AudioEffectsError]
     val invalidGainMin = Config.GainConfig.min - 1.0f
-    val resultChunkMin = GainEffect(invalidGainMin)(chunk)
+    val resultChunkMin = AudioEffect.gain(invalidGainMin)(chunk)
     resultChunkMin.left.value shouldBe a[AudioError.AudioEffectsError]
 
   "PanEffect" should "return a new StereoChunk" in:
     val pan = (Config.PanConfig.min + Config.PanConfig.max) / 2
-    val resultChunk = PanEffect(pan)(chunk)
+    val resultChunk = AudioEffect.pan(pan)(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
   "PanEffect" should "disable right channel when the min pan value is inserted" in :
     val pan = Config.PanConfig.min
-    val resultChunk = PanEffect(pan)(chunk)
+    val resultChunk = AudioEffect.pan(pan)(chunk)
     resultChunk.value.getVectors(1) shouldBe Vector.fill(sizeChunk)(0.0f)
 
   it should "return an AudioError if the pan is out of bounds" in:
     val invalidMaxPan = Config.PanConfig.max + 1.0f
-    val resultChunkMax = PanEffect(invalidMaxPan)(chunk)
+    val resultChunkMax = AudioEffect.pan(invalidMaxPan)(chunk)
     resultChunkMax.left.value shouldBe a [AudioError.AudioEffectsError]
     val invalidMinPan = Config.PanConfig.min - 1.0f
-    val resultChunkMin = PanEffect(invalidMinPan)(chunk)
+    val resultChunkMin = AudioEffect.pan(invalidMinPan)(chunk)
     resultChunkMin.left.value shouldBe a[AudioError.AudioEffectsError]
 
   "VolumeEffect" should "return the same chunk if the volume is set to its default value" in:
-    val resultChunk = VolumeEffect(Config.VolumeConfig.default)(chunk)
+    val resultChunk = AudioEffect.volume(Config.VolumeConfig.default)(chunk)
     resultChunk.value shouldBe chunk
+    resultChunk.value shouldBe a [MonoChunk]
 
   it should "process both channel of a StereoChunk" in:
     val leftValue = defaultValueChunk / 2.0f
@@ -86,17 +90,17 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val rightChunk = Vector.fill(sizeChunk)(rightValue)
     val stereoChunk = StereoChunk(leftChunk, rightChunk)
     val volume = (Config.VolumeConfig.min + Config.VolumeConfig.max) / 2
-    val resultChunk = VolumeEffect(volume)(stereoChunk)
+    val resultChunk = AudioEffect.volume(volume)(stereoChunk)
     resultChunk.value shouldBe StereoChunk(
       Vector.fill(sizeChunk)(leftValue * volume), 
       Vector.fill(sizeChunk)(rightValue * volume))
 
   it should "return an AudioError if the volume is out of bounds" in:
     val invalidVolumeMax = Config.VolumeConfig.max + 1.0f
-    val resultChunkMax = VolumeEffect(invalidVolumeMax)(chunk)
+    val resultChunkMax = AudioEffect.volume(invalidVolumeMax)(chunk)
     resultChunkMax.left.value shouldBe a [AudioError.AudioEffectsError]
     val invalidVolumeMin = Config.VolumeConfig.min - 1.0f
-    val resultChunkMin = VolumeEffect(invalidVolumeMin)(chunk)
+    val resultChunkMin = AudioEffect.volume(invalidVolumeMin)(chunk)
     resultChunkMin.left.value shouldBe a[AudioError.AudioEffectsError]
 
   "DistortionEffect" should "return a new AudioChunk with " +
@@ -104,22 +108,22 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val distortion = (Config.DistortionConfig.min + Config.DistortionConfig.max) / 2
 
     // Test with Soft Clipping (Tanh)
-    val resultChunkTanh = DistortionEffect(distortion, isSoftClipping = true)(chunk)
+    val resultChunkTanh = AudioEffect.distortion(distortion, isSoftClipping = true)(chunk)
     val resultValueTanh = math.tanh(distortion * defaultValueChunk).toFloat
     resultChunkTanh.value shouldBe MonoChunk(Vector.fill(sizeChunk)(resultValueTanh))
 
     // Test with Wave Folding (Sin)
-    val resultChunkSin = DistortionEffect(distortion, isSoftClipping = false)(chunk)
+    val resultChunkSin = AudioEffect.distortion(distortion, isSoftClipping = false)(chunk)
     val resultValueSin = math.sin(distortion * defaultValueChunk).toFloat
     resultChunkSin.value shouldBe MonoChunk(Vector.fill(sizeChunk)(resultValueSin))
 
   it should "return an AudioError if the distortion is out of bounds" in:
     val invalidDistortionMax = Config.DistortionConfig.max + 3.0f
-    val resultChunkMax = DistortionEffect(invalidDistortionMax, isSoftClipping = true)(chunk)
+    val resultChunkMax = AudioEffect.distortion(invalidDistortionMax, isSoftClipping = true)(chunk)
     resultChunkMax.left.value shouldBe a [AudioError.AudioEffectsError]
 
     val invalidDistortionMin = Config.DistortionConfig.min - 3.0f
-    val resultChunkMin = DistortionEffect(invalidDistortionMin, isSoftClipping = true)(chunk)
+    val resultChunkMin = AudioEffect.distortion(invalidDistortionMin, isSoftClipping = true)(chunk)
     resultChunkMin.left.value shouldBe a[AudioError.AudioEffectsError]
 
   "AutopanEffect" should "return a new StereoChunk where " +

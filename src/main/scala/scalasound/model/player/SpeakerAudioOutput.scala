@@ -6,112 +6,99 @@ import scalasound.model.domain.AudioChunk
 import java.nio.{ByteBuffer, ByteOrder}
 import javax.sound.sampled.{AudioFormat, AudioSystem, SourceDataLine}
 
-object PcmAudioEncoding:
-  val BitsPerSample: Int = 16
-  private val BytesPerSample: Int = BitsPerSample / 8
-  private val Pcm16MaxAmplitude: Float = 32767.0f
-
-  extension (chunk: AudioChunk)
-
-    /**
-     * Converts an immutable [[AudioChunk]] into raw 16-bit PCM bytes.
-     */
-    def toPcmBytes: Array[Byte] =
-      import AudioChunk.*
-      val frameCount = chunk match
-        case MonoChunk(samples)      => samples.size
-        case StereoChunk(left, right) => math.min(left.size, right.size)
-      val buffer = ByteBuffer.allocate(
-        frameCount * BytesPerSample * (chunk match
-          case MonoChunk(_) => 1
-          case StereoChunk(_, _) => 2
-          )
-      )
-      buffer.order(ByteOrder.LITTLE_ENDIAN)
-      chunk match
-        case MonoChunk(samples) =>
-          samples.foreach { sample =>
-            val clamped = math.max(-1.0f, math.min(1.0f, sample))
-            buffer.putShort((clamped * Pcm16MaxAmplitude).toShort)
-          }
-        case StereoChunk(left, right) =>
-          left.zip(right).foreach { (left, right) =>
-            val clampedLeft = math.max(-1.0f, math.min(1.0f, left))
-            val clampedRight = math.max(-1.0f, math.min(1.0f, right))
-            buffer.putShort((clampedLeft * Pcm16MaxAmplitude).toShort)
-            buffer.putShort((clampedRight * Pcm16MaxAmplitude).toShort)
-          }
-      buffer.array()
-
-import PcmAudioEncoding.*
-
 /**
- * An [[AudioOutput]] that plays audio chunks to the speakers using the Java Sound API.
+ * An [[AudioOutput]] that plays [[AudioChunk]]s to the speakers using the Java Sound API.
+ *
+ * Keeps one [[SourceDataLine]] open and reuses it while the format (sample rate and channel count)
+ * stays the same; a format change drains and replaces it.
  */
-class SpeakerAudioOutput extends AudioOutput:
+private final class SpeakerAudioOutput extends AudioOutput:
+  import SpeakerAudioOutput.*
 
-  private case class ActiveLine(line: SourceDataLine, sampleRate: Int, channels: Int)
-  private var activeLine: Option[ActiveLine] = None
+  private var active: Option[ActiveLine] = None
 
   /**
-   * Writes an [[AudioChunk]] at the specified sample rate to the speaker output device.
-   *
-   * This operation blocks until the audio bytes are successfully written to the
-   * underlying line buffer.
-   *
-   * @param chunk the [[AudioChunk]] to be played
-   * @param sampleRate the sample rate in Hz (e.g., 44100, 48000)
-   * @return an [[IO]] effect wrapping the write operation
+   * Writes a chunk to the sound card, opening or reopening the line if the format changed.
+   * Completes when the bytes have been accepted by the line's buffer.
    */
   override def write(chunk: AudioChunk, sampleRate: Int): IO[Unit] =
-    IO.blocking {
-      val channels = chunk match
-        case AudioChunk.MonoChunk(_) => 1
-        case AudioChunk.StereoChunk(_, _) => 2
-      val bytes = chunk.toPcmBytes
-      val line = lineFor(sampleRate, channels)
-      line.write(bytes, 0, bytes.length)
-    }.void
+    for
+      bytes <- IO(chunk.toPcmBytes)
+      _     <- IO.blocking {
+        val line = lineFor(Format(sampleRate, chunk.channels))
+        line.write(bytes, 0, bytes.length)
+      }
+    yield ()
 
-  /**
-   * Closes any active audio output line and releases system resources associate with the speaker playback.
-   *
-   * @return an [[IO]] effect wrapping the cleanup operation
-   */
-  def close: IO[Unit] =
-    IO.blocking {
-      activeLine.foreach(active => closeLine(active.line))
-      activeLine = None
-    }
-
-  private def lineFor(sampleRate: Int, channels: Int): SourceDataLine =
-    activeLine.filter(active => active.sampleRate == sampleRate && active.channels == channels) match
-      case Some(active) => active.line
+  private def lineFor(format: Format): SourceDataLine =
+    active.filter(_.format == format) match
+      case Some(current) => current.line
       case None =>
-        activeLine.foreach(active => closeLine(active.line))
-        val line = openLine(sampleRate, channels)
-        activeLine = Some(ActiveLine(line, sampleRate, channels))
+        val previous = active
+        active = None
+        previous.foreach(p => release(p.line))
+        val line = open(format)
+        active = Some(ActiveLine(format, line))
         line
 
-  private def openLine(sampleRate: Int, channels: Int): SourceDataLine =
-    val frameSize = channels * (BitsPerSample / 8)
-    val format = new AudioFormat(
-      AudioFormat.Encoding.PCM_SIGNED,
-      sampleRate.toFloat,
-      BitsPerSample,
-      channels,
-      frameSize,
-      sampleRate.toFloat,
-      false
-    )
-    val line = AudioSystem.getSourceDataLine(format)
-    line.open(format, frameSize * (sampleRate / 5))
+  private def open(format: Format): SourceDataLine =
+    val line = AudioSystem.getSourceDataLine(format.toAudioFormat)
+    line.open(format.toAudioFormat, format.bufferBytes)
     line.start()
     line
 
-  private def closeLine(line: SourceDataLine): Unit =
-    try
-      line.drain()
-      line.stop()
-      line.close()
-    catch case _: Exception => ()
+  private def release(line: SourceDataLine): Unit =
+    line.drain()
+    line.close()
+
+private object SpeakerAudioOutput:
+  private val BitsPerSample = 16
+  private val BytesPerSample = BitsPerSample / 8
+  private val MaxAmplitude = Short.MaxValue.toFloat
+  private val BufferMillis = 200
+
+  private final case class ActiveLine(format: Format, line: SourceDataLine)
+
+  private final case class Format(sampleRate: Int, channels: Int):
+    def bufferBytes: Int = channels * BytesPerSample * sampleRate * BufferMillis / 1000
+
+    def toAudioFormat: AudioFormat =
+      AudioFormat(
+        AudioFormat.Encoding.PCM_SIGNED,
+        sampleRate.toFloat,
+        BitsPerSample,
+        channels,
+        channels * BytesPerSample,
+        sampleRate.toFloat,
+        false // little-endian, must match ByteOrder.LITTLE_ENDIAN in toPcmBytes
+      )
+
+  extension (chunk: AudioChunk)
+    private def channels: Int = chunk match
+      case AudioChunk.MonoChunk(_) => 1
+      case AudioChunk.StereoChunk(_, _) => 2
+
+    /**
+     * Encodes the [[AudioChunk]] as raw 16-bit signed PCM, little-endian.
+     *
+     * Mono chunks produce one 2-byte sample per frame. Stereo chunks are interleaved
+     * (left, right, left, right, ...), so each frame takes 4 bytes.
+     *
+     * @return the encoded bytes, `frameCount * channels * 2` of them
+     */
+    private[player] def toPcmBytes: Array[Byte] =
+      val buffer = ByteBuffer
+        .allocate(chunk.frameCount * chunk.channels * BytesPerSample)
+        .order(ByteOrder.LITTLE_ENDIAN)
+      chunk match
+        case AudioChunk.MonoChunk(samples) =>
+          samples.foreach(sample => buffer.putShort(sample.toPcm16))
+        case AudioChunk.StereoChunk(left, right) =>
+          left.zip(right).foreach: (l, r) =>
+            buffer.putShort(l.toPcm16)
+            buffer.putShort(r.toPcm16)
+      buffer.array()
+
+  extension (sample: Float)
+    private def toPcm16: Short =
+      (sample.max(-1f).min(1f) * MaxAmplitude).toShort

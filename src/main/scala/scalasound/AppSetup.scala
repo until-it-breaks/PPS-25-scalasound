@@ -18,16 +18,17 @@ object AppSetup:
     for
       store              <- Resource.eval(AppStateStore.make)
       loadSaveController <- LoadSaveController.make(store, WavAudioReader, WavAudioWriter)
-      loadSaveControls    = LoadSaveControlsImpl(loadSaveController)
-      trackBoxLogic       = TrackBoxLogic(store, PlaybackControllerImpl(store))
-      effectsLogic        = EffectsLogic(EffectsController(store))
-      _                  <- startPlayer(store)
-      _                  <- (ready >> LoadSaveObserverImpl(store, loadSaveControls).observe).background
-      _                  <- (ready >> trackBoxLogic.observe).background
+      loadSaveControls = LoadSaveControlsImpl(loadSaveController)
+      trackBoxLogic    = TrackBoxLogic(store, PlaybackControllerImpl(store))
+      effectsLogic     = EffectsLogic(EffectsController(store))
+      _ <- startPlayer(store)
+      _ <- (ready >> LoadSaveObserverImpl(store, loadSaveControls).observe).background
+      _ <- (ready >> trackBoxLogic.observe).background
     yield AppDependencies(effectsLogic, loadSaveController, loadSaveControls, trackBoxLogic)
 
   private def startPlayer(store: AppStateStore): Resource[IO, Unit] =
-    AudioPlayer.streaming(AudioProcessorWithRules, AudioOutput.speakers)
+    AudioPlayer
+      .streaming(AudioProcessorWithRules, AudioOutput.speakers)
       .run(store)
       .compile
       .drain

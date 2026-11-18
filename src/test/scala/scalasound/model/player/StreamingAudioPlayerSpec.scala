@@ -4,7 +4,12 @@ import cats.effect.IO
 import munit.CatsEffectSuite
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.model.player.AudioOutput
-import scalasound.model.processing.{AudioEffect, AudioError, AudioProcessor, AudioProcessorWithRules}
+import scalasound.model.processing.{
+  AudioEffect,
+  AudioError,
+  AudioProcessor,
+  AudioProcessorWithRules
+}
 import scalasound.model.state.*
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -12,10 +17,11 @@ import scala.concurrent.duration.{Duration, DurationInt}
 class StreamingAudioPlayerSpec extends CatsEffectSuite:
   override def munitIOTimeout: Duration = 5.seconds
 
-  /** [[AudioOutput]] that records every chunk it receives, with the sample rate it was written at. */
+  /** [[AudioOutput]] that records every chunk it receives, with the sample rate it was written at.
+    */
   private final class RecordingOutput extends AudioOutput:
     var chunks: Vector[AudioChunk] = Vector.empty
-    var sampleRates: Vector[Int] = Vector.empty
+    var sampleRates: Vector[Int]   = Vector.empty
 
     override def write(chunk: AudioChunk, sampleRate: Int): IO[Unit] = IO {
       chunks = chunks :+ chunk
@@ -29,10 +35,11 @@ class StreamingAudioPlayerSpec extends CatsEffectSuite:
 
   /** [[AudioProcessor]] that reports an error for every chunk. */
   private object FailingProcessor extends AudioProcessor:
-    override def apply(chunk: AudioChunk,
-                       effects: List[AudioEffect],
-                       chunkIndex: Int
-                      ): Either[AudioError, AudioChunk] =
+    override def apply(
+        chunk: AudioChunk,
+        effects: List[AudioEffect],
+        chunkIndex: Int
+    ): Either[AudioError, AudioChunk] =
       Left(AudioError.AudioProcessorError(this, "error"))
 
   private val sampleRate = 44100
@@ -61,18 +68,19 @@ class StreamingAudioPlayerSpec extends CatsEffectSuite:
       .drain
 
   /** Runs a player on a fresh store: imports the track, sends `Play` and waits for `Stopped`. */
-  private def playToEnd(track: AudioTrack,
-                        out: AudioOutput,
-                        processor: AudioProcessor = AudioProcessorWithRules
-                       ): IO[AppState] =
+  private def playToEnd(
+      track: AudioTrack,
+      out: AudioOutput,
+      processor: AudioProcessor = AudioProcessorWithRules
+  ): IO[AppState] =
     for
       store <- AppStateStore.make
-      _ <- AudioPlayer.streaming(processor, out).run(store).compile.drain.background.use { _ =>
+      _     <- AudioPlayer.streaming(processor, out).run(store).compile.drain.background.use { _ =>
         for
-          _       <- store.dispatch(Command.UpdateImport(ImportState.Imported(track)))
-          waiter  <- untilStopped(store).start
-          _       <- store.dispatch(Command.Play)
-          _       <- waiter.joinWithNever
+          _      <- store.dispatch(Command.UpdateImport(ImportState.Imported(track)))
+          waiter <- untilStopped(store).start
+          _      <- store.dispatch(Command.Play)
+          _      <- waiter.joinWithNever
         yield ()
       }
       state <- store.current

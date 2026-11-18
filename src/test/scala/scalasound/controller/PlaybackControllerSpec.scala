@@ -7,9 +7,9 @@ import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackStat
 
 class PlaybackControllerSpec extends CatsEffectSuite:
 
-  private val sampleRate = 1000
+  private val sampleRate     = 1000
   private val framesPerChunk = 1000
-  private val chunkCount = 5
+  private val chunkCount     = 5
 
   private val track = MonoTrack(
     sampleRate,

@@ -50,7 +50,10 @@ class SpeakerAudioOutputSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "use 4 bytes per stereo frame" in {
-    AudioChunk.StereoChunk(Vector.fill(10)(0.0f), Vector.fill(10)(0.0f)).toPcmBytes.length shouldBe 40
+    AudioChunk
+      .StereoChunk(Vector.fill(10)(0.0f), Vector.fill(10)(0.0f))
+      .toPcmBytes
+      .length shouldBe 40
   }
 
   it should "produce no bytes for an empty chunk" in {

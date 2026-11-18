@@ -7,35 +7,34 @@ import scalasound.model.state.Command.{Pause, Play, SeekToIndex, Stop}
 
 import scala.annotation.tailrec
 
-/**
- * The operations a user can perform on playback: play, pause, stop and seek.
- */
+/** The operations a user can perform on playback: play, pause, stop and seek.
+  */
 trait PlaybackController:
-  /**
-   * Starts or resumes playback.
-   */
+  /** Starts or resumes playback.
+    */
   def play: IO[Unit]
-  /**
-   * Pauses playback, keeping the current position.
-   */
+
+  /** Pauses playback, keeping the current position.
+    */
   def pause: IO[Unit]
-  /**
-   * Stops playback.
-   */
+
+  /** Stops playback.
+    */
   def stop: IO[Unit]
 
-  /**
-   * Moves play head to the given position in the current track.
-   *
-   * @param positionSeconds the target position in seconds
-   */
+  /** Moves play head to the given position in the current track.
+    *
+    * @param positionSeconds
+    *   the target position in seconds
+    */
   def seek(positionSeconds: Double): IO[Unit]
 
-/**
- * A [[PlaybackController]] that carries out each request by dispatching a command to the [[AppStateStore]].
- *
- * @param store the [[AppStateStore]] that receives the playback commands
- */
+/** A [[PlaybackController]] that carries out each request by dispatching a command to the
+  * [[AppStateStore]].
+  *
+  * @param store
+  *   the [[AppStateStore]] that receives the playback commands
+  */
 class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
 
   def play: IO[Unit] = store.dispatch(Play).void
@@ -53,10 +52,9 @@ class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
     yield ()
 
   extension (track: AudioTrack)
-    /**
-     * Index of the chunk that corresponds to the given position in seconds. Positions before the start go to
-     * the first chunk, positions past the end go to the last one.
-     */
+    /** Index of the chunk that corresponds to the given position in seconds. Positions before the
+      * start go to the first chunk, positions past the end go to the last one.
+      */
     private def chunkIndexAt(positionSeconds: Double): Int =
       val targetFrame = (positionSeconds * track.sampleRate).toLong.max(0L)
       @tailrec

@@ -4,6 +4,12 @@ lazy val root = rootProject
   .settings(
     name := "PPS-25-scalasound",
     mainClass := Some("scalasound.Main"),
+    scalacOptions ++= Seq(
+      "-deprecation",
+      "-feature",
+      "-unchecked",
+      "-Wunused:all"
+    ),
     coverageExcludedPackages := """scalasound\.(?!model|controller).*""",
     coverageDataDir := (Compile / classDirectory).value,
     assembly / assemblyJarName := "scalasound.jar",

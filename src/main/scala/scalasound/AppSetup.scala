@@ -1,6 +1,5 @@
 package scalasound
 
-import cats.Applicative.ops.toAllApplicativeOps
 import cats.effect.{IO, Resource}
 import cats.effect.unsafe.IORuntime
 import scalasound.controller.{EffectsController, LoadSaveController, PlaybackControllerImpl}
@@ -33,4 +32,4 @@ object AppSetup:
       .compile
       .drain
       .background
-      .void
+      .map(_ => ())

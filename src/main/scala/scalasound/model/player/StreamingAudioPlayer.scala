@@ -4,25 +4,21 @@ import cats.effect.IO
 import cats.kernel.Eq
 import fs2.Stream
 import scalasound.model.domain.AudioChunk
-import scalasound.model.processing.{AudioEffect, AudioProcessor}
+import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.{AppState, AppStateStore, Command, PlaybackState}
 
-private object StreamingAudioPlayer:
-  private val Tag = "[STREAMING_AUDIO_PLAYER]"
-
-  private def report(message: String): IO[Unit] =
-    IO.println(s"$Tag $message")
-
-/** An [[AudioPlayer]] that plays one chunk at a time, processing each chunk just before writing it.
+/** An [[AudioPlayer]] that processes and plays audio in real time, one chunk at a time.
+ *
+ * Each chunk is processed with the current effects just before it is played, so effect changes are
+ * heard on the next chunk and nothing is processed in advance.
   *
   * @param processor
-  *   used to apply [[AudioEffect]]s to each [[AudioChunk]] just before it is written
+  *   the processor used to apply effects to each [[AudioChunk]]
   * @param out
   *   where the processed chunks are written (e.g. the speakers)
   */
 private final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOutput)
     extends AudioPlayer:
-  import StreamingAudioPlayer.report
 
   private given Eq[(PlaybackState, Int)] = Eq.fromUniversalEquals
 
@@ -39,7 +35,7 @@ private final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOu
   /** Prints the failure and stops playback; the player itself is kept alive. */
   private def stopAfterFailure(store: AppStateStore)(error: Throwable): IO[Unit] =
     for
-      _ <- report(s"playback failed: $error")
+      _ <- IO.println(s"Audio player failed: $error")
       _ <- store.dispatch(Command.Stop)
     yield ()
 
@@ -78,5 +74,5 @@ private final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOu
       processed <- result match
         case Right(value) => IO.pure(value)
         case Left(error)  =>
-          report(s"processing failed at chunk ${state.chunkIndex}: $error").as(chunk)
+          IO.println(s"Audio processing failed at chunk ${state.chunkIndex}: $error").as(chunk)
     yield processed

@@ -5,9 +5,9 @@ import cats.effect.unsafe.IORuntime
 import scalafx.application.Platform
 import scalasound.controller.PlaybackController
 import scalasound.model.domain.AudioTrack
-import scalasound.model.state.{AppState, AppStateStore}
+import scalasound.model.state.AppStateStore
 
-/** Keeps the track box (timeline and time labels) in sync with the [[AppState]], forwards the track
+/** Keeps the track box (timeline and time labels) in sync with the AppState, forwards the track
   * box buttons to the [[PlaybackController]], and forwards user seeks on the timeline to it as
   * well.
   *
@@ -15,7 +15,7 @@ import scalasound.model.state.{AppState, AppStateStore}
   * releases the slider after dragging.
   *
   * @param store
-  *   source of [[AppState]] changes (current track and position)
+  *   source of AppState changes (current track and position)
   * @param controller
   *   receives the playback and seek requests made by the user
   */
@@ -58,7 +58,7 @@ class TrackBoxLogic(store: AppStateStore, controller: PlaybackController)(using 
         .foreach(controller.seek(_).unsafeRunAndForget())
     }
 
-  /** Subscribes to [[AppState]] changes and updates the [[TrackBox]] on the JavaFX thread for each
+  /** Subscribes to AppState changes and updates the [[TrackBox]] on the JavaFX thread for each
     * one.
     *
     * This runs for as long as the state stream is open, so it is typically started in the

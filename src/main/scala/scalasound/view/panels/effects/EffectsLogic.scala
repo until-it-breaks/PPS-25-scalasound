@@ -1,8 +1,6 @@
 package scalasound.view.panels.effects
 
-import cats.effect.unsafe.IORuntime
 import scalafx.scene.control.Slider
-import scalasound.controller.EffectsController
 import scalasound.model.processing.AudioEffect
 import scalasound.view.panels.effects.DistortionEnum.{Sin, Tanh}
 
@@ -12,6 +10,9 @@ object EffectsLogic:
    * Everytime the slider is moved it needs to update itself and perform the action.
    */
   extension (slider: Slider)
+
+    private def sliderValue: Float = slider.value.value.toFloat
+
     private def sliderListener(onUpdate: Float => Unit): Unit =
       slider.valueChanging.onChange { (_, wasChanging, isChanging) =>
         if wasChanging && !isChanging then onUpdate(slider.value.value.toFloat)
@@ -19,16 +20,24 @@ object EffectsLogic:
       slider.onMouseReleased = _ =>
         if !slider.valueChanging.value then onUpdate(slider.value.value.toFloat)
 
-/** Wrapper on [[EffectsController]] to execute commands on effects asynchronously. Event actions
-  * are triggered when the sliders values change, and only once when the user releases the slider
-  * after dragging or the user clicks on the specific point onto the slider.
+  extension (filter: DistortionEnum)
+    /* Checks if the distortion to be applied is SoftClipping or not. */
+    private def isSoftClipping: Boolean = filter match
+      case Tanh => true
+      case Sin => false
+
+/** Execute commands on effects asynchronously. Event actions
+  * are triggered when the sliders values change, and only once when
+  * the user releases the slider after dragging or the user clicks on
+  * the specific point onto the slider.
   * @param controller
   *   the controller responsible for handling operations based on the effects.
   */
-final class EffectsLogic(controller: EffectsController)(using IORuntime):
-  import EffectsLogic.sliderListener
+final class EffectsLogic(controller: EffectsControllerProxy):
 
-  /** Connects the buttons and the sliders of the given pane to the [[EffectsController]]. Must be
+  import EffectsLogic.*
+
+  /** Connects the buttons and the sliders of the given pane to the controller. Must be
     * called once, on the JavaFX thread, before the box is shown.
     * @param effectPanel
     *   the panel containing the "views" of each effect.
@@ -39,7 +48,7 @@ final class EffectsLogic(controller: EffectsController)(using IORuntime):
     val echoAutopanBox   = effectPanel.echoAutopanBox
 
     effectPanel.resetAllButton.onAction = _ =>
-      removeAll()
+      controller.removeAll()
       volumeGainBox.resetSlidersAndValues()
       distortionPanBox.resetSlidersAndValues()
       echoAutopanBox.resetSlidersAndValues()
@@ -49,23 +58,11 @@ final class EffectsLogic(controller: EffectsController)(using IORuntime):
     echoAutopanLogic(echoAutopanBox)
 
   /*
-   * Removes all the effects applied on the input.
-   */
-  private def removeAll(): Unit =
-    controller.removeAll().unsafeRunAndForget()
-
-  /*
-   * Adds a new effect to the current input (track or chunk).
-   */
-  private def setEffect(effect: AudioEffect): Unit =
-    controller.addEffect(effect).unsafeRunAndForget()
-
-  /*
    * Handles the logic of volume and gain sliders.
    */
   private def volumeGainLogic(vg: VolumeGainBox): Unit =
-    vg.volumeSlider.sliderListener(v => setEffect(AudioEffect.volume(v)))
-    vg.gainSlider.sliderListener(v => setEffect(AudioEffect.gain(v)))
+    vg.volumeSlider.sliderListener(v => controller.addEffect(AudioEffect.volume(v)))
+    vg.gainSlider.sliderListener(v => controller.addEffect(AudioEffect.gain(v)))
 
   /*
    * Handles the logic of distortion and pan sliders, plus the distortion filter button.
@@ -73,20 +70,17 @@ final class EffectsLogic(controller: EffectsController)(using IORuntime):
   private def distortionPanLogic(dp: DistortionPanBox): Unit =
     val distortionFilter = dp.distortionFilter
     distortionFilter.onChange { (_, _, newFilter) =>
-      updateDistortion(dp.distortionSlider.value.value.toFloat, newFilter)
+      updateDistortion(dp.distortionSlider.sliderValue, newFilter)
     }
     dp.distortionSlider.sliderListener(v => updateDistortion(v, distortionFilter.value))
-    dp.panSlider.sliderListener(v => setEffect(AudioEffect.pan(v)))
+    dp.panSlider.sliderListener(v => controller.addEffect(AudioEffect.pan(v)))
 
   /*
    * Defines how to treat the clipping function when a
    * specific DistortionEnum value is inserted.
    */
   private def updateDistortion(value: Float, filter: DistortionEnum): Unit =
-    val isSoft = filter match
-      case Tanh => true
-      case Sin  => false
-    setEffect(AudioEffect.distortion(value, isSoftClipping = isSoft))
+    controller.addEffect(AudioEffect.distortion(value, isSoftClipping = filter.isSoftClipping))
 
   /*
    * Handles the logic of echo and autopan sliders.
@@ -96,13 +90,13 @@ final class EffectsLogic(controller: EffectsController)(using IORuntime):
     val delaySlider = ea.delaySlider
     alphaSlider.sliderListener(_ => updateEcho(alphaSlider, delaySlider))
     delaySlider.sliderListener(_ => updateEcho(alphaSlider, delaySlider))
-    ea.autopanSlider.sliderListener(v => setEffect(AudioEffect.autopan(v)))
+    ea.autopanSlider.sliderListener(v => controller.addEffect(AudioEffect.autopan(v)))
 
   /*
    * Defines how to treat the echo effect when one of
    * the two parameters, alpha or delay, changes.
    */
   private def updateEcho(alphaSlider: Slider, delaySlider: Slider): Unit =
-    val alpha = alphaSlider.value.value.toFloat
-    val delay = delaySlider.value.value.toInt
-    setEffect(AudioEffect.echo(alpha, delay))
+    val alpha = alphaSlider.sliderValue
+    val delay = delaySlider.sliderValue.toInt
+    controller.addEffect(AudioEffect.echo(alpha, delay))

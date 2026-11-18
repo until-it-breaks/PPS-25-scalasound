@@ -1,7 +1,6 @@
 package scalasound.model.processing
 
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
-import AutopanEffect.panning
 import scalasound.model.domain.AudioChunk
 
 /* *** AUTOPAN EFFECT *** */
@@ -9,6 +8,7 @@ private[processing] object AutopanEffect extends AudioConfiguration:
   private val DefaultFrequency: Float = 1.0f //HZ for Oscillation Frequency
   private val MinFrequency: Float = 0.0f
   private val MaxFrequency: Float = 20.0f
+  private val MinSampleRate: Float = 0.0f
 
   /**
    * Extracts the information related to the autopan parameter.
@@ -22,6 +22,9 @@ private[processing] object AutopanEffect extends AudioConfiguration:
   private def isFrequencyValid(frequency: Float): Boolean =
     frequency >= AutopanEffect.MinFrequency &&
       frequency <= AutopanEffect.MaxFrequency
+
+  private def isSampleRateValid(sampleRate: Float): Boolean =
+    sampleRate > MinSampleRate
 
   /* Defines the panning factor both for left and right channels. */
   private def panning(frequency: Float, sampleRate: Float, indexSample: Int): (left: Float, right: Float) =
@@ -56,9 +59,16 @@ private[processing] object AutopanEffect extends AudioConfiguration:
  * how fast the sound move from right to left channel.
  */
 private[processing] final case class AutopanEffect(frequency: Float, sampleRate: Float) extends TimeAudioEffect:
+  import AutopanEffect.*
+
+  private val checkFrequency = checkConstraints(isFrequencyValid(frequency),
+    "Exceeded the range [" + MinFrequency + ", " + MaxFrequency + "]!")
+
+  private val checkSampleRate = checkConstraints(isSampleRateValid(sampleRate),
+    "Exceeded the range (" + MinSampleRate + "... )!")
+
   override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =
-    checkConstraints(AutopanEffect.isFrequencyValid(frequency),
-      "Exceeded the range [" + AutopanEffect.MinFrequency + ", " + AutopanEffect.MaxFrequency + ")!").
+    checkFrequency.orElse(checkSampleRate).
       toLeft:
         val initialSampleIndex = chunkIndex * chunk.frameCount
         val (lch, rch) = chunk match
@@ -69,7 +79,7 @@ private[processing] final case class AutopanEffect(frequency: Float, sampleRate:
         val result = for
           i <- lch.indices
           panningFactor = panning(frequency, sampleRate, initialSampleIndex + i)
-        yield
-          (lch(i) * panningFactor.left, rch(i) * panningFactor.right)
+          leftRight = (lch(i) * panningFactor.left, rch(i) * panningFactor.right)
+        yield leftRight
 
         StereoChunk(result.map(_._1).toVector, result.map(_._2).toVector)

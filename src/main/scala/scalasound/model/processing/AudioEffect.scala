@@ -55,13 +55,14 @@ object AudioEffect:
   def effectsNames: List[String] =
     AudioEffectType.values.map(_.name).toList
 
-  /**
-   * Returns the expected type for the specific effect.
-   */
   extension (effect: AudioEffect)
     /*
      * Generalizes the output because it doesn't matter
-     * what type effect is now. So the wildcard ? is used.
+     * what type effect is now in input.
+     * The wildcard ? is used for this motivation.
+     */
+    /**
+     * @return the expected type for the specific effect.
      */
     def effectType: AudioEffectType[?] = effect match
       case IdentityEffect => AudioEffectType.Identity
@@ -72,15 +73,14 @@ object AudioEffect:
       case _: AutopanEffect => AudioEffectType.Autopan
       case _: VolumeEffect => AudioEffectType.Volume
 
-  /**
-   * Checks when two effects share the same effectType.
-   *
-   * @param effect1 the first effect.
-   * @param effect2 the second effect.
-   * @return true if the two effects have the same type and false otherwise.
-   */
-  def checkEqualEffectType(effect1: AudioEffect, effect2: AudioEffect): Boolean =
-    effect1.effectType == effect2.effectType
+    /**
+     * Checks when two effects share the same effectType.
+     *
+     * @param effect2 the second effect.
+     * @return true if the two effects have the same type and false otherwise.
+     */
+    def hasSameEffectTypeOf(effect2: AudioEffect): Boolean =
+      effect.effectType == effect2.effectType
 
   /**
    * Returns the Identity effect.

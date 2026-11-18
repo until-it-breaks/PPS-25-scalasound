@@ -27,9 +27,11 @@ private[processing] object DistortionEffect extends AudioConfiguration:
  */
 private[processing] final case class DistortionEffect(distortion: Float, isSoftClipping: Boolean) extends AudioEffect:
 
+  import DistortionEffect.*
+
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(DistortionEffect.isDistortionValid(distortion),
-      "Exceeded the range [" + DistortionEffect.MinDistortion + "," + DistortionEffect.MaxDistortion + "]!").
+    checkConstraints(isDistortionValid(distortion),
+      "Exceeded the range [" + MinDistortion + "," + MaxDistortion + "]!").
       toLeft:
         applyDistortion(chunk, if isSoftClipping then tanh else sinWave)
 
@@ -37,19 +39,19 @@ private[processing] final case class DistortionEffect(distortion: Float, isSoftC
    * Hyperbolic-tangent based formula to apply the
    * SoftClipping Distortion effect.
    */
-  private inline def tanh(x: Float): Float =
+  private def tanh(x: Float): Float =
     math.tanh(x * distortion).toFloat
 
   /*
    * Sin-based formula to apply the
    * WaveFolding Distortion effect.
    */
-  private inline def sinWave(x: Float): Float =
+  private def sinWave(x: Float): Float =
     math.sin(x * distortion).toFloat
 
   private def applyDistortion(chunk: AudioChunk, function: Float => Float): AudioChunk =
     chunk match
       case MonoChunk(samples) =>
-        MonoChunk(samples.map(x => function(x)))
+        MonoChunk(samples.map(function))
       case StereoChunk(left, right) =>
-        StereoChunk(left.map(l => function(l)), right.map(r => function(r)))
+        StereoChunk(left.map(function), right.map(function))

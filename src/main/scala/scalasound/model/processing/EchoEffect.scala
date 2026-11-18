@@ -51,12 +51,14 @@ private[processing] final case class EchoEffect(alpha: Float,
                                                 delay: Int,
                                                 sampleRate: Float) extends TimeAudioEffect:
 
-  private val checkAlpha = checkConstraints(EchoEffect.isAlphaValid(alpha),
-    "Exceeded the range [" + EchoEffect.MinAlpha + "," + EchoEffect.MaxAlpha + "]!")
-  private val checkSamples = checkConstraints(EchoEffect.isDelayValid(delay),
-    "Exceeded the range [" + EchoEffect.MinDelay + "," + EchoEffect.MaxDelay + "]!")
-  private val checkFrequency = checkConstraints(EchoEffect.isSampleRateValid(sampleRate),
-    "Exceeded the range [" + EchoEffect.MinSampleRate + ", ∞ )!")
+  import EchoEffect.*
+
+  private val checkAlpha = checkConstraints(isAlphaValid(alpha),
+    "Exceeded the range [" + MinAlpha + "," + MaxAlpha + "]!")
+  private val checkSamples = checkConstraints(isDelayValid(delay),
+    "Exceeded the range [" + MinDelay + "," + MaxDelay + "]!")
+  private val checkFrequency = checkConstraints(isSampleRateValid(sampleRate),
+    "Exceeded the range [" + MinSampleRate + ", ∞ )!")
 
   /* Number of samples = Delay (in milliseconds) * Frequency (in Hz) */
   private val nSamples: Int = math.max(1, ((delay.toFloat / 1000.0f) * sampleRate).toInt)

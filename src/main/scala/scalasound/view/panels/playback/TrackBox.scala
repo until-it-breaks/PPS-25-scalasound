@@ -9,8 +9,10 @@ private[panels] object TrackBox:
 
   /** Text shown in the time labels when no track is loaded. */
   val EmptyTime: String = "--:--"
+
   /** Slider range when no track is loaded. */
   val EmptyDuration: Double = 1.0
+
   /** Slider position when no track is loaded. */
   val EmptyPosition: Double = 0.0
 
@@ -35,18 +37,18 @@ private[panels] object TrackBox:
       -fx-alignment: center;
     """
 
-/**
- * Container for the timeline of the track and the buttons that manage the playback (Play, Pause, Stop).
- */
+/** Container for the timeline of the track and the buttons that manage the playback (Play, Pause,
+  * Stop).
+  */
 private[panels] final class TrackBox extends VBox:
   import TrackBox.*
 
-  val timeLine: Slider = new Slider(0, EmptyDuration, EmptyPosition) { prefWidth = 500 }
+  val timeLine: Slider      = new Slider(0, EmptyDuration, EmptyPosition) { prefWidth = 500 }
   val startTimeLabel: Label = createTimeLabel
-  val endTimeLabel: Label = createTimeLabel
-  val playButton: Button = createAudioButton("▶")
-  val pauseButton: Button = createAudioButton("❚❚")
-  val stopButton: Button = createAudioButton("⏹")
+  val endTimeLabel: Label   = createTimeLabel
+  val playButton: Button    = createAudioButton("▶")
+  val pauseButton: Button   = createAudioButton("❚❚")
+  val stopButton: Button    = createAudioButton("⏹")
 
   private val timelineBox = new HBox:
     alignment = Pos.Center

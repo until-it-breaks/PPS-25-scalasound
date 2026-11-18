@@ -41,57 +41,64 @@ import ImportState.*
 import Command.*
 
 /** Core immutable application state and state machine for the audio system.
- *
- *   - Playback Control (`Play`, `Pause`, `Stop`): Playback can only transition to `Playing` if a
- *     track is successfully loaded (`track = Some(...)`). Pausing works exclusively from a `Playing`
- *     state. Stopping halts playback and resets the play head (`chunkIndex = 0`).
- *   - Position & Seeking (`SeekToIndex`, `NextChunk`): The play head position
- *     (`chunkIndex`) is maintained as a top-level property, allowing seeking at any time (whether playing,
- *     paused, or stopped). Index boundaries are automatically clamped between `0` and `track.chunks.length - 1`.
- *   - Track Import (`UpdateImport`): When an audio track is successfully imported (`Imported(track)`),
- *     the state automatically locks in the new track, resets playback to `Stopped`, and repositions the
- *     play head to `0`.
- *   - Track Export (`UpdateExport`): Tracks the progress and lifecycle of
- *     file export tasks independently of audio playback.
- *
- * @param playbackState current playback state (`Stopped`, `Playing`, `Paused`)
- * @param importState   current track import state
- * @param track         the successfully loaded audio track, if any
- * @param effects       the list of effects that are applied on the current track.
- * @param chunkIndex    the current active audio chunk position (play head index)
- * @param exportState   current track export state
- */
+  *
+  *   - Playback Control (`Play`, `Pause`, `Stop`): Playback can only transition to `Playing` if a
+  *     track is successfully loaded (`track = Some(...)`). Pausing works exclusively from a
+  *     `Playing` state. Stopping halts playback and resets the play head (`chunkIndex = 0`).
+  *   - Position & Seeking (`SeekToIndex`, `NextChunk`): The play head position (`chunkIndex`) is
+  *     maintained as a top-level property, allowing seeking at any time (whether playing, paused,
+  *     or stopped). Index boundaries are automatically clamped between `0` and
+  *     `track.chunks.length - 1`.
+  *   - Track Import (`UpdateImport`): When an audio track is successfully imported
+  *     (`Imported(track)`), the state automatically locks in the new track, resets playback to
+  *     `Stopped`, and repositions the play head to `0`.
+  *   - Track Export (`UpdateExport`): Tracks the progress and lifecycle of file export tasks
+  *     independently of audio playback.
+  *
+  * @param playbackState
+  *   current playback state (`Stopped`, `Playing`, `Paused`)
+  * @param importState
+  *   current track import state
+  * @param track
+  *   the successfully loaded audio track, if any
+  * @param effects
+  *   the list of effects that are applied on the current track.
+  * @param chunkIndex
+  *   the current active audio chunk position (play head index)
+  * @param exportState
+  *   current track export state
+  */
 final case class AppState(
-                           playbackState: PlaybackState,
-                           importState: ImportState,
-                           track: Option[AudioTrack],
-                           effects: List[AudioEffect],
-                           chunkIndex: Int,
-                           exportState: ExportState
-                         ):
+    playbackState: PlaybackState,
+    importState: ImportState,
+    track: Option[AudioTrack],
+    effects: List[AudioEffect],
+    chunkIndex: Int,
+    exportState: ExportState
+):
 
   /** Command router mapping a [[Command]] to designated state transitions. */
   def handle(command: Command): AppState =
     command match
-      case Play                 => handlePlay()
-      case Pause                => handlePause()
-      case Stop                 => handleStop()
-      case NextChunk            => handleNextChunk()
-      case RemoveAll            => handleRemoveAll()
-      case AddEffect(effect)    => handleAddEffect(effect)
-      case SeekToIndex(index)   => handleSeek(index)
-      case UpdateImport(state)  => handleImport(state)
-      case UpdateExport(state)  => handleExport(state)
+      case Play                => handlePlay()
+      case Pause               => handlePause()
+      case Stop                => handleStop()
+      case NextChunk           => handleNextChunk()
+      case RemoveAll           => handleRemoveAll()
+      case AddEffect(effect)   => handleAddEffect(effect)
+      case SeekToIndex(index)  => handleSeek(index)
+      case UpdateImport(state) => handleImport(state)
+      case UpdateExport(state) => handleExport(state)
 
   private def handlePlay(): AppState =
     track match
-      case None => this
+      case None    => this
       case Some(_) => copy(playbackState = Playing)
 
   private def handlePause(): AppState =
     playbackState match
       case Playing => copy(playbackState = Paused)
-      case _ => this
+      case _       => this
 
   private def handleStop(): AppState =
     copy(playbackState = Stopped, chunkIndex = 0)
@@ -99,7 +106,7 @@ final case class AppState(
   private def handleNextChunk(): AppState =
     playbackState match
       case Playing => copy(chunkIndex = chunkIndex + 1)
-      case _ => this
+      case _       => this
 
   private def handleRemoveAll(): AppState =
     copy(effects = List.empty)
@@ -114,16 +121,16 @@ final case class AppState(
    */
   private def handleAddEffect(effect: AudioEffect): AppState =
     val isSameType = AudioEffect.checkEqualEffectType(_, effect)
-    //val (firstHalf, secondHalf) = effects.span(!isSameType(_))
-    //copy(effects = firstHalf ++ (effect :: secondHalf.filterNot(isSameType(_))))
+    // val (firstHalf, secondHalf) = effects.span(!isSameType(_))
+    // copy(effects = firstHalf ++ (effect :: secondHalf.filterNot(isSameType(_))))
     copy(effects = effect :: effects.filterNot(isSameType(_)))
 
   private def handleSeek(index: Int): AppState =
     track match
-      case None => this
+      case None        => this
       case Some(track) =>
         val maxIndex = math.max(0, track.chunks.length - 1)
-        val clamped = math.max(0, math.min(index, maxIndex))
+        val clamped  = math.max(0, math.min(index, maxIndex))
         copy(chunkIndex = clamped)
 
   def currentPositionSeconds: Double =

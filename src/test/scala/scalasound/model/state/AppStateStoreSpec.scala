@@ -6,22 +6,28 @@ import fs2.Stream
 import munit.CatsEffectSuite
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.MonoTrack
-import scalasound.model.state.{AppState, AppStateStore, Command, ExportState, ImportState, PlaybackState}
+import scalasound.model.state.{
+  AppState,
+  AppStateStore,
+  Command,
+  ExportState,
+  ImportState,
+  PlaybackState
+}
 
 class AppStateStoreSpec extends CatsEffectSuite:
 
   private val dummyTrack = MonoTrack(44100, Vector(MonoChunk(Vector.empty)))
   private val otherTrack = MonoTrack(48000, Vector(MonoChunk(Vector.empty)))
 
-  /**
-   * A fake store whose `changes` stream is a fixed list of states.
-   * Used to test `playbackChanges` / `trackChanges`, which only transform `changes`.
-   */
+  /** A fake store whose `changes` stream is a fixed list of states. Used to test `playbackChanges`
+    * / `trackChanges`, which only transform `changes`.
+    */
   private def storeEmitting(states: AppState*): AppStateStore =
     new AppStateStore:
-      def current: IO[AppState]                 = IO.pure(states.last)
-      def dispatch(c: Command): IO[AppState]    = IO.pure(states.last)
-      def changes: Stream[IO, AppState]         = Stream.emits(states)
+      def current: IO[AppState]              = IO.pure(states.last)
+      def dispatch(c: Command): IO[AppState] = IO.pure(states.last)
+      def changes: Stream[IO, AppState]      = Stream.emits(states)
 
   private val base = AppState.initial
 
@@ -108,9 +114,8 @@ class AppStateStoreSpec extends CatsEffectSuite:
     }
   }
 
-  /**
-   * Runs `stream` in the background and pushes each emission into a queue.
-   */
+  /** Runs `stream` in the background and pushes each emission into a queue.
+    */
   private def subscribe[A](stream: Stream[IO, A]): Resource[IO, Queue[IO, A]] =
     for
       queue <- Resource.eval(Queue.unbounded[IO, A])
@@ -119,7 +124,7 @@ class AppStateStoreSpec extends CatsEffectSuite:
 
   test("a live subscriber should receive states as they are dispatched") {
     for
-      store <- AppStateStore.make
+      store  <- AppStateStore.make
       result <- subscribe(store.changes).use { queue =>
         for
           initial <- queue.take

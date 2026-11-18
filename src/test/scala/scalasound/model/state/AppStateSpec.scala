@@ -16,22 +16,22 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
   private val track = MonoTrack(
     sampleRate = 44100,
     chunks = Vector(
-      MonoChunk(Vector.fill(44100)(0f)),  // 0.0s to 1.0s chunk (Index 0)
-      MonoChunk(Vector.fill(44100)(0f)),  // 1.0s to 2.0s chunk (Index 1)
-      MonoChunk(Vector.fill(44100)(0f))   // 2.0s to 3.0s chunk (Index 2)
+      MonoChunk(Vector.fill(44100)(0f)), // 0.0s to 1.0s chunk (Index 0)
+      MonoChunk(Vector.fill(44100)(0f)), // 1.0s to 2.0s chunk (Index 1)
+      MonoChunk(Vector.fill(44100)(0f))  // 2.0s to 3.0s chunk (Index 2)
     )
   )
 
   "initial state" should "have playback stopped, no track loaded, have chunkIndex at 0, " +
     "effects list empty and import/export in idle" in {
-    val state = AppState.initial
-    state.playbackState shouldBe Stopped
-    state.importState shouldBe ImportState.Idle
-    state.track shouldBe None
-    state.chunkIndex shouldBe 0
-    state.effects shouldBe List.empty
-    state.exportState shouldBe ExportState.Idle
-  }
+      val state = AppState.initial
+      state.playbackState shouldBe Stopped
+      state.importState shouldBe ImportState.Idle
+      state.track shouldBe None
+      state.chunkIndex shouldBe 0
+      state.effects shouldBe List.empty
+      state.exportState shouldBe ExportState.Idle
+    }
 
   "loading a track" should "stop playback, set the track and set chunkIndex to 0" in {
     val state = AppState.initial
@@ -51,7 +51,7 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
   }
 
   "pause" should "transition to playback to pause only if currently playing" in {
-    val base = AppState.initial.handle(UpdateImport(Imported(track)))
+    val base         = AppState.initial.handle(UpdateImport(Imported(track)))
     val stoppedState = base.handle(Pause)
     stoppedState.playbackState shouldBe Stopped
     val playingState = base.handle(Play).handle(Pause)
@@ -89,7 +89,7 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
   }
 
   "nextChunk" should "do nothing if playback is paused or stopped" in {
-    val base = AppState.initial.handle(UpdateImport(Imported(track)))
+    val base         = AppState.initial.handle(UpdateImport(Imported(track)))
     val stoppedState = base.handle(NextChunk)
     stoppedState.chunkIndex shouldBe 0
     val pausedState = base.handle(Play).handle(Pause).handle(NextChunk)
@@ -103,8 +103,8 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
 
   it should "remove all the effects contained in the effects list" in:
     val effects = Seq(AudioEffect.volume(1.0f), AudioEffect.gain(1.0f))
-    val base = effects.foldLeft(AppState.initial) {
-      (accumulator, x) => accumulator.handle(AddEffect(x))
+    val base    = effects.foldLeft(AppState.initial) { (accumulator, x) =>
+      accumulator.handle(AddEffect(x))
     }
     base.effects should not be List.empty
     base.effects.length shouldBe effects.length
@@ -114,8 +114,8 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
     val base = AppState.initial
     base.effects shouldBe List.empty
     val effects = Seq(AudioEffect.volume(1.0f), AudioEffect.gain(1.0f))
-    val full = effects.foldLeft(base) {
-      (accumulator, x) => accumulator.handle(AddEffect(x))
+    val full    = effects.foldLeft(base) { (accumulator, x) =>
+      accumulator.handle(AddEffect(x))
     }
     full.effects should not be List.empty
     full.effects.length shouldBe effects.length
@@ -123,10 +123,10 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
 
   it should "replace an existing type effect with a new one as the head of the list" in:
     val volume1 = AudioEffect.volume(1.0f)
-    val gain = AudioEffect.gain(1.0f)
+    val gain    = AudioEffect.gain(1.0f)
     val effects = Seq(volume1, gain)
-    val base = effects.foldLeft(AppState.initial) {
-      (accumulator, x) => accumulator.handle(AddEffect(x))
+    val base    = effects.foldLeft(AppState.initial) { (accumulator, x) =>
+      accumulator.handle(AddEffect(x))
     }
     // The new effect is added to the front of the list.
     base.effects.head.effectType shouldBe Gain
@@ -149,11 +149,11 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
   }
 
   "import and export" should "handle intermediate and failure states without losing track" in {
-    val loaded = AppState.initial.handle(UpdateImport(Imported(track)))
+    val loaded         = AppState.initial.handle(UpdateImport(Imported(track)))
     val importingState = loaded.handle(UpdateImport(ImportState.Importing))
     importingState.importState shouldBe ImportState.Importing
     importingState.track shouldBe Some(track)
-    val loadError = AudioLoadError.CorruptedData("Corrupt file")
+    val loadError    = AudioLoadError.CorruptedData("Corrupt file")
     val failedImport = loaded.handle(UpdateImport(ImportState.Failed(loadError)))
     failedImport.importState shouldBe ImportState.Failed(loadError)
     failedImport.track shouldBe Some(track)
@@ -164,9 +164,12 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
   }
 
   it should "return to Idle once a failure or a completed export is acknowledged" in {
-    val failedImport = AppState.initial.handle(UpdateImport(ImportState.Failed(AudioLoadError.FileNotFound("a.wav"))))
+    val failedImport = AppState.initial.handle(
+      UpdateImport(ImportState.Failed(AudioLoadError.FileNotFound("a.wav")))
+    )
     failedImport.handle(UpdateImport(ImportState.Idle)).importState shouldBe ImportState.Idle
-    val failedExport = AppState.initial.handle(UpdateExport(ExportState.Failed(AudioSaveError.NoTrackLoaded)))
+    val failedExport =
+      AppState.initial.handle(UpdateExport(ExportState.Failed(AudioSaveError.NoTrackLoaded)))
     failedExport.exportState shouldBe ExportState.Failed(AudioSaveError.NoTrackLoaded)
     failedExport.handle(UpdateExport(ExportState.Idle)).exportState shouldBe ExportState.Idle
     val exported = AppState.initial.handle(UpdateExport(ExportState.Exported))

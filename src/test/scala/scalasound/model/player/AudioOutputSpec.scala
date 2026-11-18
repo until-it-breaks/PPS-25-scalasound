@@ -21,8 +21,8 @@ class AudioOutputSpec extends CatsEffectSuite:
   private def elapsed(io: IO[Unit]): IO[FiniteDuration] =
     for
       start <- IO.monotonic
-      _ <- io
-      end <- IO.monotonic
+      _     <- io
+      end   <- IO.monotonic
     yield end - start
 
   private def assertWaitedAtLeast(actual: FiniteDuration, expected: FiniteDuration): Unit =

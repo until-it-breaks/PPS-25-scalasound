@@ -6,9 +6,9 @@ import fs2.Stream
 import fs2.concurrent.SignallingRef
 import scalasound.model.domain.AudioTrack
 
-given Eq[PlaybackState] = Eq.fromUniversalEquals
-given Eq[ImportState] = Eq.fromUniversalEquals
-given Eq[ExportState] = Eq.fromUniversalEquals
+given Eq[PlaybackState]      = Eq.fromUniversalEquals
+given Eq[ImportState]        = Eq.fromUniversalEquals
+given Eq[ExportState]        = Eq.fromUniversalEquals
 given Eq[Option[AudioTrack]] = Eq.fromUniversalEquals
 
 /** Storage abstraction for managing [[AppState]] and exposing real-time change streams. */
@@ -20,7 +20,8 @@ trait AppStateStore:
   def dispatch(command: Command): IO[AppState]
 
   /** A continuous stream of [[AppState]] values: the current state first, then the latest state
-   * after each update. */
+    * after each update.
+    */
   def changes: Stream[IO, AppState]
 
   /** A dedicated stream for playback state changes only. */

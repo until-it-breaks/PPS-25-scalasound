@@ -13,12 +13,13 @@ object AudioPlaybackDemo extends IOApp.Simple:
 
   val run: IO[Unit] =
     for
-      _ <- IO.println("[DEMO] Initializing app state store...")
+      _     <- IO.println("[DEMO] Initializing app state store...")
       store <- AppStateStore.make
 
       _ <- IO.println("[DEMO] Loading sample WAV file from resources...")
       path = Paths.get(getClass.getResource("/file_example_WAV_5MG.wav").toURI).toString
-      track <- IO.blocking(WavAudioReader.load(path))
+      track <- IO
+        .blocking(WavAudioReader.load(path))
         .map(_.left.map(e => new RuntimeException(e.toString)))
         .rethrow
 
@@ -35,7 +36,8 @@ object AudioPlaybackDemo extends IOApp.Simple:
       //   AudioOutput.console.paced     prints chunk info at real-time speed (headless demo)
       //   AudioOutput.speakers.paced    works, but not recommended: the line already blocks, so you'd double the delay
       player = AudioPlayer.streaming(SimpleAudioProcessor, AudioOutput.console.paced)
-      _ <- player.run(store)
+      _ <- player
+        .run(store)
         .compile
         .drain
         .background

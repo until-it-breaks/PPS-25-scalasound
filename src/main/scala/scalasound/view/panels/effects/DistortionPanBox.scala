@@ -31,22 +31,6 @@ private[effects] object DistortionPanBox:
       -fx-border-width: 1px 1px 1px 0px;
     """
 
-  private def styleButton(isSelected: Boolean, distType: DistortionEnum): String =
-    val bkg = if isSelected then BackgroundColor else "white"
-    val frg = if isSelected then "white" else "black"
-    val border = distType match
-      case DistortionEnum.Tanh => BorderLeft
-      case DistortionEnum.Sin => BorderRight
-    s"""
-        -fx-background-color: $bkg;
-        -fx-text-fill: $frg;
-        -fx-font-size: 16px;
-        -fx-font-weight: bold;
-        -fx-padding: 6px 15px 6px 15px;
-        -fx-border-color: black;
-        $border
-      """
-
   private def switch(selectedDistortion: ObjectProperty[DistortionEnum]): HBox = new HBox:
     private val group = new ToggleGroup()
 
@@ -68,25 +52,42 @@ private[effects] object DistortionPanBox:
     alignment = Pos.Center
     children = buttons.toSeq
 
+  private def styleButton(isSelected: Boolean, distType: DistortionEnum): String =
+    val bkg = if isSelected then BackgroundColor else "white"
+    val frg = if isSelected then "white" else "black"
+    val border = distType match
+      case DistortionEnum.Tanh => BorderLeft
+      case DistortionEnum.Sin => BorderRight
+    s"""
+        -fx-background-color: $bkg;
+        -fx-text-fill: $frg;
+        -fx-font-size: 16px;
+        -fx-font-weight: bold;
+        -fx-padding: 6px 15px 6px 15px;
+        -fx-border-color: black;
+        $border
+      """
+
 /* Box for the Distortion-Pan effects. */
 private[effects] final class DistortionPanBox extends VBox with EffectPane:
+
   import DistortionEnum.*
   import DistortionPanBox.*
 
   /* Importing of the Pan and Distortion parameter values. */
   private val panConfig = AudioConfiguration.parameterConfiguration(Pan)
   private val distortionConfig = AudioConfiguration.parameterConfiguration(Distortion)
-  
+
   /* Initialization of the switch for the distortion effect to be applied. */
   private val defaultSwitchValue = Tanh
   private val _distortionFilter: ObjectProperty[DistortionEnum] = ObjectProperty(defaultSwitchValue)
   private val distortionSwitch = switch(_distortionFilter)
-  
+
   private val panContainer = Utility.effectContainer(Pan.name,
     panConfig.panConfiguration,
     v => f"$v%.2f",
     labels = Some("L", "R"))
-  
+
   private val distortionContainer = Utility.effectContainer(Distortion.name,
     distortionConfig.distortionConfiguration,
     v => f"$v%.2f")

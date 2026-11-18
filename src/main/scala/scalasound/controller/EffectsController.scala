@@ -14,6 +14,7 @@ trait EffectsController:
   /**
    * Adds a new effect to the current effect
    * list that will be applied on the track.
+   *
    * @param effect the new effect to add to the list.
    */
   def addEffect(effect: AudioEffect): IO[Unit]
@@ -25,7 +26,7 @@ trait EffectsController:
   def removeAll(): IO[Unit]
 
 /**
- * A [[EffectsController]] that carries out each request by 
+ * A [[EffectsController]] that carries out each request by
  * dispatching a command to the [[AppStateStore]].
  */
 object EffectsController:

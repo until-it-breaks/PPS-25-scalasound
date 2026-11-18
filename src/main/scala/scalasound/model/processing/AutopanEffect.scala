@@ -5,12 +5,6 @@ import AutopanEffect.panning
 import scalasound.model.domain.AudioChunk
 
 /* *** AUTOPAN EFFECT *** */
-
-/*
- * AutopanEffect Companion Object
- * it contains variables (constants) only accessible
- * by the Autopan Effect case class.
- */
 private[processing] object AutopanEffect extends AudioConfiguration:
   private val DefaultFrequency: Float = 1.0f //HZ for Oscillation Frequency
   private val MinFrequency: Float = 0.0f
@@ -18,6 +12,7 @@ private[processing] object AutopanEffect extends AudioConfiguration:
 
   /**
    * Extracts the information related to the autopan parameter.
+   *
    * @return a ParameterConfiguration containing the autopan configuration.
    */
   def autopanConfiguration: ParameterConfiguration =
@@ -54,7 +49,7 @@ private[processing] object AutopanEffect extends AudioConfiguration:
     val leftCos = math.cos(halfPI * alpha).toFloat
     val rightSin = math.sin(halfPI * alpha).toFloat
     (leftCos, rightSin)
-  
+
 /*
  * Effect that applies the autopan effect on the input audio chunk.
  * Implementation of the LFO (Low-Frequency-Oscillator) where frequency specifies
@@ -62,7 +57,7 @@ private[processing] object AutopanEffect extends AudioConfiguration:
  */
 private[processing] final case class AutopanEffect(frequency: Float, sampleRate: Float) extends TimeAudioEffect:
   override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =
-    checkConstraints(AutopanEffect.isFrequencyValid(frequency), 
+    checkConstraints(AutopanEffect.isFrequencyValid(frequency),
       "Exceeded the range [" + AutopanEffect.MinFrequency + ", " + AutopanEffect.MaxFrequency + ")!").
       toLeft:
         val initialSampleIndex = chunkIndex * chunk.frameCount

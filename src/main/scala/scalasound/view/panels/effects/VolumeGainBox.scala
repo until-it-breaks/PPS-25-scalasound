@@ -10,18 +10,22 @@ import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 private[effects] final class VolumeGainBox extends HBox with EffectPane:
 
   /* Importing of the Gain and Volume parameter values. */
-  private val gainConfig = AudioConfiguration.parameterConfiguration(Gain)
+  private val gainConfig   = AudioConfiguration.parameterConfiguration(Gain)
   private val volumeConfig = AudioConfiguration.parameterConfiguration(Volume)
 
-  private val gainContainer = Utility.effectContainer(Gain.name,
+  private val gainContainer = Utility.effectContainer(
+    Gain.name,
     gainConfig.gainConfiguration,
     v => f"$v%.2f",
-    isHorizontal = false)
+    isHorizontal = false
+  )
 
-  private val volumeContainer = Utility.effectContainer(Volume.name,
+  private val volumeContainer = Utility.effectContainer(
+    Volume.name,
     volumeConfig.volumeConfiguration,
     v => f"${v * 100}%.2f%%",
-    isHorizontal = false)
+    isHorizontal = false
+  )
 
   alignment = Pos.Center
   padding = Insets(10, 30, 10, 30)
@@ -38,6 +42,6 @@ private[effects] final class VolumeGainBox extends HBox with EffectPane:
   def gainSlider: Slider = gainContainer.slider
 
   /**
-   * @return the slider of Volume parameter.
-   */
+    * @return the slider of Volume parameter.
+    */
   def volumeSlider: Slider = volumeContainer.slider

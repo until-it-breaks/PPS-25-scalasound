@@ -4,14 +4,6 @@ import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
 
 /* *** PAN EFFECT *** */
-
-/*
- * PanEffect Companion Object
- * it contains variables (constants) only accessible
- * by the Pan Effect case class.
- * Also, a static method is defined to compute
- * the pan factor for both left and right channels.
- */
 private[processing] object PanEffect extends AudioConfiguration:
   private val DefaultPan: Float = 0.0f
   private val MinPan: Float = -1.0f
@@ -19,12 +11,13 @@ private[processing] object PanEffect extends AudioConfiguration:
 
   /**
    * Extracts the information related to the pan parameter.
+   *
    * @return a ParameterConfiguration containing the pan configuration.
    */
   def panConfiguration: ParameterConfiguration =
     ParameterConfiguration(MinPan, MaxPan, DefaultPan)
 
-  private def isPanValid(pan: Float): Boolean = 
+  private def isPanValid(pan: Float): Boolean =
     pan >= PanEffect.MinPan && pan <= PanEffect.MaxPan
 
   /*
@@ -33,14 +26,6 @@ private[processing] object PanEffect extends AudioConfiguration:
    */
   extension (angle: Float)
     inline private def toRadiant: Float = (angle * (math.Pi / 180)).toFloat
-
-  /*
-   * Avoid using infinitesimal values obtained during
-   * the operations with math.Pi, math.Sin and math.Cos
-   * caused by Float conversion from Double.
-   */
-  private def valueRounding(value: Float): Float =
-    if math.abs(value) < 1e-6 then 0.0f else value
 
   /*
    * The pan effect can be computed by using sin-cos functions.
@@ -59,14 +44,23 @@ private[processing] object PanEffect extends AudioConfiguration:
     val rightPan = prefix * (math.cos(radiant) + math.sin(radiant)).toFloat
     (valueRounding(leftPan), valueRounding(rightPan))
 
+  /*
+   * Avoid using infinitesimal values obtained during
+   * the operations with math.Pi, math.Sin and math.Cos
+   * caused by Float conversion from Double.
+   */
+  private def valueRounding(value: Float): Float =
+    if math.abs(value) < 1e-6 then 0.0f else value
+
 /*
  * Effect that applies the pan effect on the input audio chunk.
  * Pan defines the strength of the pan with values are accepted between [-1.0f,1.0f].
  */
 private[processing] final case class PanEffect(pan: Float) extends AudioEffect:
+
   import PanEffect.toRadiant
 
-  override def apply(chunk:  AudioChunk): Either[AudioError, AudioChunk] =
+  override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
 
     /*
      * Since the range of admissible angles is between [-45°,45°],
@@ -74,7 +68,7 @@ private[processing] final case class PanEffect(pan: Float) extends AudioEffect:
      * can be obtained by this ratio:
      * (-1)/(-45) = pan/x , as x the angle to find.
      */
-    checkConstraints(PanEffect.isPanValid(pan), 
+    checkConstraints(PanEffect.isPanValid(pan),
       "Exceeded the range [" + PanEffect.MinPan + "," + PanEffect.MaxPan + "]!")
       .toLeft:
         val angle = pan * 45

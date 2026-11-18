@@ -3,9 +3,9 @@ package scalasound.view.panels.effects
 import scalafx.scene.control.Slider
 import scalafx.scene.layout.Pane
 
-/* 
+/*
  * Container for each effect that contains the effect panel and the specific slider
- * where it can be assigned to listeners for update the effects by the user behavior. 
+ * where it can be assigned to listeners for update the effects by the user behavior.
  */
 private[effects] final case class PanelComponents(panel: Pane, slider: Slider)
 
@@ -21,6 +21,6 @@ private[effects] trait EffectPane extends Pane:
   """
 
   /**
-   * Sets to default the various sliders.
-   */
+    * Sets to default the various sliders.
+    */
   def resetSlidersAndValues(): Unit

@@ -12,11 +12,12 @@ import java.nio.charset.StandardCharsets
 /* Utility class that contains common method used in different effect panels. */
 private[effects] object Utility:
 
-  val BackgroundColor = "#4287f5"
-  val TitleEffectSize = 20
-
+  private lazy val HorizontalSlider: String = sliderStyleDataUri(true)
+  private lazy val VerticalSlider: String = sliderStyleDataUri(false)
   private val ThicknessThumb = 8
   private val HeightThumb = ThicknessThumb * 3
+  val BackgroundColor = "#4287f5"
+  val TitleEffectSize = 20
 
   /* Converting it in Data URI valid for the Wrapper ScalaFx. */
   private def sliderStyleDataUri(horizontal: Boolean): String =
@@ -35,12 +36,9 @@ private[effects] object Utility:
   """
     "data:text/css," + URLEncoder.encode(customSlider, StandardCharsets.UTF_8).replace("+", "%20")
 
-  private lazy val HorizontalSlider: String = sliderStyleDataUri(true)
-  private lazy val VerticalSlider: String = sliderStyleDataUri(false)
-
   /* Constructor for Slider Control. */
-  private def slider(config: ParameterConfiguration, 
-                     horizontal: Boolean, 
+  private def slider(config: ParameterConfiguration,
+                     horizontal: Boolean,
                      sliderSize: Int = 300): Slider = new Slider:
     private val sliderStyle = if horizontal then HorizontalSlider else VerticalSlider
     min = config.min
@@ -55,7 +53,7 @@ private[effects] object Utility:
     else
       orientation = Orientation.Vertical
       prefHeight = sliderSize
-  
+
   /**
    * Constructor for container of the effect in the GUI.
    * @param title the title of the container.
@@ -93,7 +91,7 @@ private[effects] object Utility:
       children = Seq(label(title, boldTitle, titleSize), middle, valueLabel)
 
     PanelComponents(vbox, slide)
-  
+
   /**
    * Constructor for the label component.
    * @param label the text.

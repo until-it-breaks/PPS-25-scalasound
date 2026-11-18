@@ -110,20 +110,9 @@ final case class AppState(
 
   private def handleRemoveAll(): AppState =
     copy(effects = List.empty)
-
-  /*
-   * 1) Checks for equality of effectType;
-   * 2) Splits the list of effects into two halves,
-   * based on whether an effect of the same type is present in the input;
-   * 3) Finally, takes the first part obtained in the previous step and
-   * concatenates it with (effect + second half),
-   * while avoiding any additional, redundant effects of the same type.
-   */
+  
   private def handleAddEffect(effect: AudioEffect): AppState =
-    val isSameType = AudioEffect.checkEqualEffectType(_, effect)
-    // val (firstHalf, secondHalf) = effects.span(!isSameType(_))
-    // copy(effects = firstHalf ++ (effect :: secondHalf.filterNot(isSameType(_))))
-    copy(effects = effect :: effects.filterNot(isSameType(_)))
+    copy(effects = effect :: effects.filterNot(_.hasSameEffectTypeOf(effect)))
 
   private def handleSeek(index: Int): AppState =
     track match

@@ -58,7 +58,13 @@ private[processing] object PanEffect extends AudioConfiguration:
  */
 private[processing] final case class PanEffect(pan: Float) extends AudioEffect:
 
-  import PanEffect.toRadiant
+  import PanEffect.*
+
+  private val checkPan = checkConstraints(isPanValid(pan),
+    "Exceeded the range [" + MinPan + "," + MaxPan + "]!")
+
+  private val angle = pan * 45
+  private val (leftPan, rightPan) = PanEffect.panFactors(angle.toRadiant)
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
 
@@ -68,16 +74,12 @@ private[processing] final case class PanEffect(pan: Float) extends AudioEffect:
      * can be obtained by this ratio:
      * (-1)/(-45) = pan/x , as x the angle to find.
      */
-    checkConstraints(PanEffect.isPanValid(pan),
-      "Exceeded the range [" + PanEffect.MinPan + "," + PanEffect.MaxPan + "]!")
-      .toLeft:
-        val angle = pan * 45
-        val (leftPan, rightPan) = PanEffect.panFactors(angle.toRadiant)
 
-        val (lch, rch) = chunk match
-          case MonoChunk(samples) => (samples, samples)
-          case StereoChunk(left, right) => (left, right)
+    checkPan.toLeft:
+      val (lch, rch) = chunk match
+        case MonoChunk(samples) => (samples, samples)
+        case StereoChunk(left, right) => (left, right)
 
-        StereoChunk(
-          lch.map(x => x * leftPan),
-          rch.map(x => x * rightPan))
+      StereoChunk(
+        lch.map(x => x * leftPan),
+        rch.map(x => x * rightPan))

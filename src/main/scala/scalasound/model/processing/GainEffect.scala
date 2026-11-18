@@ -25,6 +25,11 @@ private[processing] object GainEffect extends AudioConfiguration:
  * Gain defines the strength of the gain where values are accepted between [0.0f,2.0f].
  */
 private[processing] final case class GainEffect(gain: Float) extends AudioEffect:
+
+  import GainEffect.*
+
+  private val checkGain = checkConstraints(isGainValid(gain),
+    "Exceeded the range [" + MinGain + "," + MaxGain + "]!")
   /*
    * toLeft is the same to:
    * checkConstraints() match
@@ -35,14 +40,12 @@ private[processing] final case class GainEffect(gain: Float) extends AudioEffect
    * is empty then do something.
    */
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(GainEffect.isGainValid(gain),
-      "Exceeded the range [" + GainEffect.MinGain + "," + GainEffect.MaxGain + "]!").
-      toLeft:
-        chunk match
-          case MonoChunk(samples) =>
-            MonoChunk(samples.map(x => clamp(x * gain)))
-          case StereoChunk(left, right) =>
-            StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
+    checkGain.toLeft:
+      chunk match
+        case MonoChunk(samples) =>
+          MonoChunk(samples.map(x => clamp(x * gain)))
+        case StereoChunk(left, right) =>
+          StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
 
   /*
    * Defines the "clamp" logic necessary to maintain

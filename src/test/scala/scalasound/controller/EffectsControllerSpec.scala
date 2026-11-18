@@ -50,7 +50,7 @@ final class EffectsControllerSpec extends CatsEffectSuite:
       assert(current.effects.isEmpty)
       assert(emptyStore.effects.isEmpty)
       assert(gainStore.effects.nonEmpty)
-      assertEquals(gainStore.effects.head.effectType, gain.effectType)
+      assert(gainStore.effects.head.hasSameEffectTypeOf(gain))
       assert(newEmptyStore.effects.isEmpty)
 
   test("addEffect should add an effect to the list and " +
@@ -67,6 +67,6 @@ final class EffectsControllerSpec extends CatsEffectSuite:
     yield
       assert(twoEffectsStore.effects.nonEmpty)
       assertEquals(twoEffectsStore.effects.length, 2)
-      assertEquals(twoEffectsStore.effects.head.effectType, gain.effectType)
+      assert(twoEffectsStore.effects.head.hasSameEffectTypeOf(gain))
       assertEquals(newStore.effects.length, 2)
-      assertEquals(newStore.effects.head.effectType, volume.effectType)
+      assert(newStore.effects.head.hasSameEffectTypeOf(volume))

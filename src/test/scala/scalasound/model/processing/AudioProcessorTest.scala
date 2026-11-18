@@ -39,7 +39,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
   private val orderedEffects = List(gain, pan, volume)
   private val chunk: AudioChunk = MonoChunk(Vector.fill(SizeChunk)(InitialValue))
 
-  private def pipeline(effects: List[AudioEffect], chunk: AudioChunk, chunkIndex: Int = 0): Either[AudioError, AudioChunk] =
+  private def pipeline(effects: List[AudioEffect], chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =
     effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)):
       (currentChunk, effect) =>
         currentChunk.flatMap:

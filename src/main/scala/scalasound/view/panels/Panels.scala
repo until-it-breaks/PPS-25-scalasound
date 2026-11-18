@@ -14,8 +14,10 @@ import scalasound.view.panels.playback.TrackBox
 object Panels:
 
   // TODO: AGGIORNARE DOC.
+
   /**
    * Gets the Panel containing the upper section of the screen.
+   *
    * @param stage the primary stage of the ScalaFx app.
    * @return the TitlePane.
    */
@@ -35,6 +37,7 @@ object Panels:
 
   /**
    * Gets the Pane containing the lower section of the screen.
+   *
    * @return the EffectsPanel.
    */
   def effectsPanel(): EffectsPanelContainer = EffectsPanelContainer()

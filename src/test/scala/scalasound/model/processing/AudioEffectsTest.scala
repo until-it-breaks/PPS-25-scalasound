@@ -26,9 +26,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     case VolumeConfig extends Config(AudioConfiguration.parameterConfiguration(Volume).volumeConfiguration)
   
   private val sizeChunk: Int = 10
-  private val minValueChunk: Float = -1.0f
   private val defaultValueChunk: Float = 0.5f
-  private val maxValueChunk: Float = 1.0f
   private val sampleRateStandard = 44100.0f
   private val chunk: AudioChunk = MonoChunk(Vector.fill(sizeChunk)(defaultValueChunk))
 

@@ -19,37 +19,24 @@ object EffectsLogic:
       slider.onMouseReleased = _ =>
         if !slider.valueChanging.value then onUpdate(slider.value.value.toFloat)
 
-/**
- * Wrapper on [[EffectsController]] to execute commands on effects asynchronously.
- * Event actions are triggered when the sliders values change,
- * and only once when the user releases the slider after dragging or
- * the user clicks on the specific point onto the slider.
- * @param controller the controller responsible for handling operations based on the effects.
- */
+/** Wrapper on [[EffectsController]] to execute commands on effects asynchronously. Event actions
+  * are triggered when the sliders values change, and only once when the user releases the slider
+  * after dragging or the user clicks on the specific point onto the slider.
+  * @param controller
+  *   the controller responsible for handling operations based on the effects.
+  */
 final class EffectsLogic(controller: EffectsController)(using IORuntime):
   import EffectsLogic.sliderListener
 
-  /*
-   * Adds a new effect to the current input (track or chunk).
-   */
-  private def setEffect(effect: AudioEffect): Unit =
-    controller.addEffect(effect).unsafeRunAndForget()
-
-  /*
-   * Removes all the effects applied on the input.
-   */
-  private def removeAll(): Unit =
-    controller.removeAll().unsafeRunAndForget()
-
-  /**
-   * Connects the buttons and the sliders of the given pane to the [[EffectsController]].
-   * Must be called once, on the JavaFX thread, before the box is shown.
-   * @param effectPanel the panel containing the "views" of each effect.
-   */
+  /** Connects the buttons and the sliders of the given pane to the [[EffectsController]]. Must be
+    * called once, on the JavaFX thread, before the box is shown.
+    * @param effectPanel
+    *   the panel containing the "views" of each effect.
+    */
   def attach(effectPanel: EffectsPanelContainer): Unit =
-    val volumeGainBox = effectPanel.volumeGainBox
+    val volumeGainBox    = effectPanel.volumeGainBox
     val distortionPanBox = effectPanel.distortionPanBox
-    val echoAutopanBox = effectPanel.echoAutopanBox
+    val echoAutopanBox   = effectPanel.echoAutopanBox
 
     effectPanel.resetAllButton.onAction = _ =>
       removeAll()
@@ -60,6 +47,18 @@ final class EffectsLogic(controller: EffectsController)(using IORuntime):
     volumeGainLogic(volumeGainBox)
     distortionPanLogic(distortionPanBox)
     echoAutopanLogic(echoAutopanBox)
+
+  /*
+   * Removes all the effects applied on the input.
+   */
+  private def removeAll(): Unit =
+    controller.removeAll().unsafeRunAndForget()
+
+  /*
+   * Adds a new effect to the current input (track or chunk).
+   */
+  private def setEffect(effect: AudioEffect): Unit =
+    controller.addEffect(effect).unsafeRunAndForget()
 
   /*
    * Handles the logic of volume and gain sliders.
@@ -86,7 +85,7 @@ final class EffectsLogic(controller: EffectsController)(using IORuntime):
   private def updateDistortion(value: Float, filter: DistortionEnum): Unit =
     val isSoft = filter match
       case Tanh => true
-      case Sin => false
+      case Sin  => false
     setEffect(AudioEffect.distortion(value, isSoftClipping = isSoft))
 
   /*

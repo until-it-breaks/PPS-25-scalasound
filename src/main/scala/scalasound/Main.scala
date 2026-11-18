@@ -1,21 +1,23 @@
 package scalasound
 
 import cats.effect.unsafe.IORuntime
-import cats.effect.{Deferred, IO, IOApp}
+import cats.effect.{Deferred, IO}
 import scalasound.view.ScalaFxApp
 
-object Main extends IOApp.Simple:
+object Main:
 
-  override def run: IO[Unit] =
-    given IORuntime = runtime
+  def main(args: Array[String]): Unit =
+    given IORuntime = IORuntime.global
 
-    Deferred[IO, Unit].flatMap { ready =>
-      AppSetup.make(ready.get).use { dependencies =>
-        IO.blocking {
-          new ScalaFxApp(
-            dependencies,
-            onReady = () => ready.complete(()).void.unsafeRunAndForget()
-          ).main(Array.empty[String])
-        }
-      }
-    }
+    val ready = Deferred.unsafe[IO, Unit]
+
+    val (dependencies, release) =
+      AppSetup.make(ready.get).allocated.unsafeRunSync()
+
+    try
+      new ScalaFxApp(
+        dependencies,
+        onReady = () => ready.complete(()).void.unsafeRunAndForget()
+      ).main(args)
+    finally
+      release.unsafeRunSync()

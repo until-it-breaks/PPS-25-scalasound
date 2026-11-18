@@ -1,6 +1,6 @@
 package scalasound.view.panels.playback
 
-import scalafx.geometry.Pos
+import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Cursor
 import scalafx.scene.control.{Button, Label, Slider}
 import scalafx.scene.layout.{HBox, VBox}
@@ -23,8 +23,6 @@ private[panels] object TrackBox:
 
   private def createAudioButton(text: String): Button = new Button(text):
     cursor = Cursor.Hand
-    prefWidth = 75
-    prefHeight = 40
     style = """
       -fx-background-color: #3c6382;
       -fx-text-fill: white;
@@ -46,9 +44,9 @@ private[panels] final class TrackBox extends VBox:
   val timeLine: Slider      = new Slider(0, EmptyDuration, EmptyPosition) { prefWidth = 500 }
   val startTimeLabel: Label = createTimeLabel
   val endTimeLabel: Label   = createTimeLabel
-  val playButton: Button    = createAudioButton("▶")
-  val pauseButton: Button   = createAudioButton("❚❚")
-  val stopButton: Button    = createAudioButton("⏹")
+  val playButton: Button    = createAudioButton("Play")
+  val pauseButton: Button   = createAudioButton("Pause")
+  val stopButton: Button    = createAudioButton("Stop")
 
   private val timelineBox = new HBox:
     alignment = Pos.Center
@@ -62,4 +60,5 @@ private[panels] final class TrackBox extends VBox:
 
   alignment = Pos.Center
   spacing = 30
+  padding = Insets(20)
   children = Seq(timelineBox, buttonsBox)

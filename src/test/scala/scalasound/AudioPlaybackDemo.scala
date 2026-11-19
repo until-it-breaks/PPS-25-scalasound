@@ -6,7 +6,6 @@ import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.SimpleAudioProcessor
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
 
-import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
 
 object AudioPlaybackDemo extends IOApp.Simple:
@@ -17,7 +16,7 @@ object AudioPlaybackDemo extends IOApp.Simple:
       store <- AppStateStore.make
 
       _ <- IO.println("[DEMO] Loading sample WAV file from resources...")
-      path = Paths.get(getClass.getResource("/file_example_WAV_5MG.wav").toURI).toString
+      path = "src/test/resources/file_example_WAV_5MG.wav"
       track <- IO
         .blocking(WavAudioReader.load(path))
         .map(_.left.map(e => new RuntimeException(e.toString)))
@@ -35,7 +34,7 @@ object AudioPlaybackDemo extends IOApp.Simple:
       //   AudioOutput.console           prints chunk info, no pacing (runs through the file instantly)
       //   AudioOutput.console.paced     prints chunk info at real-time speed (headless demo)
       //   AudioOutput.speakers.paced    works, but not recommended: the line already blocks, so you'd double the delay
-      player = AudioPlayer.streaming(SimpleAudioProcessor, AudioOutput.console.paced)
+      player = AudioPlayer.streaming(SimpleAudioProcessor, AudioOutput.speakers)
       _ <- player
         .run(store)
         .compile

@@ -92,7 +92,7 @@ trait AudioProcessor:
               // Checks if the effect is type TimeAudioEffect since this type
               // of effects need the chunk index to compute the final result.
               case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
-              case standardEffect: AudioEffect => standardEffect(chunky)
+              case standardEffect: StatelessAudioEffect => standardEffect(chunky)
     }
 
 /**

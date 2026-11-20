@@ -30,6 +30,12 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
   private val sampleRateStandard = 44100.0f
   private val chunk: AudioChunk = MonoChunk(Vector.fill(sizeChunk)(defaultValueChunk))
 
+  private object newStatelessEffect extends StatelessAudioEffect:
+    override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] = Right(chunk)
+
+  private object newTimeEffect extends TimeAudioEffect:
+    override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] = Right(chunk)
+
   "Available effects" should "be the ones contained in the AudioEffectType enum" in:
     AudioEffect.effectsNames.length shouldBe AudioEffectType.values.length
 
@@ -40,6 +46,29 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
   it should "be a MonoChunk and not a StereoChunk" in:
     chunk shouldBe a [MonoChunk]
     chunk should not be a [StereoChunk]
+
+  "Effects type" should "return the expected AudioEffectType for known effects" in:
+    AudioEffect.identity.effectType shouldBe Some(AudioEffectType.Identity)
+    AudioEffect.gain(Config.GainConfig.default).effectType shouldBe Some(AudioEffectType.Gain)
+    AudioEffect.volume(Config.VolumeConfig.default).effectType shouldBe Some(AudioEffectType.Volume)
+    AudioEffect.pan(Config.PanConfig.default).effectType shouldBe Some(AudioEffectType.Pan)
+    AudioEffect.autopan(Config.AutopanConfig.default).effectType shouldBe Some(AudioEffectType.Autopan)
+    AudioEffect.echo(Config.AlphaConfig.default, Config.DelayConfig.default.toInt).effectType shouldBe Some(AudioEffectType.Echo)
+    AudioEffect.distortion(Config.DistortionConfig.default).effectType shouldBe Some(AudioEffectType.Distortion)
+
+  it should "return no type for unregistered effects" in:
+    newStatelessEffect.effectType shouldBe Option.empty
+    newTimeEffect.effectType shouldBe Option.empty
+
+  it should "return true for effects of the same type even if they have different parameters" +
+    "otherwise it should return false because the two effects doesn't have the same type" in:
+    val gain1 = AudioEffect.gain(Config.GainConfig.default)
+    val gain2 = AudioEffect.gain(Config.GainConfig.max)
+    gain1.hasSameEffectTypeOf(gain2) shouldBe true
+    val pan = AudioEffect.pan(Config.PanConfig.default)
+    gain1.hasSameEffectTypeOf(pan) shouldBe false
+    gain1.hasSameEffectTypeOf(newStatelessEffect) shouldBe false
+    gain1.hasSameEffectTypeOf(newTimeEffect) shouldBe false
 
   "IdentityEffect" should "return the same initial chunk" in:
     val resultChunk = AudioEffect.identity(chunk)
@@ -155,11 +184,6 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
   it should "return an AudioError if the frequency is out of bounds" in:
     val frequency = Config.AutopanConfig.min - 1
     val resultChunk = AutopanEffect(frequency, sampleRateStandard)(chunk, chunkIndex = 0)
-    resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
-
-  it should "return an AudioError if no chunk index is specified" in:
-    val frequency = (Config.AutopanConfig.min + Config.AutopanConfig.max) / 2
-    val resultChunk = AutopanEffect(frequency, sampleRateStandard)(chunk)
     resultChunk.left.value shouldBe a [AudioError.AudioEffectsError]
 
   "EchoEffect" should "return an AudioError when the " +

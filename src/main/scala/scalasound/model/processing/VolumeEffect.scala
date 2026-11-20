@@ -25,7 +25,7 @@ private[processing] object VolumeEffect extends AudioConfiguration:
  * Effect that applies the volume effect on the input audio chunk.
  * Volume defines the strength of the effect where values accepted are between [0.0f,1.0f].
  */
-private[processing] final case class VolumeEffect(volume: Float) extends AudioEffect:
+private[processing] final case class VolumeEffect(volume: Float) extends StatelessAudioEffect:
 
   import VolumeEffect.*
 

@@ -47,7 +47,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
             // Checks if the effect is type TimeAudioEffect since this type
             // of effects need the chunk index to compute the final result.
             case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
-            case standardEffect: AudioEffect => standardEffect(chunky)
+            case standardEffect: StatelessAudioEffect => standardEffect(chunky)
 
   private def createTrack: AudioTrack =
     MonoTrack(SampleRate, Vector.fill(SizeTrack)(MonoChunk(chunk.getVectors.head)))
@@ -57,7 +57,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
    * adapts with new filters unknown, so not already in
    * the known effect list.
    */
-  private case object NewEffect extends AudioEffect:
+  private case object NewEffect extends StatelessAudioEffect:
     override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
       chunk match
         case MonoChunk(samples) =>

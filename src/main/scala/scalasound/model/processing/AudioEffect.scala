@@ -1,7 +1,6 @@
 package scalasound.model.processing
 
 import scalasound.model.domain.AudioChunk
-import scalasound.model.processing.AudioError.AudioEffectsError
 
 /**
  * Defines the available effects.
@@ -26,23 +25,24 @@ enum AudioEffectType[+T <: AudioConfiguration](val name: String, val instance: T
 /**
  * Defines a contract that applies a transformation on an audio block.
  */
-trait AudioEffect:
-  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
-
+sealed trait AudioEffect:
   /* Check whether the constraints for a given effect are met. */
   protected def checkConstraints(isValid: Boolean, msg: String): Option[AudioError] =
     if isValid then Option.empty
     else Some(AudioError.AudioEffectsError(this, msg))
 
 /**
+ * Defines a contract that applies a transformation on an audio block with
+ * no relation to time.
+ */
+trait StatelessAudioEffect extends AudioEffect:
+  def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
+
+/**
  * Defines a contract that applies a transformation on an audio block,
  * but keeping trace of the passing of time by using the chunk index.
  */
 trait TimeAudioEffect extends AudioEffect:
-  /* If the index is not present then every chunk is the first one. */
-  final override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    Left(AudioEffectsError(this, "An index is needed!"))
-
   def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
 
 object AudioEffect:
@@ -56,22 +56,18 @@ object AudioEffect:
     AudioEffectType.values.map(_.name).toList
 
   extension (effect: AudioEffect)
-    /*
-     * Generalizes the output because it doesn't matter
-     * what type effect is now in input.
-     * The wildcard ? is used for this motivation.
-     */
     /**
      * @return the expected type for the specific effect.
      */
-    def effectType: AudioEffectType[?] = effect match
-      case IdentityEffect => AudioEffectType.Identity
-      case _: GainEffect => AudioEffectType.Gain
-      case _: DistortionEffect => AudioEffectType.Distortion
-      case _: EchoEffect => AudioEffectType.Echo
-      case _: PanEffect => AudioEffectType.Pan
-      case _: AutopanEffect => AudioEffectType.Autopan
-      case _: VolumeEffect => AudioEffectType.Volume
+    def effectType: Option[AudioEffectType[?]] = effect match
+      case IdentityEffect => Some(AudioEffectType.Identity)
+      case _: GainEffect => Some(AudioEffectType.Gain)
+      case _: DistortionEffect => Some(AudioEffectType.Distortion)
+      case _: EchoEffect => Some(AudioEffectType.Echo)
+      case _: PanEffect => Some(AudioEffectType.Pan)
+      case _: AutopanEffect => Some(AudioEffectType.Autopan)
+      case _: VolumeEffect => Some(AudioEffectType.Volume)
+      case _ => Option.empty
 
     /**
      * Checks when two effects share the same effectType.
@@ -80,12 +76,14 @@ object AudioEffect:
      * @return true if the two effects have the same type and false otherwise.
      */
     def hasSameEffectTypeOf(effect2: AudioEffect): Boolean =
-      effect.effectType == effect2.effectType
+      (effect.effectType, effect2.effectType) match
+        case (Some(ef1), Some(ef2)) => ef1 == ef2
+        case _ => false
 
   /**
    * Returns the Identity effect.
    */
-  def identity: AudioEffect =
+  def identity: StatelessAudioEffect =
     IdentityEffect
 
   /**
@@ -93,7 +91,7 @@ object AudioEffect:
    *
    * @param gainValue the value of the gain.
    */
-  def gain(gainValue: Float): AudioEffect =
+  def gain(gainValue: Float): StatelessAudioEffect =
     GainEffect(gainValue)
 
   /**
@@ -102,7 +100,7 @@ object AudioEffect:
    * @param distortionValue the strength of the distortion.
    * @param isSoftClipping  if [[true]] applies a tanh transformation else a sin-based effect.
    */
-  def distortion(distortionValue: Float, isSoftClipping: Boolean = true): AudioEffect =
+  def distortion(distortionValue: Float, isSoftClipping: Boolean = true): StatelessAudioEffect =
     DistortionEffect(distortionValue, isSoftClipping)
 
   /**
@@ -112,7 +110,7 @@ object AudioEffect:
    * @param delay      expressed in milliseconds defines the delay of the echo effect.
    * @param sampleRate the sampling rate in Hz.
    */
-  def echo(alpha: Float, delay: Int, sampleRate: Float = 44100f): AudioEffect =
+  def echo(alpha: Float, delay: Int, sampleRate: Float = 44100f): TimeAudioEffect =
     EchoEffect(alpha, delay, sampleRate)
 
   /**
@@ -120,7 +118,7 @@ object AudioEffect:
    *
    * @param panValue the strength of the pan effect.
    */
-  def pan(panValue: Float): AudioEffect =
+  def pan(panValue: Float): StatelessAudioEffect =
     PanEffect(panValue)
 
   /**
@@ -129,7 +127,7 @@ object AudioEffect:
    * @param autopanValue it's the frequency in Hz from switching left to right.
    * @param sampleRate   it's the frequency of sampling the chunks.
    */
-  def autopan(autopanValue: Float, sampleRate: Float = 44100f): AudioEffect =
+  def autopan(autopanValue: Float, sampleRate: Float = 44100f): TimeAudioEffect =
     AutopanEffect(autopanValue, sampleRate)
 
   /**
@@ -137,5 +135,5 @@ object AudioEffect:
    *
    * @param volumeValue the strength of the volume.
    */
-  def volume(volumeValue: Float): AudioEffect =
+  def volume(volumeValue: Float): StatelessAudioEffect =
     VolumeEffect(volumeValue)

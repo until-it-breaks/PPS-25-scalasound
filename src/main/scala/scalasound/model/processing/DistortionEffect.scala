@@ -25,7 +25,7 @@ private[processing] object DistortionEffect extends AudioConfiguration:
  * Effect that applies the distortion effect on the input audio chunk.
  * Distortion defines the strength of the effect where values accepted are between [0.0f,10.0f].
  */
-private[processing] final case class DistortionEffect(distortion: Float, isSoftClipping: Boolean) extends AudioEffect:
+private[processing] final case class DistortionEffect(distortion: Float, isSoftClipping: Boolean) extends StatelessAudioEffect:
 
   import DistortionEffect.*
 
@@ -39,14 +39,14 @@ private[processing] final case class DistortionEffect(distortion: Float, isSoftC
    * Hyperbolic-tangent based formula to apply the
    * SoftClipping Distortion effect.
    */
-  private def tanh(x: Float): Float =
+  private inline def tanh(x: Float): Float =
     math.tanh(x * distortion).toFloat
 
   /*
    * Sin-based formula to apply the
    * WaveFolding Distortion effect.
    */
-  private def sinWave(x: Float): Float =
+  private inline def sinWave(x: Float): Float =
     math.sin(x * distortion).toFloat
 
   private def applyDistortion(chunk: AudioChunk, function: Float => Float): AudioChunk =

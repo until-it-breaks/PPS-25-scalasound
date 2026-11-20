@@ -129,11 +129,11 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
       accumulator.handle(AddEffect(x))
     }
     // The new effect is added to the front of the list.
-    base.effects.head.effectType shouldBe Gain
+    base.effects.head.effectType shouldBe Some(Gain)
     val volume2 = AudioEffect.volume(0.5f)
     val newBase = base.handle(AddEffect(volume2))
     newBase.effects.length shouldBe effects.length
-    newBase.effects.head.effectType shouldBe Volume
+    newBase.effects.head.effectType shouldBe Some(Volume)
     newBase.effects shouldBe List(volume2, gain)
 
   "currentPositionSeconds" should "calculate correct time based on active chunkIndex" in {

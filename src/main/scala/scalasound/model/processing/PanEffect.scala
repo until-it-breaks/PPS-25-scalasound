@@ -56,7 +56,7 @@ private[processing] object PanEffect extends AudioConfiguration:
  * Effect that applies the pan effect on the input audio chunk.
  * Pan defines the strength of the pan with values are accepted between [-1.0f,1.0f].
  */
-private[processing] final case class PanEffect(pan: Float) extends AudioEffect:
+private[processing] final case class PanEffect(pan: Float) extends StatelessAudioEffect:
 
   import PanEffect.*
 

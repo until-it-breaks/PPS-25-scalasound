@@ -24,7 +24,7 @@ private[processing] object GainEffect extends AudioConfiguration:
  * Effect that applies the Gain effect on the input audio chunk.
  * Gain defines the strength of the gain where values are accepted between [0.0f,2.0f].
  */
-private[processing] final case class GainEffect(gain: Float) extends AudioEffect:
+private[processing] final case class GainEffect(gain: Float) extends StatelessAudioEffect:
 
   import GainEffect.*
 

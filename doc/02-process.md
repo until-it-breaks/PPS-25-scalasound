@@ -5,7 +5,7 @@ Come metodologia di sviluppo, è stata adottata la metodologia SCRUM, proposta d
 
 ## Ruoli
 - **Jiekai Sun** - Domain Expert / Developer
-- **Simon Carpi** - Product Owner / Developer
+- **Simone Carpi** - Product Owner / Developer
 - **Martin Tomassi** - Developer
 
 Tutti i membri ricoprono il ruolo di Developer e contribuiscono in modo equo all'implementazione del progetto.
@@ -20,14 +20,16 @@ Ciascuno Sprint si articola attraverso le seguenti fasi:
 - **Meeting finale:** Verifica del raggiungimento degli obiettivi prefissati, valutazione dei risultati ottenuti ed eventuali correzioni/aggiustamenti per gli Sprint successivi.
 
 ## Strumenti Utilizzati
-| Categoria                   | Strumento                  |
-|:----------------------------|:---------------------------|
-| **IDE di Sviluppo**         | **IntelliJ IDEA**          |
-| **Version Control System**  | **Git & GitHub**           |
-| **Build Tool & Dipendenze** | **SBT (Scala Build Tool)** |
-| **Testing Framework**       | **ScalaTest & MUnit**      |
-| **CI/CD**                   | **GitHub Actions**         |
-| **Documentazione & Report** | **Pandoc e XeLaTeX**       |
+| Categoria                   | Strumento             |
+|:----------------------------|:----------------------|
+| **IDE di Sviluppo**         | **IntelliJ IDEA**     |
+| **Version Control System**  | **Git e GitHub**      |
+| **Build Tool**              | **SBT**               |
+| **Formattazione Codice**    | **scalafmt**          |
+| **Testing Framework**       | **ScalaTest e MUnit** |
+| **Code Coverage**           | **Scoverage**         |
+| **CI/CD**                   | **GitHub Actions**    |
+| **Documentazione e Report** | **Pandoc e XeLaTeX**  |
 
 ## Strategia di Branching e Controllo di Versione
 Il repository è stato configurato con le seguenti regole:
@@ -35,7 +37,7 @@ Il repository è stato configurato con le seguenti regole:
 - È vietata la scrittura diretta sul branch principale `main`. Ogni feature o refactor viene sviluppato su un branch secondario dedicato (`feature/...` o `refactor/...`).
 - Il branch `main` è protetto da push manuali. L'integrazione del codice avviene esclusivamente tramite **Pull Request**, subordinata al superamento obbligatorio di tutti i test automatizzati (sia quelli esistenti che i nuovi test introdotti nella modifica) e all'approvazione di un membro del team.
 
-## Pipeline di Continuous Integration e Continuous Delivery (CI/CD)
+## Continuous Integration e Continuous Delivery (CI/CD)
 L'infrastruttura è supportata da due workflow in **GitHub Actions**:
 
 1. **Scala CI (`ci.yml`):** Ad ogni push o apertura di Pull Request su `main`, la pipeline esegue:
@@ -44,6 +46,6 @@ L'infrastruttura è supportata da due workflow in **GitHub Actions**:
 
 2. **PDF & Release (`release.yml`):** Gestisce la documentazione e i rilasci in modalità automatizzata:
    * A ogni modifica tracciata nella cartella `doc/`, un container Docker (`pandoc/extra:latest`) con motore XeLaTeX compila automaticamente i file Markdown in un unico report PDF, salvandolo come artefatto scaricabile dall'interfaccia delle GitHub Actions.
-   * Al rilascio di un tag di versione (es. `v1.0.0`), la pipeline compila contestualmente l'eseguibile `app.jar` e il report finale `relazione.pdf`, pubblicandoli automaticamente come release ufficiale su GitHub.
+   * Compila anche l'eseguibile con `sbt assembly` e, al rilascio di un tag di versione (es. `v1.0.0`), pubblica automaticamente come release ufficiale su GitHub l'eseguibile `scalasound.jar` e il report finale `report.pdf`.
 
 \newpage

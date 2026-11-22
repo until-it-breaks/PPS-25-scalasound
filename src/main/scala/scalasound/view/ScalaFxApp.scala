@@ -9,6 +9,8 @@ import scalasound.view.panels.Panels
 class ScalaFxApp(dependencies: AppDependencies, onReady: () => Unit) extends JFXApp3:
 
   override def start(): Unit =
+    val titlePane = Panels.titlePane()
+    dependencies.loadSaveLogic.attach(titlePane)
     val trackBox = Panels.trackBox()
     dependencies.trackBoxLogic.attach(trackBox)
     val effectsPanel = Panels.effectsPanel()
@@ -19,8 +21,7 @@ class ScalaFxApp(dependencies: AppDependencies, onReady: () => Unit) extends JFX
       scene = new Scene:
         root = new BorderPane:
           center = trackBox
-          top =
-            Panels.titlePane(stage, dependencies.loadSaveController, dependencies.loadSaveControls)
+          top = titlePane
           bottom = effectsPanel
 
     onReady()

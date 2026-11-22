@@ -1,4 +1,4 @@
-package scalasound.view.loadsave
+package scalasound.view.panels.loadsave
 
 import scalasound.model.io.{AudioLoadError, AudioSaveError}
 

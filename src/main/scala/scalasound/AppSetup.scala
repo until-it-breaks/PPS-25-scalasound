@@ -8,8 +8,8 @@ import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.AudioProcessorWithRules
 import scalasound.model.state.AppStateStore
 import scalasound.view.AppDependencies
-import scalasound.view.loadsave.{LoadSaveControlsImpl, LoadSaveObserverImpl}
 import scalasound.view.panels.effects.{EffectsControllerProxy, EffectsLogic}
+import scalasound.view.panels.loadsave.LoadSaveLogic
 import scalasound.view.panels.playback.TrackBoxLogic
 
 object AppSetup:
@@ -17,14 +17,14 @@ object AppSetup:
     for
       store              <- Resource.eval(AppStateStore.make)
       loadSaveController <- LoadSaveController.make(store, WavAudioReader, WavAudioWriter)
-      loadSaveControls = LoadSaveControlsImpl(loadSaveController)
-      trackBoxLogic    = TrackBoxLogic(store, PlaybackControllerImpl(store))
-      effectsProxy     = EffectsControllerProxy(EffectsController(store))
-      effectsLogic     = EffectsLogic(effectsProxy)
+      loadSaveLogic      = LoadSaveLogic(store, loadSaveController)
+      trackBoxLogic      = TrackBoxLogic(store, PlaybackControllerImpl(store))
+      effectsProxy       = EffectsControllerProxy(EffectsController(store))
+      effectsLogic       = EffectsLogic(effectsProxy)
       _ <- startPlayer(store)
-      _ <- (ready >> LoadSaveObserverImpl(store, loadSaveControls).observe).background
+      _ <- (ready >> loadSaveLogic.observe).background
       _ <- (ready >> trackBoxLogic.observe).background
-    yield AppDependencies(effectsLogic, loadSaveController, loadSaveControls, trackBoxLogic)
+    yield AppDependencies(effectsLogic, loadSaveLogic, trackBoxLogic)
 
   private def startPlayer(store: AppStateStore): Resource[IO, Unit] =
     AudioPlayer

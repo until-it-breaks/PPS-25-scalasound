@@ -1,12 +1,14 @@
 package scalasound
 
+import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import munit.CatsEffectSuite
-import scalasound.controller.LoadSaveController
-import scalasound.model.domain.AudioTrack
-import scalasound.model.io.{AudioLoadError, AudioSaveError, WavAudioReader, WavAudioWriter}
-import scalasound.model.state.AppStateStore
-import scalasound.view.loadsave.{LoadSaveControls, LoadSaveObserverImpl}
+import scalafx.scene.control.Alert.AlertType
+import scalasound.controller.{EffectsController, LoadSaveController}
+import scalasound.model.io.{WavAudioReader, WavAudioWriter}
+import scalasound.model.processing.{AudioEffect, AudioProcessorWithRules}
+import scalasound.model.state.{AppStateStore, ExportState, ImportState}
+import scalasound.view.panels.loadsave.LoadSaveLogic
 
 import java.nio.file.{Files, Path}
 import java.util.concurrent.atomic.AtomicReference
@@ -14,47 +16,36 @@ import scala.concurrent.duration.*
 
 class LoadSaveIntegrationSpec extends CatsEffectSuite:
 
-  private final class RecordingView extends LoadSaveControls:
-    val events = AtomicReference(Vector.empty[String])
-    val importedTracks = AtomicReference(Vector.empty[AudioTrack])
-
-    private def record(event: String): Unit =
-      events.updateAndGet(_ :+ event)
-      ()
-
-    def importIdle(): Unit = record("import:idle")
-    def importStarted(): Unit = record("import:started")
-    def importCompleted(track: AudioTrack): Unit =
-      importedTracks.updateAndGet(_ :+ track)
-      record("import:completed")
-    def importFailed(error: AudioLoadError): Unit = record(s"import:failed:$error")
-    def exportIdle(): Unit = record("export:idle")
-    def exportStarted(): Unit = record("export:started")
-    def exportCompleted(): Unit = record("export:completed")
-    def exportFailed(error: AudioSaveError): Unit = record(s"export:failed:$error")
-
   private val tempDir: Resource[IO, Path] =
     Resource.make(IO.blocking(Files.createTempDirectory("scalasound-integration"))) { dir =>
       IO.blocking {
-        dir.toFile.listFiles().foreach(_.delete())
+        Option(dir.toFile.listFiles()).foreach(_.foreach(_.delete()))
         Files.delete(dir)
       }
     }
 
-  /** The controller and the observer, working on a new store; the observer updates the given view synchronously. */
-  private def application(view: RecordingView): Resource[IO, LoadSaveController] = {
-    for
-      store <- Resource.eval(AppStateStore.make)
-      controller <- LoadSaveController.make(store, WavAudioReader, WavAudioWriter)
-      _ <- LoadSaveObserverImpl(store, view, update => update).observe.background
-      _ <- Resource.eval(waitUntil(view.events.get.contains("import:idle") && view.events.get.contains("export:idle")))
-    yield controller
-  }
+  private given IORuntime = munitIORuntime
 
-  private def waitUntil(condition: => Boolean): IO[Unit] =
+  private def application(
+      recorder: AlertRecorder
+  ): Resource[IO, (AppStateStore, LoadSaveController, EffectsController)] =
+    for
+      store              <- Resource.eval(AppStateStore.make)
+      loadSaveController <- LoadSaveController.make(store, WavAudioReader, WavAudioWriter)
+      effectsController = EffectsController(store)
+      logic             = LoadSaveLogic(
+        store = store,
+        controller = loadSaveController,
+        runOnGUIThread = update => update,
+        showAlert = recorder.show
+      )
+      _ <- logic.observe.background
+    yield (store, loadSaveController, effectsController)
+
+  private def waitUntil(condition: IO[Boolean]): IO[Unit] =
     def loop: IO[Unit] =
-      IO(condition).flatMap {
-        case true => IO.unit
+      condition.flatMap {
+        case true  => IO.unit
         case false => IO.cede >> loop
       }
     loop.timeout(5.seconds)
@@ -62,43 +53,146 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
   private def orFail[E, A](result: Either[E, A]): IO[A] =
     IO.fromEither(result.left.map(error => AssertionError(error.toString)))
 
-  test("a WAV file is imported and the track is exported back with the view following each outcome") {
+  private final case class RecordedAlert(alertType: AlertType, title: String, message: String)
+
+  private final class AlertRecorder:
+    val alerts = AtomicReference(Vector.empty[RecordedAlert])
+
+    def show(alertType: AlertType, title: String, message: String): Unit =
+      alerts.updateAndGet(_ :+ RecordedAlert(alertType, title, message))
+      ()
+
+  test(
+    "a WAV file is imported and the track is exported back with LoadSaveLogic notifying and acknowledging each outcome"
+  ) {
     tempDir.use { dir =>
       val input = dir.resolve("input.wav")
-      val track = WavAudioReader.load("src/test/resources/file_example_WAV_2MG.wav")
+      val track = WavAudioReader
+        .load("src/test/resources/file_example_WAV_2MG.wav")
         .getOrElse(fail("Failed to load the test WAV file."))
-      val view = RecordingView()
-      application(view).use { controller =>
+      val recorder = AlertRecorder()
+
+      application(recorder).use { (store, loadSaveController, _) =>
         for
           _ <- IO.blocking(WavAudioWriter.save(track, input)).flatMap(orFail(_))
-          _ <- IO.blocking(controller.load(input))
-          _ <- waitUntil(view.importedTracks.get.nonEmpty)
-          _ <- IO.blocking(controller.save(dir.resolve("output")))
-          _ <- waitUntil(view.events.get.contains("export:completed"))
-          _ <- IO.blocking(controller.acknowledgeExport)
-          _ <- waitUntil(view.events.get.count(_ == "export:idle") >= 2)
-          exported <- IO.blocking(WavAudioReader.load(dir.resolve("output.wav").toString)).flatMap(orFail(_))
+          _ <- loadSaveController.load(input)
+          _ <- waitUntil(
+            store.current.map(state =>
+              state.track.contains(track) && state.importState == ImportState.Idle
+            )
+          )
+          _ <- loadSaveController.save(dir.resolve("output"))
+          _ <- waitUntil(
+            store.current
+              .map(_.exportState == ExportState.Idle)
+              .map(_ && recorder.alerts.get.exists(_.title == "Export completed"))
+          )
+          exported <- IO
+            .blocking(WavAudioReader.load(dir.resolve("output.wav").toString))
+            .flatMap(orFail(_))
         yield
-          assertEquals(view.importedTracks.get, Vector[AudioTrack](track))
+          assertEquals(
+            recorder.alerts.get,
+            Vector(
+              RecordedAlert(
+                AlertType.Information,
+                "Import completed",
+                "The track has been imported."
+              ),
+              RecordedAlert(
+                AlertType.Information,
+                "Export completed",
+                "The track has been exported."
+              )
+            )
+          )
           assertEquals(exported, track)
       }
     }
   }
 
-  test("failures reach the view and are cleared once acknowledged") {
+  test(
+    "active effects are applied to the track before exporting without modifying the loaded track"
+  ) {
     tempDir.use { dir =>
-      val view = RecordingView()
-      application(view).use { controller =>
+      val input = dir.resolve("input.wav")
+      val track = WavAudioReader
+        .load("src/test/resources/file_example_WAV_2MG.wav")
+        .getOrElse(fail("Failed to load the test WAV file."))
+      val recorder = AlertRecorder()
+
+      val activeEffect  = AudioEffect.gain(0.0f)
+      val expectedTrack = AudioProcessorWithRules
+        .apply(track, List(activeEffect))
+        .getOrElse(fail("Failed to apply effect in test setup."))
+
+      application(recorder).use { (store, loadSaveController, effectsController) =>
         for
-          _ <- IO.blocking(controller.load(dir.resolve("missing.wav")))
-          _ <- waitUntil(view.events.get.exists(_.startsWith("import:failed:")))
-          _ <- IO.blocking(controller.acknowledgeImport)
-          _ <- waitUntil(view.events.get.count(_ == "import:idle") >= 2)
-          _ <- IO.blocking(controller.save(dir.resolve("out.wav")))
-          _ <- waitUntil(view.events.get.contains("export:failed:NoTrackLoaded"))
-          _ <- IO.blocking(controller.acknowledgeExport)
-          _ <- waitUntil(view.events.get.count(_ == "export:idle") >= 2)
-        yield assert(view.importedTracks.get.isEmpty)
+          _ <- IO.blocking(WavAudioWriter.save(track, input)).flatMap(orFail(_))
+          _ <- loadSaveController.load(input)
+          _ <- waitUntil(
+            store.current.map(state =>
+              state.track.contains(track) && state.importState == ImportState.Idle
+            )
+          )
+          _ <- effectsController.addEffect(activeEffect)
+          _ <- loadSaveController.save(dir.resolve("processed_output"))
+          _ <- waitUntil(
+            store.current
+              .map(_.exportState == ExportState.Idle)
+              .map(_ && recorder.alerts.get.exists(_.title == "Export completed"))
+          )
+          exported <- IO
+            .blocking(WavAudioReader.load(dir.resolve("processed_output.wav").toString))
+            .flatMap(orFail(_))
+          current <- store.current
+        yield
+          assertNotEquals(exported, track)
+          assertEquals(exported, expectedTrack)
+          assertEquals(current.track, Some(track))
+      }
+    }
+  }
+
+  test(
+    "failures trigger error alerts in LoadSaveLogic and are automatically acknowledged back to Idle"
+  ) {
+    tempDir.use { dir =>
+      val missingFile = dir.resolve("missing.wav")
+      val recorder    = AlertRecorder()
+
+      application(recorder).use { (store, loadSaveController, _) =>
+        for
+          _ <- loadSaveController.load(missingFile)
+          _ <- waitUntil(
+            store.current
+              .map(_.importState == ImportState.Idle)
+              .map(_ && recorder.alerts.get.exists(_.title == "Import failed"))
+          )
+          _ <- loadSaveController.save(dir.resolve("out.wav"))
+          _ <- waitUntil(
+            store.current
+              .map(_.exportState == ExportState.Idle)
+              .map(_ && recorder.alerts.get.exists(_.title == "Export failed"))
+          )
+          current <- store.current
+        yield
+          assert(current.track.isEmpty)
+          assertEquals(
+            recorder.alerts.get,
+            Vector(
+              RecordedAlert(
+                AlertType.Error,
+                "Import failed",
+                s"The file was not found: $missingFile"
+              ),
+              RecordedAlert(
+                AlertType.Error,
+                "Export failed",
+                "There is no track to export. Import a track first."
+              )
+            )
+          )
       }
     }
   }

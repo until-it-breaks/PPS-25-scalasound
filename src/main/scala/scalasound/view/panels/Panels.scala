@@ -1,10 +1,7 @@
 package scalasound.view.panels
 
-import scalafx.application.JFXApp3.PrimaryStage
-import scalasound.controller.LoadSaveController
-import scalasound.view.loadsave.LoadSaveControls
 import scalasound.view.panels.effects.EffectsPanelContainer
-import scalasound.view.panels.TitlePane
+import scalasound.view.panels.loadsave.TitlePane
 import scalasound.view.panels.playback.TrackBox
 
 /**
@@ -13,20 +10,12 @@ import scalasound.view.panels.playback.TrackBox
  */
 object Panels:
 
-  // TODO: AGGIORNARE DOC.
-
   /**
    * Gets the Panel containing the upper section of the screen.
    *
-   * @param stage the primary stage of the ScalaFx app.
    * @return the TitlePane.
    */
-  def titlePane(
-                 stage: PrimaryStage,
-                 loadSaveController: LoadSaveController,
-                 loadSaveControls: LoadSaveControls
-               ): TitlePane =
-    new TitlePane(stage, loadSaveController, loadSaveControls)
+  def titlePane(): TitlePane = TitlePane()
 
   /**
    * Gets the Box containing the middle section of the screen.

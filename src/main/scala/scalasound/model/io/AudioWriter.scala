@@ -14,7 +14,3 @@ trait AudioWriter:
     *         [[AudioSaveError]] describing why the export failed
     */
   def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit]
-
-object DummyAudioWriter extends AudioWriter:
-  def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
-    Left(AudioSaveError.WriteFailure(path, "DummyAudioWriter does not write files"))

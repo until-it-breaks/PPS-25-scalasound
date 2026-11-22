@@ -11,7 +11,3 @@ trait AudioReader:
    *          or a `Left` containing an [[AudioLoadError]] if loading fails
    */
   def load(filePath: String): Either[AudioLoadError, AudioTrack]
-
-object DummyAudioReader extends AudioReader:
-  def load(filePath: String): Either[AudioLoadError, AudioTrack] =
-    Left(AudioLoadError.UnsupportedFormat("DummyAudioReader does not load files"))

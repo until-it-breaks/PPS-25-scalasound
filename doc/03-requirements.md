@@ -1,92 +1,68 @@
 # Requisiti
 
 ## Business
-L'applicazione nasce per offrire un ambiente desktop di riproduzione e manipolazione audio in tempo reale, rivolto agli appassionati che desiderano ascoltare file audio applicando effetti regolabili.
+L'applicazione nasce per offrire un ambiente desktop di riproduzione e manipolazione audio, rivolto agli appassionati che desiderano ascoltare file audio applicando effetti regolabili.
 
-L'applicazione è concepita come un riproduttore a traccia singola, privo di funzionalità di gestione multi-traccia o di editing sofisticato tipiche delle workstation professionali. Per questa ragione, ciascun effetto della libreria viene applicato in modo globale all'intera traccia corrente, agendo sull'intero flusso audio anziché su porzioni temporali o regioni specifiche.
+L'applicazione è concepita come un riproduttore audio a traccia singola, privo di funzionalità di gestione multi-traccia o di editing sofisticato tipiche delle workstation professionali. Per questa ragione, ciascun effetto disponibile viene applicato globalmente all'intera traccia corrente, anziché su porzioni temporali o regioni specifiche.
 
 ## Modello di dominio
 
-Dal punto di vista concettuale, il suono nel mondo reale è un'onda continua; per poter essere elaborato da un computer, viene convertito in un segnale audio digitale, ovvero una sequenza discreta di **campioni** numerici registrati a una determinata **frequenza di campionamento** (es. 44.1 kHz). Ciascun campione è un numero in virgola mobile che esprime l'ampiezza del segnale, normalizzata nell'intervallo $[-1, 1)$, dove 0 rappresenta il silenzio e gli estremi la massima ampiezza rappresentabile.
+Dal punto di vista concettuale, il suono nel mondo reale è un'onda continua; per poter essere interpretato da un computer, viene convertito in un segnale audio digitale, ovvero una sequenza discreta di **campioni numerici** registrati ad una determinata **frequenza di campionamento** (es. 44.1 kHz). Ciascun campione è un valore numerico che esprime l'ampiezza del segnale e può essere rappresentato in modi diversi, ad esempio con numeri interi, come nei file WAV a 16 bit, oppure in virgola mobile, normalizzato nell'intervallo $[-1, 1]$ e indipendente dal formato del file, in cui lo zero corrisponde al silenzio e i due estremi sono i picchi massimi di ampiezza, in direzioni opposte.
 
-La spazialità del suono, che è anche quella supportata dall'applicazione, si distingue principalmente in:
+![Campionamento di un'onda sonora](doc/img/requisiti_campionamento.png){ width=85% }
 
-- **Mono:** Il flusso audio è composto da un unico canale sonoro; il segnale viene riprodotto in modo identico su qualsiasi cassa o cuffia, senza percezione di direzionalità spaziale.
-- **Stereo:** Il flusso audio si scompone in due canali distinti e sincronizzati (destro e sinistro), permettendo di distribuire il suono nello spazio orizzontale.
+La spazialità del suono si distingue principalmente in:
 
-A partire da questi concetti di base, il dominio modella le entità principali del sistema:
+- **Mono:** Il flusso audio è composto da un unico canale sonoro, per cui il segnale viene riprodotto in modo identico su tutti i canali del dispositivo audio, senza percezione della direzionalità spaziale.
+- **Stereo:** Il flusso audio si scompone in due canali distinti e sincronizzati (sinistro e destro), permettendo di distribuire il suono nello spazio orizzontale.
 
-- **AudioChunk:** Rappresenta una porzione di campioni audio discretizzati, costituendo l'unità fondamentale per l'elaborazione sequenziale del flusso.
-- **AudioTrack:** L'entità principale che astrae il brano musicale indipendentemente dal formato del file. Incapsula i metadati fondamentali (quali la frequenza di campionamento e la configurazione dei canali) e una sequenza ordinata di `AudioChunk`.
-- **AudioEffect:** L'astrazione che modella le trasformazioni applicabili al flusso audio. Ciascun effetto riceve in ingresso un `AudioChunk` e restituisce una versione elaborata dello stesso, consentendo di concatenare più trasformazioni sequenziali per la manipolazione del suono.
+\newpage
 
-Dal punto di vista dinamico, il sistema include diversi cicli di vita:
+![Una traccia mono ha una sola sequenza di campioni, una stereo ne ha due](doc/img/requisiti_mono_stereo.png){ width=85% }
 
-- **Riproduzione ed effetti:** il riproduttore audio si trova in uno di tre stati (fermo, in riproduzione, in pausa). L'avvio richiede una traccia caricata, la pausa è possibile solo durante la riproduzione, l'arresto riporta l'avanzamento all'inizio mentre a fine traccia la riproduzione si ferma da sola. Durante la riproduzione ogni chunk viene elaborato prima di essere riprodotto, applicando gli effetti attivi (al più uno per tipo) sempre nello stesso ordine di priorità.
-- **Importazione ed esportazione:** attraversano ciascuna gli stati di inattività, in corso, riuscita o fallita. Un'importazione riuscita sostituisce la traccia corrente, ferma la riproduzione e azzera l'avanzamento; l'esportazione è invece indipendente dalla riproduzione.
+La frequenza di campionamento indica quanti campioni descrivono un secondo di audio, per ciascun canale: a 44.1 kHz un secondo è composto da 44100 campioni per canale, quindi 44100 in totale in una traccia mono e 88200 in una stereo. La durata di una traccia si ricava con la seguente formula:
 
-### Specifica degli effetti e dei formati
+$$\text{durata (s)} = \frac{\text{campioni di un canale}}{\text{frequenza di campionamento (Hz)}}$$
 
-Ogni effetto ha uno o più parametri regolabili dall'utente. La tabella riporta, per ciascuno, l'intervallo di valori ammesso e il valore predefinito:
+A partire da questi concetti di base sono state individuate le entità di dominio principali:
 
-| Effetto    | Parametro    | Intervallo    | Predefinito |
-|------------|--------------|---------------|-------------|
-| Gain       | fattore      | [0, 2]        | 1           |
-| Volume     | livello      | [0, 1]        | 1           |
-| Distortion | intensità    | [0, 10]       | 1           |
-| Echo       | attenuazione | [0, 0.9]      | 0.5         |
-| Echo       | ritardo      | [10, 1000] ms | 100         |
-| Pan        | posizione    | [-1, 1]       | 0           |
-| Autopan    | frequenza    | [0, 20] Hz    | 1           |
-
-Priorità di applicazione: l'ordine è fisso perché il risultato di una catena di effetti dipende dall'ordine in cui vengono applicati. La priorità scelta ha una motivazione sonora:
-
-- il guadagno precede la distorsione, perché è il livello del segnale in ingresso a determinare quanto questa satura;
-- l'eco segue la distorsione, in modo che le ripetizioni riproducano il suono già distorto;
-- panning e autopan seguono l'eco, così da spostare nello spazio anche le sue ripetizioni;
-- il volume è ultimo, perché regola il livello finale dell'intera catena e non deve alterare il timbro prodotto dagli altri effetti.
-
-Comportamento degli effetti:
-
-- **Gain:** moltiplica i campioni e limita il risultato a $[-1, 1]$.
-- **Volume:** si limita a moltiplicare i campioni.
-- **Distortion:** applica a ogni campione $x$ la funzione $\tanh(i \cdot x)$ oppure $\sin(i \cdot x)$, con intensità $i$, a scelta dell'utente.
-- **Echo:** somma a ogni campione quello emesso un ritardo prima, moltiplicato per l'attenuazione, e limita il risultato a $[-1, 1]$.
-- **Pan:** distribuisce il suono tra i due canali con una legge a potenza costante: al centro ciascun canale vale circa 0.707 del segnale, agli estremi si sente un solo canale.
-- **Autopan:** fa oscillare la distribuzione del Pan alla frequenza indicata.
-- **Pan e Autopan** producono sempre un segnale stereo, anche da una traccia mono, che viene duplicata sui due canali.
-
-Formato dei file:
-
-- Lettura e scrittura WAV in PCM con segno a 16 bit, little-endian, mono o stereo; gli altri formati vengono rifiutati con un errore.
-- In esportazione i campioni fuori dall'intervallo $[-1, 1)$ vengono limitati agli estremi.
+- **AudioChunk:** Rappresenta una porzione di campioni discretizzati, costituendo l'unità fondamentale per l'elaborazione e riproduzione del flusso audio.
+- **AudioTrack:** L'entità principale che astrae una traccia audio indipendentemente dal formato del file. Incapsula i metadati fondamentali (quali la frequenza di campionamento e la configurazione dei canali) e una sequenza ordinata di `AudioChunk`.
+- **AudioEffect:** Rappresenta una trasformazione applicabile al flusso audio. Ciascun effetto riceve in ingresso un `AudioChunk` e restituisce una versione elaborata dello stesso, consentendo di concatenare più trasformazioni in sequenza.
 
 ## Requisiti Funzionali
 
 ### Utente
 - L'utente deve poter selezionare e caricare dal file system un file audio nel formato `.wav`.
-- L'utente deve poter visualizzare la timeline, la durata totale della traccia e il momento attuale di riproduzione.
+- L'utente deve poter visualizzare la durata totale della traccia e il punto in cui si trova la riproduzione.
 - L'utente deve poter avviare, mettere in pausa e arrestare la riproduzione in qualsiasi momento.
-- L'utente deve poter spostare il cursore di riproduzione in un punto qualsiasi della traccia tramite la barra di avanzamento.
-- L'utente deve poter manipolare in tempo reale i parametri degli effetti da applicare tramite appositi controlli(slider e bottoni).
-- L'utente deve poter ripristinare istantaneamente tutti gli effetti ai valori di fabbrica.
-- L'utente deve poter esportare su disco un nuovo file audio contenente l'elaborazione finale dei filtri applicati nel formato `.wav`.
-- L'utente deve ricevere un feedback visivo immediato tramite l'interfaccia grafica in caso di errori di importazione o esportazione.
+- L'utente deve poter far proseguire l'ascolto da un punto qualsiasi della traccia, selezionandolo sulla barra di avanzamento.
+- L'utente deve poter manipolare i parametri degli effetti tramite appositi controlli anche durante la riproduzione, senza interromperla. Le modifiche si percepiscono dal momento in cui vengono effettuate.
+- L'utente deve poter ripristinare istantaneamente tutti i parametri degli effetti ai valori predefiniti con cui l'applicazione si avvia.
+- L'utente deve poter esportare sul file system un nuovo file audio contenente l'elaborazione finale degli effetti applicati nel formato `.wav`.
+- L'utente deve ricevere un feedback visivo immediato tramite l'interfaccia grafica in caso di errori di importazione o esportazione, con un messaggio che ne indichi la causa.
 
 ### Sistema
-- Il sistema deve decodificare flussi audio in ingresso nel formato `.wav`, supportando nativamente sia configurazioni monofoniche che stereofoniche.
-- Il sistema deve gestire in modo sicuro ed incapsulato eventuali anomalie di formato o di I/O durante la lettura e la scrittura, impedendo il crash dell'applicazione e notificando l'errore all'interfaccia utente.
-- Il sistema deve elaborare in tempo reale le trasformazioni audio attraverso una libreria di effetti componibili, che include:
-  - **Gain:** Amplificazione del segnale audio (con fattore scalare e gestione dei limiti di picco). L'utente percepisce un incremento di potenza e spinta del suono, che può tendere alla saturazione se spinto al massimo.
-  - **Volume:** Regolazione lineare del livello complessivo d'ascolto. L'utente percepisce semplicemente il brano più forte o più silenzioso, senza alterazioni timbriche o di dinamica.
-  - **Distortion:** Elaborazione non lineare della forma d'onda (tramite funzioni come la tangente iperbolica $\tanh$ o modulazioni sinusoidali). L'utente percepisce un'alterazione timbrica aggressiva, calda o graffiante.
-  - **Echo:** Generazione di echi temporali configurabili tramite fattore di attenuazione, ritardo in millisecondi e frequenza di campionamento. L'utente percepisce la ripetizione a distanza di tempo del segnale sonoro, creando un effetto di riverbero acustico.
-  - **Pan:** Gestione statica della spazialità stereofonica. L'utente percepisce lo spostamento del suono prevalentemente verso il canale sinistro o destro.
-  - **Autopan:** Modulazione dinamica automatica della spazialità. L'utente percepisce il suono che si sposta fluidamente e ciclicamente da un auricolare (o cassa) all'altro in modo continuo.
-- Il sistema deve supportare la composizione e l'applicazione sequenziale di tali trasformazioni, consentendo sia un'elaborazione basata sull'ordine dinamico sia l'applicazione di regole di prioritizzazione nella catena degli effetti.
-- Il sistema deve gestire le transizioni di stato del riproduttore audio attraverso una macchina a stati finiti coerente.
+- Il sistema deve decodificare flussi audio in ingresso nel formato `.wav`, supportando nativamente sia configurazioni monofoniche che stereofoniche. Sono accettati solo file con campioni PCM a 16 bit con segno; i file con altre codifiche o con più di due canali vengono rifiutati con un errore.
+- Il sistema deve gestire in modo sicuro ed incapsulato eventuali anomalie di formato o di I/O, impedendo il crash dell'applicazione e notificando l'errore all'interfaccia utente.
+- Il sistema deve elaborare in tempo reale le trasformazioni audio attraverso una libreria di effetti componibili, ciascuno con parametri regolabili dall'utente entro un intervallo di valori ammesso:
+  - **Gain:** amplificazione del segnale per un fattore in $[0, 2]$. L'utente percepisce un incremento di potenza e spinta del suono, che può tendere alla saturazione se spinto al massimo.
+  - **Volume:** moltiplicazione lineare dei campioni per un livello in $[0, 1]$. L'utente percepisce semplicemente il brano più forte o più silenzioso.
+  - **Distortion:** applicazione a ogni campione $x$ della funzione $\tanh(i \cdot x)$ oppure $\sin(i \cdot x)$, a scelta dell'utente, con intensità $i$ in $[0, 10]$. L'utente percepisce un'alterazione timbrica aggressiva, calda o graffiante.
+  - **Echo:** somma a ogni campione quello emesso un ritardo prima, in $[10, 1000]$ ms, moltiplicato per un'attenuazione in $[0, 0.9]$. L'utente percepisce la ripetizione a distanza di tempo del segnale sonoro, creando un effetto di riverbero acustico.
+  - **Pan:** distribuzione statica del suono tra i due canali, con una posizione in $[-1, 1]$ e una legge a potenza costante: al centro ciascun canale vale circa 0.707 del segnale, agli estremi si sente un solo canale. L'utente percepisce lo spostamento del suono verso il canale sinistro o destro.
+  - **Autopan:** oscillazione automatica della posizione del Pan, con una frequenza in $[0, 20]$ Hz. L'utente percepisce il suono che si sposta ciclicamente da un auricolare (o cassa) all'altro in modo continuo.
+
+  Nota: Pan e Autopan producono sempre un segnale stereo. Se applicati ad una traccia mono, quest'ultima viene duplicata su due canali.
+- Il sistema deve applicare gli effetti impostati (al più uno per tipo) prima della riproduzione, in un ordine fisso, perché il risultato di una catena di effetti dipende dall'ordine in cui vengono applicati. Ogni effetto riceve il segnale già elaborato da quelli che lo precedono, nell'ordine: Gain, Distortion, Echo, Pan, Autopan, Volume. I motivi sono i seguenti:
+  - il Gain precede la Distortion, perché è il livello del segnale in ingresso a determinare quanto questa satura;
+  - l'Echo segue la Distortion, in modo che le ripetizioni riproducano il suono già distorto;
+  - Pan e Autopan seguono l'Echo, così da spostare nello spazio anche le sue ripetizioni;
+  - il Volume è l'ultimo, perché regola il livello finale dell'intera catena e non deve alterare il timbro prodotto dagli altri effetti.
+- Il sistema deve gestire la riproduzione attraverso tre stati (fermo, in riproduzione, in pausa): l'avvio richiede una traccia caricata, la pausa è possibile solo durante la riproduzione, l'arresto riporta l'avanzamento all'inizio e a fine traccia la riproduzione si ferma da sola.
+- Il sistema deve gestire importazione ed esportazione attraverso gli stati: inattivo, in corso, riuscito o fallito. Un'importazione riuscita carica/sostituisce la traccia corrente, ferma la riproduzione e azzera l'avanzamento; l'esportazione non influisce sulla riproduzione.
 - Il sistema deve consentire una sola importazione e una sola esportazione alla volta.
-- Il sistema deve consentire l'esportazione del flusso audio elaborato salvandolo su disco nel formato `.wav`.
+- Il sistema deve esportare file `.wav` PCM a 16 bit con segno, little-endian, con la stessa frequenza di campionamento della traccia originale.
 
 ## Requisiti non funzionali
 - L'applicativo deve poter essere eseguito su diversi sistemi operativi (quali Windows, macOS e Linux) sfruttando la portabilità dell'ecosistema Java.

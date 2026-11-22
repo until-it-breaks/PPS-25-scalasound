@@ -2,6 +2,7 @@ package scalasound.model.io
 
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import AudioLoadError.*
+import Pcm16.{fromLittleEndianBytes, toNormalised}
 import scalasound.model.domain.{AudioTrack, MonoTrack, StereoTrack}
 
 import java.io.{EOFException, File, IOException}
@@ -13,7 +14,7 @@ import scala.util.Using
  * Supported subset: PCM signed, 16 bit per sample, little-endian, mono or stereo.
  *
  * Samples are normalised to [-1.0, 1.0): a 16 bit sample `s` becomes
- * `s / 32768f`, so -32768 maps to -1.0 and 32767 to 32767/32768.
+ * `s / 32768f`, so -32768 maps to -1.0 and 32767 to 32767/32768 (see [[Pcm16]]).
  *
  * The last chunk holds the remaining frames, without padding.
  * A valid file without frames is accepted and produces a track with no chunks (duration 0).
@@ -21,8 +22,6 @@ import scala.util.Using
 object WavAudioReader extends AudioReader:
 
   private final val FramesPerChunk: Int = 1024
-  private final val BytesPerSample = 2
-  private final val Normalisation = 32768f
 
   /** Loads a WAV file from the given path.
    *
@@ -33,25 +32,29 @@ object WavAudioReader extends AudioReader:
   override def load(filePath: String): Either[AudioLoadError, AudioTrack] =
     for
       file <- ensureFileExists(filePath)
-      track <- decodeAudioFile(file)
+      raw <- readRawAudio(file)
+      track <- decode(raw)
     yield track
 
   private def ensureFileExists(filePath: String): Either[AudioLoadError, File] =
     val file = File(filePath)
     Either.cond(file.isFile, file, FileNotFound(filePath))
 
-  private def decodeAudioFile(file: File): Either[AudioLoadError, AudioTrack] =
-    Using(AudioSystem.getAudioInputStream(file))(parseAudioTrack).toEither
+  private def readRawAudio(file: File): Either[AudioLoadError, RawAudio] =
+    Using(AudioSystem.getAudioInputStream(file))(readFromStream).toEither
       .left.map(mapThrowableToAudioLoadError)
       .flatMap(result => result)
 
-  private def parseAudioTrack(stream: AudioInputStream): Either[AudioLoadError, AudioTrack] =
-    val format = stream.getFormat
+  private def readFromStream(stream: AudioInputStream): Either[AudioLoadError, RawAudio] =
     for
-      valid <- validateAudioFormat(format)
+      format <- validateAudioFormat(stream.getFormat)
       bytes = stream.readAllBytes()
-      frameCount <- validateAudioData(bytes, stream.getFrameLength, valid.layout.frameSize)
-    yield buildAudioTrack(valid, bytes, frameCount)
+    yield RawAudio(format, stream.getFrameLength, bytes)
+
+  private def decode(raw: RawAudio): Either[AudioLoadError, AudioTrack] =
+    for
+      frameCount <- validateAudioData(raw.bytes, raw.declaredFrames, raw.format.layout.frameSize)
+    yield buildAudioTrack(raw.format, raw.bytes, frameCount)
 
   private def validateAudioFormat(format: AudioFormat): Either[AudioLoadError, ValidFormat] =
     for
@@ -114,18 +117,12 @@ object WavAudioReader extends AudioReader:
       case ChannelLayout.Mono =>
         MonoTrack(format.sampleRate, partitionIntoChunkBlocks(extractChannel(0)).map[MonoChunk](MonoChunk(_)).toVector)
       case ChannelLayout.Stereo =>
-        val chunks = partitionIntoChunkBlocks(extractChannel(0)).zip(partitionIntoChunkBlocks(extractChannel(1))).map[StereoChunk] {
+        val chunks = partitionIntoChunkBlocks(extractChannel(0)).zip(partitionIntoChunkBlocks(extractChannel(1))).map[StereoChunk]:
           case (left, right) => StereoChunk(left, right)
-        }
         StereoTrack(format.sampleRate, chunks.toVector)
 
   private def extractChannelSamples(bytes: Array[Byte], frameCount: Int, layout: ChannelLayout, offset: Int): Vector[Float] =
-    Vector.tabulate(frameCount)(frame => decodeNormalisedSampleAt(bytes, frame * layout.channels + offset))
-
-  private def decodeNormalisedSampleAt(bytes: Array[Byte], index: Int): Float =
-    val low = bytes(index * BytesPerSample) & 0xff
-    val high = bytes(index * BytesPerSample + 1) // keeps the sign
-    ((high << 8) | low) / Normalisation
+    Vector.tabulate(frameCount)(frame => fromLittleEndianBytes(bytes, frame * layout.channels + offset).toNormalised)
 
   private def partitionIntoChunkBlocks(samples: Vector[Float]): Iterator[Vector[Float]] =
     samples.grouped(FramesPerChunk)
@@ -139,13 +136,8 @@ object WavAudioReader extends AudioReader:
   private def extractErrorMessage(e: Throwable): String =
     Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
 
-  private enum ChannelLayout(val channels: Int):
-    case Mono extends ChannelLayout(1)
-    case Stereo extends ChannelLayout(2)
-
-    def frameSize: Int = channels * BytesPerSample
-
   private final case class ValidFormat(
                                         layout: ChannelLayout,
                                         sampleRate: Int
                                       )
+  private final case class RawAudio(format: ValidFormat, declaredFrames: Long, bytes: Array[Byte])

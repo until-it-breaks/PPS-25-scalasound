@@ -1,18 +1,15 @@
-package scalasound.view.panels
+package scalasound.view.panels.loadsave
 
-import scalafx.application.JFXApp3.PrimaryStage
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Cursor
 import scalafx.scene.control.{Button, Label}
 import scalafx.scene.layout.{BorderPane, HBox}
 import scalafx.stage.FileChooser
-import scalasound.controller.LoadSaveController
-import scalasound.view.loadsave.LoadSaveControls
 
 private[panels] object TitlePane:
   private val BackgroundColor = "#4287f5"
 
-  private def titleLabel = new Label("ScalaSound"):
+  private def titleLabel: Label = new Label("ScalaSound"):
     style = """
       -fx-text-fill: #ecf0f1;
       -fx-font-size: 30px;
@@ -34,47 +31,29 @@ private[panels] object TitlePane:
       -fx-alignment: center;
     """
 
-  private def fileChooserConfig = new FileChooser:
+  def fileChooserConfig: FileChooser = new FileChooser:
     title = "Choose .wav file"
     extensionFilters.add(new FileChooser.ExtensionFilter("Audio Files", "*.wav"))
 
-  private def saveChooserConfig = new FileChooser:
+  def saveChooserConfig: FileChooser = new FileChooser:
     title = "Export as .wav file"
     initialFileName = "track.wav"
     extensionFilters.add(new FileChooser.ExtensionFilter("Audio Files", "*.wav"))
 
-private[panels] final class TitlePane(
-                                          stage: PrimaryStage,
-                                          controller: LoadSaveController,
-                                          loadSaveControls: LoadSaveControls
-                                        ) extends BorderPane:
+private[panels] final class TitlePane extends BorderPane:
   import TitlePane.*
 
-  private val statusLabel = new Label:
+  val statusLabel: Label = new Label:
     style = """
       -fx-text-fill: #ecf0f1;
       -fx-font-size: 16px;
     """
-  private val importButton = createButton("Import")
-  private val exportButton = createButton("Export")
+  val importButton: Button = createButton("Import")
+  val exportButton: Button = createButton("Export")
+
   private val buttonContainer: HBox = new HBox:
     spacing = 10
     children = Seq(importButton, exportButton)
-
-  statusLabel.text <==
-    loadSaveControls.operationStatusText
-  importButton.disable <==
-    loadSaveControls.importInProgress
-  exportButton.disable <==
-    loadSaveControls.exportInProgress || loadSaveControls.exportBlocked
-
-  importButton.onAction = _ =>
-    Option(fileChooserConfig.showOpenDialog(stage))
-      .foreach(file => controller.load(file.toPath))
-
-  exportButton.onAction = _ =>
-    Option(saveChooserConfig.showSaveDialog(stage))
-      .foreach(file => controller.save(file.toPath))
 
   padding = Insets(25)
   style = s"-fx-background-color: $BackgroundColor;"

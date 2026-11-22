@@ -14,8 +14,8 @@ import scala.concurrent.duration.*
 
 class LoadSaveControllerSpec extends CatsEffectSuite:
 
-  private val trackA     = MonoTrack(44100, Vector(MonoChunk(Vector(0.5f))))
-  private val trackB     = MonoTrack(48000, Vector(MonoChunk(Vector(-0.25f))))
+  private val trackA = MonoTrack(44100, Vector(MonoChunk(Vector(0.5f)))).fold(e => fail(e.toString), identity)
+  private val trackB = MonoTrack(48000, Vector(MonoChunk(Vector(-0.25f)))).fold(e => fail(e.toString), identity)
   private val inputPath  = Paths.get("in.wav")
   private val outputPath = Paths.get("out.wav")
 

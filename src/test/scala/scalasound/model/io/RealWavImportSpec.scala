@@ -2,14 +2,13 @@ package scalasound.model.io
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN
+import java.nio.file.{Files, Paths, StandardCopyOption}
 import java.security.MessageDigest
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.StereoTrack
 import scalasound.model.io.WavAudioReader
 
-import java.nio.file.{Files, Paths, StandardCopyOption}
-import scala.collection.mutable
 import scala.util.Using
 
 /** Verifies the import of two real WAV files of different sizes.
@@ -53,33 +52,34 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
     )
   )
   private val sampleRate = 44100
-  private val resolvedResourcePaths = mutable.Map.empty[String, String]
+
+  private lazy val resolvedResourcePaths: Map[String, String] =
+    fixtures.map(fixture => fixture.resource -> resolveResource(fixture.resource)).toMap
+
+  private def resolveResource(resource: String): String =
+    val url = Option(getClass.getResource(resource)).getOrElse(
+      fail(s"test resource not found on the classpath: $resource")
+    )
+
+    if url.getProtocol == "file" then
+      Paths.get(url.toURI).toString
+    else
+      val tempFile = Files.createTempFile("scalasound-wav-", ".wav")
+
+      try
+        Using.resource(url.openStream()) { input =>
+          Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING)
+        }
+
+        tempFile.toFile.deleteOnExit()
+        tempFile.toAbsolutePath.toString
+      catch
+        case e: Exception =>
+          Files.deleteIfExists(tempFile)
+          throw e
 
   private def resourcePath(resource: String): String =
-    resolvedResourcePaths.synchronized {
-      resolvedResourcePaths.getOrElseUpdate(resource, {
-        val url = Option(getClass.getResource(resource)).getOrElse(
-          fail(s"test resource not found on the classpath: $resource")
-        )
-
-        if url.getProtocol == "file" then
-          Paths.get(url.toURI).toString
-        else
-          val tempFile = Files.createTempFile("scalasound-wav-", ".wav")
-
-          try
-            Using.resource(url.openStream()) { input =>
-              Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING)
-            }
-
-            tempFile.toFile.deleteOnExit()
-            tempFile.toAbsolutePath.toString
-          catch
-            case e: Exception =>
-              Files.deleteIfExists(tempFile)
-              throw e
-      })
-    }
+    resolvedResourcePaths.getOrElse(resource, resolveResource(resource))
 
   private def loadStereo(resource: String): StereoTrack =
     WavAudioReader.load(resourcePath(resource)) match
@@ -102,7 +102,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
     name should "be imported as a stereo track with the sample rate of the source" in {
       val track = loadStereo(fixture.resource)
 
-      track.sampleRate shouldBe sampleRate
+      track.sampleRate.value shouldBe sampleRate
     }
 
     name should "contain every frame of the source and a duration consistent with them" in {

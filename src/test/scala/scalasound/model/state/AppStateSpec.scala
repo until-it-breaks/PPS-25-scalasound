@@ -1,5 +1,6 @@
 package scalasound.model.state
 
+import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.MonoChunk
@@ -12,7 +13,7 @@ import scalasound.model.state.{AppState, ExportState, ImportState}
 import scalasound.model.state.ImportState.Imported
 import scalasound.model.state.PlaybackState.*
 
-class AppStateSpec extends AnyFlatSpec with Matchers:
+class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
   private val track = MonoTrack(
     sampleRate = 44100,
     chunks = Vector(
@@ -20,7 +21,7 @@ class AppStateSpec extends AnyFlatSpec with Matchers:
       MonoChunk(Vector.fill(44100)(0f)), // 1.0s to 2.0s chunk (Index 1)
       MonoChunk(Vector.fill(44100)(0f))  // 2.0s to 3.0s chunk (Index 2)
     )
-  )
+  ).value
 
   "initial state" should "have playback stopped, no track loaded, have chunkIndex at 0, " +
     "effects list empty and import/export in idle" in {

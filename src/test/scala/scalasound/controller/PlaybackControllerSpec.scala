@@ -14,7 +14,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   private val track = MonoTrack(
     sampleRate,
     Vector.fill(chunkCount)(AudioChunk.MonoChunk(Vector.fill(framesPerChunk)(0.0f)))
-  )
+  ).fold(e => fail(e.toString), identity)
 
   private def setupWithTrack: IO[(AppStateStore, PlaybackController)] =
     for

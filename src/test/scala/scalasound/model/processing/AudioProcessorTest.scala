@@ -50,7 +50,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
             case standardEffect: StatelessAudioEffect => standardEffect(chunky)
 
   private def createTrack: AudioTrack =
-    MonoTrack(SampleRate, Vector.fill(SizeTrack)(MonoChunk(chunk.getVectors.head)))
+    MonoTrack(SampleRate, Vector.fill(SizeTrack)(MonoChunk(chunk.channels.head))).value
 
   /*
    * New type of effect added to check how the processor
@@ -72,7 +72,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     resultChunk.left.value.getContent should include("SimpleAudioProcessor")
 
   it should "return an AudioError when the track is empty" in:
-    val emptyTrack = MonoTrack(SampleRate, Vector.empty)
+    val emptyTrack = MonoTrack(SampleRate, Vector.empty).value
     val resultTrack = SimpleAudioProcessor(emptyTrack, simpleEffectsList)
     resultTrack.left.value shouldBe a [AudioError.AudioProcessorError]
 
@@ -103,13 +103,13 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     val track = createTrack
     val resultTrack = SimpleAudioProcessor(track, simpleEffectsList)
     val pipe = pipeline(simpleEffectsList, chunk, StartingIndex)
-    resultTrack.value.getVectors.forall(c => c == pipe.value) shouldBe true
+    resultTrack.value.chunksAsList.forall(c => c == pipe.value) shouldBe true
 
   it should "pass incremental index when a TimeAudioEffect is in the effects' list" in:
     val autopanConfig = AudioConfiguration.parameterConfiguration(Autopan).autopanConfiguration
     val frequency = (autopanConfig.min + autopanConfig.max) / 2
     val autopan = AutopanEffect(frequency, SampleRate.toFloat)
-    val trackVectors = SimpleAudioProcessor(createTrack, List(autopan)).value.getVectors
+    val trackVectors = SimpleAudioProcessor(createTrack, List(autopan)).value.chunksAsList
 
     // The first chunk should be equal to the default chunk with autopan applied.
     trackVectors.head shouldBe autopan(chunk, chunkIndex = 0).value
@@ -139,7 +139,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
   it should "apply the effects in a specific order for all the chunks inside the track" in:
     val resultTrack = AudioProcessorWithRules(createTrack, simpleEffectsList)
     val pipe = pipeline(orderedEffects, chunk, StartingIndex)
-    resultTrack.value.getVectors.forall(c => c == pipe.value) shouldBe true
+    resultTrack.value.chunksAsList.forall(c => c == pipe.value) shouldBe true
 
   it should "enforce priority on the effects even if a new effect previously " +
     "unknown is passed to the processor" in:

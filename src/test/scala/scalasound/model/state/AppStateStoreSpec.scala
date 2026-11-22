@@ -17,8 +17,10 @@ import scalasound.model.state.{
 
 class AppStateStoreSpec extends CatsEffectSuite:
 
-  private val dummyTrack = MonoTrack(44100, Vector(MonoChunk(Vector.empty)))
-  private val otherTrack = MonoTrack(48000, Vector(MonoChunk(Vector.empty)))
+  private val dummyTrack =
+    MonoTrack(44100, Vector(MonoChunk(Vector.empty))).fold(e => fail(e.toString), identity)
+  private val otherTrack =
+    MonoTrack(48000, Vector(MonoChunk(Vector.empty))).fold(e => fail(e.toString), identity)
 
   /** A fake store whose `changes` stream is a fixed list of states. Used to test `playbackChanges`
     * / `trackChanges`, which only transform `changes`.

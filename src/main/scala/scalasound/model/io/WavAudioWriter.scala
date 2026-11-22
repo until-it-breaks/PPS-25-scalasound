@@ -38,7 +38,7 @@ object WavAudioWriter extends AudioWriter:
   override def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
     for
       layout <- determineChannelLayout(track)
-      format <- buildAudioFormat(layout, track.sampleRate)
+      format <- buildAudioFormat(layout, track.sampleRate.value)
       _ <- calculateDataSize(track.frameCount, layout.channels)
       _ <- validateFiniteSamples(track)
       _ <- writeAudioToFile(path, format, track.frameCount, track.chunks)
@@ -71,7 +71,7 @@ object WavAudioWriter extends AudioWriter:
 
   private def validateFiniteSamples(track: AudioTrack): Either[AudioSaveError, Unit] =
     track.chunks.iterator
-      .flatMap(_.getVectors.iterator.flatten)
+      .flatMap(_.channels.iterator.flatten)
       .find(sample => !java.lang.Float.isFinite(sample))
       .fold[Either[AudioSaveError, Unit]](Right(()))(bad => Left(InvalidSample(s"non-finite sample value: $bad")))
 

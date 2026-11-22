@@ -4,39 +4,39 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN
 import java.nio.charset.StandardCharsets.US_ASCII
 import java.nio.file.{Files, Path}
-import org.scalatest.BeforeAndAfterEach
+import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import WavFixtures.*
-import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
+import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, SampleRate, StereoTrack}
 import scalasound.model.io.{AudioSaveError, AudioWriter, WavAudioWriter}
 
-class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach:
-
-  private var tempDir: Path = scala.compiletime.uninitialized
+class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
 
   private val KnownSamples = Vector(0, 16384, -16384, 32767, -32768, 1, -1, 256)
 
-  override def beforeEach(): Unit =
-    tempDir = Files.createTempDirectory("scalasound-wav-writer-test")
-
-  override def afterEach(): Unit =
-    tempDir.toFile.listFiles().foreach(_.delete())
-    Files.delete(tempDir)
+  private def withTempDir[A](test: Path => A): A =
+    val dir = Files.createTempDirectory("scalasound-wav-writer-test-")
+    try test(dir)
+    finally
+      Option(dir.toFile.listFiles()).foreach(_.foreach(_.delete()))
+      Files.deleteIfExists(dir)
 
   private def toFloats(ints: Seq[Int]): Vector[Float] = ints.map(_ / 32768f).toVector
 
   private def monoTrack(rate: Int, chunks: Seq[Int]*): MonoTrack =
-    MonoTrack(rate, chunks.map[MonoChunk](c => MonoChunk(toFloats(c))).toVector)
+    MonoTrack(rate, chunks.map[MonoChunk](c => MonoChunk(toFloats(c))).toVector).value
 
   private def stereoTrack(rate: Int, chunks: (Seq[Int], Seq[Int])*): StereoTrack =
-    StereoTrack(rate, chunks.map[StereoChunk] { case (l, r) => StereoChunk(toFloats(l), toFloats(r)) }.toVector)
+    StereoTrack(rate, chunks.map[StereoChunk] { case (l, r) => StereoChunk(toFloats(l), toFloats(r)) }.toVector).value
 
   private def exported(track: AudioTrack, name: String = "out.wav"): Array[Byte] =
-    val path = tempDir.resolve(name)
-    WavAudioWriter.save(track, path) shouldBe Right(())
-    Files.readAllBytes(path)
+    withTempDir { dir =>
+      val path = dir.resolve(name)
+      WavAudioWriter.save(track, path) shouldBe Right(())
+      Files.readAllBytes(path)
+    }
 
   private def interleave(left: Seq[Int], right: Seq[Int]): Seq[Int] =
     left.zip(right).flatMap { case (l, r) => Seq(l, r) }
@@ -93,7 +93,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
   }
 
   it should "produce a header-only file for a track without chunks" in {
-    val bytes = exported(MonoTrack(44100, Vector.empty))
+    val bytes = exported(MonoTrack(44100, Vector.empty).value)
 
     bytes shouldBe pcm16Wav(44100, 1, Seq.empty)
     bytes.length shouldBe 44
@@ -148,7 +148,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
   }
 
   it should "produce a header-only file for an empty track" in {
-    exported(StereoTrack(44100, Vector.empty)) shouldBe pcm16Wav(44100, 2, Seq.empty)
+    exported(StereoTrack(44100, Vector.empty).value) shouldBe pcm16Wav(44100, 2, Seq.empty)
 
     exported(stereoTrack(44100, (Seq.empty, Seq.empty)), "empty-chunk.wav") shouldBe pcm16Wav(44100, 2, Seq.empty)
   }
@@ -201,7 +201,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
   }
 
   it should "write clipped values to the file for out-of-range samples" in {
-    val track = MonoTrack(44100, Vector(MonoChunk(Vector(2.0f, -2.0f, 1.0f, -1.0f))))
+    val track = MonoTrack(44100, Vector(MonoChunk(Vector(2.0f, -2.0f, 1.0f, -1.0f)))).value
 
     exported(track) shouldBe pcm16Wav(44100, 1, Seq(32767, -32768, 32767, -32768))
   }
@@ -214,16 +214,16 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
   }
 
   private def invalidSampleTrack(bad: Float): MonoTrack =
-    MonoTrack(44100, Vector(MonoChunk(Vector(0.1f, bad, 0.2f))))
+    MonoTrack(44100, Vector(MonoChunk(Vector(0.1f, bad, 0.2f)))).value
 
-  "Exporting invalid samples" should "reject NaN with InvalidSample and create no file" in {
+  "Exporting invalid samples" should "reject NaN with InvalidSample and create no file" in withTempDir { tempDir =>
     val path = tempDir.resolve("nan.wav")
 
     WavAudioWriter.save(invalidSampleTrack(Float.NaN), path) should matchPattern { case Left(AudioSaveError.InvalidSample(_)) => }
     Files.exists(path) shouldBe false
   }
 
-  it should "reject positive and negative infinity with InvalidSample" in {
+  it should "reject positive and negative infinity with InvalidSample" in withTempDir { tempDir =>
     Seq(Float.PositiveInfinity, Float.NegativeInfinity).foreach { bad =>
       val path = tempDir.resolve(s"inf-$bad.wav")
 
@@ -232,25 +232,25 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
     }
   }
 
-  it should "reject a non-finite sample in the right channel of a stereo track" in {
-    val track = StereoTrack(44100, Vector(StereoChunk(Vector(0f, 0f), Vector(0f, Float.NaN))))
+  it should "reject a non-finite sample in the right channel of a stereo track" in withTempDir { tempDir =>
+    val track = StereoTrack(44100, Vector(StereoChunk(Vector(0f, 0f), Vector(0f, Float.NaN)))).value
 
     WavAudioWriter.save(track, tempDir.resolve("stereo-nan.wav")) should matchPattern { case Left(AudioSaveError.InvalidSample(_)) => }
   }
 
-  "Exporting to an unusable path" should "return WriteFailure when the parent directory does not exist" in {
+  "Exporting to an unusable path" should "return WriteFailure when the parent directory does not exist" in withTempDir { tempDir =>
     val path = tempDir.resolve("missing-dir").resolve("out.wav")
 
     WavAudioWriter.save(monoTrack(44100, Seq(1, 2)), path) should matchPattern { case Left(AudioSaveError.WriteFailure(`path`, _)) => }
   }
 
-  it should "return WriteFailure when the path is a directory" in {
+  it should "return WriteFailure when the path is a directory" in withTempDir { tempDir =>
     val directory = tempDir
 
     WavAudioWriter.save(monoTrack(44100, Seq(1, 2)), directory) should matchPattern { case Left(AudioSaveError.WriteFailure(`directory`, _)) => }
   }
 
-  it should "overwrite an existing file without leaving stale bytes" in {
+  it should "overwrite an existing file without leaving stale bytes" in withTempDir { tempDir =>
     val path = tempDir.resolve("overwrite.wav")
     WavAudioWriter.save(monoTrack(44100, ramp(100)), path) shouldBe Right(())
     WavAudioWriter.save(monoTrack(44100, Seq(5, 6)), path) shouldBe Right(())
@@ -274,24 +274,24 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEa
     WavAudioWriter.calculateDataSize(Long.MaxValue, 2) should matchPattern { case Left(AudioSaveError.FileTooLarge(_)) => }
   }
 
-  it should "reject a sample rate a float cannot represent exactly, and accept 2^24 Hz" in {
-    val veryFast = StereoTrack(Int.MaxValue, Vector.empty)
-    val tooFast = StereoTrack((1 << 24) + 1, Vector.empty)
+  it should "reject a sample rate a float cannot represent exactly, and accept 2^24 Hz" in withTempDir { tempDir =>
+    val veryFast = StereoTrack(Int.MaxValue, Vector.empty).value
+    val tooFast = StereoTrack((1 << 24) + 1, Vector.empty).value
 
     WavAudioWriter.save(veryFast, tempDir.resolve("fast.wav")) should matchPattern { case Left(AudioSaveError.InvalidTrack(_)) => }
     WavAudioWriter.save(tooFast, tempDir.resolve("fast2.wav")) should matchPattern { case Left(AudioSaveError.InvalidTrack(_)) => }
-    WavAudioWriter.save(StereoTrack(1 << 24, Vector.empty), tempDir.resolve("limit.wav")) shouldBe Right(())
+    WavAudioWriter.save(StereoTrack(1 << 24, Vector.empty).value, tempDir.resolve("limit.wav")) shouldBe Right(())
   }
 
-  "Exporting an unknown track type" should "return InvalidTrack" in {
+  "Exporting an unknown track type" should "return InvalidTrack" in withTempDir { tempDir =>
     val custom = new AudioTrack:
-      override def sampleRate: Int = 44100
+      override def sampleRate: SampleRate = SampleRate.from(44100).value
       override def chunks: Vector[AudioChunk] = Vector.empty
 
     WavAudioWriter.save(custom, tempDir.resolve("custom.wav")) should matchPattern { case Left(AudioSaveError.InvalidTrack(_)) => }
   }
 
-  "WavAudioWriter" should "be usable through the AudioWriter abstraction" in {
+  "WavAudioWriter" should "be usable through the AudioWriter abstraction" in withTempDir { tempDir =>
     val writer: AudioWriter = WavAudioWriter
     val path = tempDir.resolve("abstract.wav")
 

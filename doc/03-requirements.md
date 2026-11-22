@@ -9,7 +9,7 @@ L'applicazione è concepita come un riproduttore audio a traccia singola, privo 
 
 Dal punto di vista concettuale, il suono nel mondo reale è un'onda continua; per poter essere interpretato da un computer, viene convertito in un segnale audio digitale, ovvero una sequenza discreta di **campioni numerici** registrati ad una determinata **frequenza di campionamento** (es. 44.1 kHz). Ciascun campione è un valore numerico che esprime l'ampiezza del segnale e può essere rappresentato in modi diversi, ad esempio con numeri interi, come nei file WAV a 16 bit, oppure in virgola mobile, normalizzato nell'intervallo $[-1, 1]$ e indipendente dal formato del file, in cui lo zero corrisponde al silenzio e i due estremi sono i picchi massimi di ampiezza, in direzioni opposte.
 
-![Campionamento di un'onda sonora](doc/img/requisiti_campionamento.png){ width=85% }
+![Campionamento di un'onda sonora](doc/img/03-requirements/campionamento.png){ width=85% }
 
 La spazialità del suono si distingue principalmente in:
 
@@ -18,7 +18,7 @@ La spazialità del suono si distingue principalmente in:
 
 \newpage
 
-![Una traccia mono ha una sola sequenza di campioni, una stereo ne ha due](doc/img/requisiti_mono_stereo.png){ width=85% }
+![Una traccia mono ha una sola sequenza di campioni, una stereo ne ha due](doc/img/03-requirements/mono-stereo.png){ width=85% }
 
 La frequenza di campionamento indica quanti campioni descrivono un secondo di audio, per ciascun canale: a 44.1 kHz un secondo è composto da 44100 campioni per canale, quindi 44100 in totale in una traccia mono e 88200 in una stereo. La durata di una traccia si ricava con la seguente formula:
 

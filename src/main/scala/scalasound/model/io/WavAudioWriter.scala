@@ -37,27 +37,27 @@ object WavAudioWriter extends AudioWriter:
    */
   override def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
     for
-      channels <- determineChannelCount(track)
-      format <- buildAudioFormat(channels, track.sampleRate)
-      _ <- calculateDataSize(track.frameCount, channels)
+      layout <- determineChannelLayout(track)
+      format <- buildAudioFormat(layout, track.sampleRate)
+      _ <- calculateDataSize(track.frameCount, layout.channels)
       _ <- validateFiniteSamples(track)
       _ <- writeAudioToFile(path, format, track.frameCount, track.chunks)
     yield ()
 
-  private def determineChannelCount(track: AudioTrack): Either[AudioSaveError, Int] = track match
-    case _: MonoTrack => Right(1)
-    case _: StereoTrack => Right(2)
+  private def determineChannelLayout(track: AudioTrack): Either[AudioSaveError, ChannelLayout] = track match
+    case _: MonoTrack => Right(ChannelLayout.Mono)
+    case _: StereoTrack => Right(ChannelLayout.Stereo)
     case other => Left(InvalidTrack(s"unsupported track type: ${other.getClass.getSimpleName}"))
 
-  private def buildAudioFormat(channels: Int, sampleRate: Int): Either[AudioSaveError, AudioFormat] =
+  private def buildAudioFormat(layout: ChannelLayout, sampleRate: Int): Either[AudioSaveError, AudioFormat] =
     Either.cond(
       sampleRate <= MaxSampleRateRepresentedByFloat,
       AudioFormat(
         AudioFormat.Encoding.PCM_SIGNED,
         sampleRate.toFloat,
         BitsPerSample,
-        channels,
-        channels * BytesPerSample,
+        layout.channels,
+        layout.frameSize,
         sampleRate.toFloat,
         false
       ),

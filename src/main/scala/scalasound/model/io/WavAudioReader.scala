@@ -2,7 +2,7 @@ package scalasound.model.io
 
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import AudioLoadError.*
-import Pcm16.{BytesPerSample, fromLittleEndianBytes, toNormalised}
+import Pcm16.{fromLittleEndianBytes, toNormalised}
 import scalasound.model.domain.{AudioTrack, MonoTrack, StereoTrack}
 
 import java.io.{EOFException, File, IOException}
@@ -135,12 +135,6 @@ object WavAudioReader extends AudioReader:
 
   private def extractErrorMessage(e: Throwable): String =
     Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
-
-  private enum ChannelLayout(val channels: Int):
-    case Mono extends ChannelLayout(1)
-    case Stereo extends ChannelLayout(2)
-
-    def frameSize: Int = channels * BytesPerSample
 
   private final case class ValidFormat(
                                         layout: ChannelLayout,

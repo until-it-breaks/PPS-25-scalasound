@@ -129,10 +129,73 @@ enum AudioEffectType[+T <: AudioConfiguration](val name: String, val instance: T
   case Autopan extends AudioEffectType("Autopan", AutopanEffect)
   case Volume extends AudioEffectType("Volume", VolumeEffect)
 ```
+---
 
 ### Processori Audio
-I processori audio sono stati definiti in due modalità: `SimpleAudioProcessor` e `AudioProcessorWithRules`
+Il processore audio è il componente responsabile dell'applicazione sequenziale degli effetti sui singoli *chunk* e
+viene modellato tramite il `trait` `AudioProcessor`.
 
-### Controller degli Effetti
+A seguito dei vari controlli preliminari eseguiti sugli input, la logica di gestione degli effetti sul chunk, risulta come segue:
+```scala
+protected def processChunk(chunk: AudioChunk,
+                             effects: List[AudioEffect],
+                             chunkIndex: Int): Either[AudioError, AudioChunk] =
+    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)) {
+      (currentChunk, effect) =>
+        currentChunk.flatMap:
+          chunky =>
+            effect match
+              case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
+              case standardEffect: StatelessAudioEffect => standardEffect(chunky)
+    }
+```
+Tramite il `foldLeft` vengono applicati in sequenza gli effetti sul *chunk* ricevuto in ingresso e con il supporto
+dell'approccio *monadico* degli `Either`, l'elaborazione si interrompe immediatamente propagando un `Left(AudioError)`.
+Inoltre, applicando l'exhaustive *pattern matching*, gli effetti vengono distinti in base alla necessità di usare l'indice per
+avere il riferimento temporale.
+
+Invece, per l'elaborazione della traccia, si è 
+
+```scala
+protected def processTrack(track: AudioTrack, 
+                           effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
+    val processedTrack = track.getVectors.
+      foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))) { 
+        (accumulator, currentChunk) =>
+          for
+            (acc, idx) <- accumulator
+            chunk <- processChunk(currentChunk, effects, idx)
+          yield
+            (chunk :: acc, idx + 1)
+      }
+    ...
+```
+
+Nel processore `AudioProcessorWithRules`, al fine di applicare con logica gli effetti selezionati dall'utente, è stato deciso
+di definire un ordinamento interno sugli effetti disponibili. Per definire questo meccanismo, è stato introdotto un `enum` privato (`EffectPriority`), utilizzando la proprietà `.ordinal` (identifica l'indice
+numerico dell'effetto all'interno dell'enum) è stata creata una "mappa" effetto-priorità dell'effetto. Inoltre, con la contextual abstraction di Scala 3, quindi l'uso
+del meccanismo dei given, è stata fornita una istanza di `Ordering[AudioEffect]` che viene passata implicitamente dal compilatore al metodo `.sorted` delle liste per ordinare gli effetti ricevuti.
+
+```scala
+object AudioProcessorWithRules extends AudioProcessor:
+ given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
+
+  private def orderingByPriority(effect: AudioEffect): Int = effect match
+    case IdentityEffect => EffectPriority.IdentityEffect.ordinal
+    case _: GainEffect => EffectPriority.GainEffect.ordinal
+    ...
+
+  override protected def processChunk(chunk: AudioChunk,
+                                      effects: List[AudioEffect],
+                                      chunkIndex: Int): Either[AudioError, AudioChunk] =
+    super.processChunk(chunk, effects.sorted, chunkIndex)
+
+  private enum EffectPriority:
+    case IdentityEffect
+    case GainEffect
+    ...
+```
+
+---
 
 ### Logica degli Effetti (GUI)

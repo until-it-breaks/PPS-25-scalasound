@@ -29,11 +29,12 @@ private[processing] final case class DistortionEffect(distortion: Float, isSoftC
 
   import DistortionEffect.*
 
+  private val checkDistortion = checkConstraints(isDistortionValid(distortion),
+    "Exceeded the range [" + MinDistortion + "," + MaxDistortion + "]!")
+
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
-    checkConstraints(isDistortionValid(distortion),
-      "Exceeded the range [" + MinDistortion + "," + MaxDistortion + "]!").
-      toLeft:
-        applyDistortion(chunk, if isSoftClipping then tanh else sinWave)
+    checkDistortion.toLeft:
+      applyTransformation(chunk, if isSoftClipping then tanh else sinWave)
 
   /*
    * Hyperbolic-tangent based formula to apply the
@@ -48,10 +49,3 @@ private[processing] final case class DistortionEffect(distortion: Float, isSoftC
    */
   private inline def sinWave(x: Float): Float =
     math.sin(x * distortion).toFloat
-
-  private def applyDistortion(chunk: AudioChunk, function: Float => Float): AudioChunk =
-    chunk match
-      case MonoChunk(samples) =>
-        MonoChunk(samples.map(function))
-      case StereoChunk(left, right) =>
-        StereoChunk(left.map(function), right.map(function))

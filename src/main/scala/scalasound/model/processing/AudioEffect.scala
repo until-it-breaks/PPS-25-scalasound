@@ -1,17 +1,14 @@
 package scalasound.model.processing
 
 import scalasound.model.domain.AudioChunk
+import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 
-/**
- * Defines the available effects.
- *
- * @param name     the name of the effect in String.
- * @param instance the correlated object containing the configuration.
- */
 /*
  * It is used the covariance so if IdentityEffect <: AudioEffect then
  * AudioEffectType[IdentityEffect.type] <: AudioEffectType[AudioConfiguration]
- * It maintains information about the original type.
+ * It maintains information about the original type and defines the available effects.
+ * The name variable defines the name of the effect, while the instance parameter
+ * specifies the correlated object containing the desired configuration.
  */
 enum AudioEffectType[+T <: AudioConfiguration](val name: String, val instance: T):
   case Identity extends AudioEffectType("Identity", IdentityEffect)
@@ -38,6 +35,13 @@ sealed trait AudioEffect:
 trait StatelessAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
 
+  protected def applyTransformation(chunk: AudioChunk, transformation: Float => Float): AudioChunk =
+    chunk match
+      case MonoChunk(samples) =>
+        MonoChunk(samples.map(transformation))
+      case StereoChunk(left, right) =>
+        StereoChunk(left.map(transformation), right.map(transformation))
+    
 /**
  * Defines a contract that applies a transformation on an audio block,
  * but keeping trace of the passing of time by using the chunk index.
@@ -46,6 +50,8 @@ trait TimeAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
 
 object AudioEffect:
+
+  private val DefaultSampleRate = 44100.0f
 
   /**
    * Defines the list of available effects.
@@ -110,7 +116,7 @@ object AudioEffect:
    * @param delay      expressed in milliseconds defines the delay of the echo effect.
    * @param sampleRate the sampling rate in Hz.
    */
-  def echo(alpha: Float, delay: Int, sampleRate: Float = 44100f): TimeAudioEffect =
+  def echo(alpha: Float, delay: Int, sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
     EchoEffect(alpha, delay, sampleRate)
 
   /**
@@ -127,7 +133,7 @@ object AudioEffect:
    * @param autopanValue it's the frequency in Hz from switching left to right.
    * @param sampleRate   it's the frequency of sampling the chunks.
    */
-  def autopan(autopanValue: Float, sampleRate: Float = 44100f): TimeAudioEffect =
+  def autopan(autopanValue: Float, sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
     AutopanEffect(autopanValue, sampleRate)
 
   /**

@@ -41,11 +41,7 @@ private[processing] final case class GainEffect(gain: Float) extends StatelessAu
    */
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkGain.toLeft:
-      chunk match
-        case MonoChunk(samples) =>
-          MonoChunk(samples.map(x => clamp(x * gain)))
-        case StereoChunk(left, right) =>
-          StereoChunk(left.map(l => clamp(l * gain)), right.map(r => clamp(r * gain)))
+      applyTransformation(chunk, x => clamp(x * gain))
 
   /*
    * Defines the "clamp" logic necessary to maintain

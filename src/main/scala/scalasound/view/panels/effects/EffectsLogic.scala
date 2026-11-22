@@ -33,7 +33,7 @@ object EffectsLogic:
   * @param controller
   *   the controller responsible for handling operations based on the effects.
   */
-final class EffectsLogic(controller: EffectsControllerProxy):
+final class EffectsLogic(controller: EffectsControllerWrapper):
 
   import EffectsLogic.*
 

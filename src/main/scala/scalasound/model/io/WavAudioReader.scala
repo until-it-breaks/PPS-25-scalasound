@@ -3,7 +3,7 @@ package scalasound.model.io
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import AudioLoadError.*
 import Pcm16.{fromLittleEndianBytes, toNormalised}
-import scalasound.model.domain.{AudioTrack, MonoTrack, StereoTrack}
+import scalasound.model.domain.{AudioDomainError, AudioTrack, MonoTrack, StereoTrack}
 
 import java.io.{EOFException, File, IOException}
 import javax.sound.sampled.{AudioFormat, AudioInputStream, AudioSystem, UnsupportedAudioFileException}
@@ -54,7 +54,8 @@ object WavAudioReader extends AudioReader:
   private def decode(raw: RawAudio): Either[AudioLoadError, AudioTrack] =
     for
       frameCount <- validateAudioData(raw.bytes, raw.declaredFrames, raw.format.layout.frameSize)
-    yield buildAudioTrack(raw.format, raw.bytes, frameCount)
+      track      <- buildAudioTrack(raw.format, raw.bytes, frameCount)
+    yield track
 
   private def validateAudioFormat(format: AudioFormat): Either[AudioLoadError, ValidFormat] =
     for
@@ -109,17 +110,27 @@ object WavAudioReader extends AudioReader:
       )
     yield frames
 
-  private def buildAudioTrack(format: ValidFormat, bytes: Array[Byte], frameCount: Int): AudioTrack =
+  private def buildAudioTrack(format: ValidFormat, bytes: Array[Byte], frameCount: Int): Either[AudioLoadError, AudioTrack] =
     def extractChannel(offset: Int): Vector[Float] =
       extractChannelSamples(bytes, frameCount, format.layout, offset)
 
-    format.layout match
+    val domainResult = format.layout match
       case ChannelLayout.Mono =>
-        MonoTrack(format.sampleRate, partitionIntoChunkBlocks(extractChannel(0)).map[MonoChunk](MonoChunk(_)).toVector)
+        MonoTrack(format.sampleRate, partitionIntoChunkBlocks(extractChannel(0))
+          .map[MonoChunk](MonoChunk(_)).toVector)
       case ChannelLayout.Stereo =>
-        val chunks = partitionIntoChunkBlocks(extractChannel(0)).zip(partitionIntoChunkBlocks(extractChannel(1))).map[StereoChunk]:
-          case (left, right) => StereoChunk(left, right)
-        StereoTrack(format.sampleRate, chunks.toVector)
+        val chunks = partitionIntoChunkBlocks(extractChannel(0))
+          .zip(partitionIntoChunkBlocks(extractChannel(1)))
+          .map[StereoChunk](StereoChunk(_, _)).toVector
+        StereoTrack(format.sampleRate, chunks)
+
+    domainResult.left.map(mapDomainErrorToLoadError)
+
+  private def mapDomainErrorToLoadError(error: AudioDomainError): AudioLoadError = error match
+    case AudioDomainError.InvalidSampleRate(rate) =>
+      CorruptedData(s"invalid sample rate: $rate")
+    case AudioDomainError.DifferentLengthsStereoChannels(idx, leftLen, rightLen) =>
+      CorruptedData(s"unbalanced stereo channels in chunk $idx: left=$leftLen, right=$rightLen")
 
   private def extractChannelSamples(bytes: Array[Byte], frameCount: Int, layout: ChannelLayout, offset: Int): Vector[Float] =
     Vector.tabulate(frameCount)(frame => fromLittleEndianBytes(bytes, frame * layout.channels + offset).toNormalised)

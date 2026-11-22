@@ -50,7 +50,7 @@ class StreamingAudioPlayerSpec extends CatsEffectSuite:
       AudioChunk.MonoChunk(Vector(0.1f, 0.2f)),
       AudioChunk.MonoChunk(Vector(0.3f, 0.4f))
     )
-  )
+  ).fold(e => fail(e.toString), identity)
 
   private val stereoTrack = StereoTrack(
     sampleRate,
@@ -58,7 +58,7 @@ class StreamingAudioPlayerSpec extends CatsEffectSuite:
       AudioChunk.StereoChunk(Vector(0.1f, 0.2f), Vector(0.1f, 0.2f)),
       AudioChunk.StereoChunk(Vector(0.3f, 0.4f), Vector(0.3f, 0.4f))
     )
-  )
+  ).fold(e => fail(e.toString), identity)
 
   private def untilStopped(store: AppStateStore): IO[Unit] =
     store.playbackChanges
@@ -108,7 +108,7 @@ class StreamingAudioPlayerSpec extends CatsEffectSuite:
 
   test("a track with no chunks stops immediately and writes nothing") {
     val out = RecordingOutput()
-    playToEnd(MonoTrack(sampleRate, Vector.empty), out).map: state =>
+    playToEnd(MonoTrack(sampleRate, Vector.empty).fold(e => fail(e.toString), identity), out).map: state =>
       assertEquals(out.chunks, Vector.empty)
       assertEquals(state.playbackState, PlaybackState.Stopped)
   }

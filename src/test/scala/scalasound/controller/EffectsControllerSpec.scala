@@ -24,7 +24,7 @@ final class EffectsControllerSpec extends CatsEffectSuite:
     for
       store             <- AppStateStore.make
       chunk: MonoChunk  = MonoChunk(Vector.fill(ChunkSize)(DefaultValue))
-      track             = MonoTrack(SampleRate, Vector.fill(TrackSize)(chunk))
+      track             = MonoTrack(SampleRate, Vector.fill(TrackSize)(chunk)).fold(e => fail(e.toString), identity)
       _                 <- store.dispatch(UpdateImport(Imported(track)))
     yield (store, EffectsController(store))
 

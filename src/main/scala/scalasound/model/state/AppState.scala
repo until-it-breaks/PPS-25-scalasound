@@ -128,7 +128,7 @@ final case class AppState(
         .take(chunkIndex)
         .map(_.frameCount.toLong)
         .sum
-      framesBeforeCurrent.toDouble / track.sampleRate
+      framesBeforeCurrent.toDouble / track.sampleRate.value
     }
 
   private def handleImport(state: ImportState): AppState =

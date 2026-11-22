@@ -40,8 +40,8 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     AudioEffect.effectsNames.length shouldBe AudioEffectType.values.length
 
   "Chunk" should "not be empty" in:
-    chunk.getVectors should not be empty
-    chunk.getVectors.head.size shouldEqual sizeChunk
+    chunk.channels should not be empty
+    chunk.channels.head.size shouldEqual sizeChunk
 
   it should "be a MonoChunk and not a StereoChunk" in:
     chunk shouldBe a [MonoChunk]
@@ -85,8 +85,8 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val stereoChunk = StereoChunk(channel, channel)
     val resultGain = math.max(-1.0f, math.min(1.0f, defaultValueChunk * gain))
     val resultChunk = AudioEffect.gain(gain)(stereoChunk)
-    val left = resultChunk.value.getVectors.head
-    val right = resultChunk.value.getVectors(1)
+    val left = resultChunk.value.channels.head
+    val right = resultChunk.value.channels(1)
     left shouldBe right
     left shouldBe Vector.fill(sizeChunk)(resultGain)
 
@@ -106,7 +106,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
   "PanEffect" should "disable right channel when the min pan value is inserted" in :
     val pan = Config.PanConfig.min
     val resultChunk = AudioEffect.pan(pan)(chunk)
-    resultChunk.value.getVectors(1) shouldBe Vector.fill(sizeChunk)(0.0f)
+    resultChunk.value.channels(1) shouldBe Vector.fill(sizeChunk)(0.0f)
 
   it should "return an AudioError if the pan is out of bounds" in:
     val invalidMaxPan = Config.PanConfig.max + 1.0f
@@ -161,8 +161,8 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val stereoChunk = StereoChunk(channel, channel)
     val resultValueTanh = math.tanh(distortion * defaultValueChunk).toFloat
     val resultChunk = AudioEffect.distortion(distortion)(stereoChunk)
-    val left = resultChunk.value.getVectors.head
-    val right = resultChunk.value.getVectors(1)
+    val left = resultChunk.value.channels.head
+    val right = resultChunk.value.channels(1)
     left shouldBe right
     left shouldBe Vector.fill(sizeChunk)(resultValueTanh)
 
@@ -216,7 +216,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
 
     val echoEffect = EchoEffect(alpha, delay, sampleRate)
     val firstChunk = echoEffect(chunk, chunkIndex = 0)
-    firstChunk.value.getVectors shouldBe chunk.getVectors
+    firstChunk.value.channels shouldBe chunk.channels
 
     val secondChunk = echoEffect(chunk, chunkIndex = 1)
     // Formula for the IIR application, the echo effect.
@@ -227,4 +227,4 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     // 3) The second defaultValueChunk refers to the values contained in the firstChunk,
     // because it was instantiated in the same way as the default chunk.
     val expectedSampleValue = defaultValueChunk + (alpha * defaultValueChunk)
-    secondChunk.value.getVectors.head shouldBe Vector.fill(sizeChunk)(expectedSampleValue)
+    secondChunk.value.channels.head shouldBe Vector.fill(sizeChunk)(expectedSampleValue)

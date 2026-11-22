@@ -23,7 +23,7 @@ private final class SpeakerAudioOutput extends AudioOutput:
     for
       bytes <- IO(chunk.toPcmBytes)
       _     <- IO.blocking {
-        val line = lineFor(Format(sampleRate, chunk.channels))
+        val line = lineFor(Format(sampleRate, chunk.channelCount))
         line.write(bytes, 0, bytes.length)
       }
     yield ()
@@ -72,7 +72,7 @@ private object SpeakerAudioOutput:
       )
 
   extension (chunk: AudioChunk)
-    private def channels: Int = chunk match
+    private def channelCount: Int = chunk match
       case AudioChunk.MonoChunk(_)      => 1
       case AudioChunk.StereoChunk(_, _) => 2
 
@@ -86,7 +86,7 @@ private object SpeakerAudioOutput:
       */
     private[player] def toPcmBytes: Array[Byte] =
       val buffer = ByteBuffer
-        .allocate(chunk.frameCount * chunk.channels * BytesPerSample)
+        .allocate(chunk.frameCount * chunk.channelCount * BytesPerSample)
         .order(ByteOrder.LITTLE_ENDIAN)
       chunk match
         case AudioChunk.MonoChunk(samples) =>

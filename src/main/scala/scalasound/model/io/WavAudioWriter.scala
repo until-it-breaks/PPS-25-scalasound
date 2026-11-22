@@ -3,6 +3,7 @@ package scalasound.model.io
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import AudioSaveError.*
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
+import Pcm16.{BitsPerSample, BytesPerSample, toPcm16}
 import java.io.{ByteArrayInputStream, SequenceInputStream}
 import java.nio.file.Path
 import javax.sound.sampled.{AudioFileFormat, AudioFormat, AudioInputStream, AudioSystem}
@@ -14,7 +15,7 @@ import scala.util.{Try, Using}
  *  Supported subset: PCM signed, 16 bit per sample, little-endian,
  *  mono or stereo. It is the same subset accepted by [[WavAudioReader]]
  *
- *  A normalised sample `x` becomes `clamp(round(x * 32768), -32768, 32767)`,
+ *  A normalised sample `x` becomes `clamp(round(x * 32768), -32768, 32767)` (see [[Pcm16]]),
  *  that is the inverse of the reader's `s / 32768f`.
  *  So, `0.0 -> 0`, `-1.0 -> -32768` and `+1.0 -> 32767` (clipped). Values outside
  *  [-1.0, 1.0) (e.g. produced by effects) are clipped to the extremes.
@@ -25,11 +26,6 @@ import scala.util.{Try, Using}
  */
 object WavAudioWriter extends AudioWriter:
 
-  private final val BitsPerSample = 16
-  private final val BytesPerSample = 2
-  private final val PcmMin = -32768L
-  private final val PcmMax = 32767L
-  private final val Scale = 32768.0
   private final val MaxSampleRateRepresentedByFloat = 1 << 24 // (2^24 Hz)
   private final val MaxDataSizeHandledByPCM = 0xffffffffL - 43 // (2^32 - 44) bytes
 
@@ -80,22 +76,24 @@ object WavAudioWriter extends AudioWriter:
       .fold[Either[AudioSaveError, Unit]](Right(()))(bad => Left(InvalidSample(s"non-finite sample value: $bad")))
 
   private def writeAudioToFile(path: Path, format: AudioFormat, frameCount: Long, chunks: Vector[AudioChunk]): Either[AudioSaveError, Unit] =
-    Using(AudioInputStream(createPcmInputStream(chunks), format, frameCount)) { stream =>
+    Using(AudioInputStream(createPcmInputStream(chunks), format, frameCount)): stream =>
       AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile)
-    }.toEither.map(_ => ()).left.map(e => WriteFailure(path, Option(e.getMessage).getOrElse(e.getClass.getSimpleName)))
+    .toEither.map(_ => ()).left.map(e => WriteFailure(path, Option(e.getMessage).getOrElse(e.getClass.getSimpleName)))
 
   private def createPcmInputStream(chunks: Vector[AudioChunk]): SequenceInputStream =
     SequenceInputStream(chunks.iterator.map(chunk => ByteArrayInputStream(encodeChunkToPcmBytes(chunk))).asJavaEnumeration)
 
   private def encodeChunkToPcmBytes(chunk: AudioChunk): Array[Byte] =
-    extractSamplesInFileOrder(chunk).flatMap { sample =>
-      val pcm = quantiseNormalisedSampleToPcm16(sample)
-      List(pcm.toByte, (pcm >> 8).toByte)
-    }.toArray
+    Pcm16.toLittleEndianBytes(quantiseInFileOrder(chunk))
 
   private[io] def quantiseNormalisedSampleToPcm16(sample: Float): Short =
-    math.round(sample.toDouble * Scale).max(PcmMin).min(PcmMax).toShort
+    sample.toPcm16
 
-  private def extractSamplesInFileOrder(chunk: AudioChunk): Vector[Float] = chunk match
-    case MonoChunk(samples) => samples
-    case StereoChunk(left, right) => left.zip(right).flatMap { case (l, r) => Vector(l, r) }
+  private def quantiseInFileOrder(chunk: AudioChunk): Array[Short] = chunk match
+    case MonoChunk(samples) =>
+      Array.tabulate(samples.length)(index => samples(index).toPcm16)
+    case StereoChunk(left, right) =>
+      Array.tabulate(2 * math.min(left.length, right.length)): index =>
+        index % 2 match
+          case 0 => left(index / 2).toPcm16
+          case _ => right(index / 2).toPcm16

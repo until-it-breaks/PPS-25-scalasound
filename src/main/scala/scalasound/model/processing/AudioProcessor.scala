@@ -2,7 +2,7 @@ package scalasound.model.processing
 
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import AudioError.AudioProcessorError
-import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
+import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, SampleRate, StereoTrack}
 
 /**
  * Defines the entity capable of managing the various effects
@@ -38,18 +38,39 @@ trait AudioProcessor:
     else if track.isEmpty then Left(AudioProcessorError(this, "Track is empty!"))
     else processTrack(track, effects)
 
+  /* Applies the effects on all the chunks in the track. */
+  private def processedAudioTrack(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, (List[AudioChunk], Int)] =
+    track.chunksAsList.
+      // It starts with an empty list and index 0.
+      foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))):
+        (accumulator, currentChunk) =>
+          for
+            /* Extracts the accumulator as a list (initially is Nil) and the first index. */
+            (acc, idx) <- accumulator
+            chunk <- processChunk(currentChunk, effects, idx) /* Extracts the chunk if is Right. */
+          yield
+            (chunk :: acc, idx + 1) /* Adds the chunk in front of the list, and it updates the index. */
+
+  /* Builds a new track Mono or Stereo by checking a flag that indicates how will be the result track. */
+  private def trackMonoOrStereo(chunks: List[AudioChunk], isStereo: Boolean, sampleRate: SampleRate): Either[AudioError, AudioTrack] =
+    if isStereo then
+      val stereoChunks: Vector[StereoChunk] = chunks.map[StereoChunk] {
+        case stereoChunk: StereoChunk => stereoChunk
+        case MonoChunk(samples) => StereoChunk(samples, samples)
+      }.toVector
+      StereoTrack
+        .fromValidated(sampleRate, stereoChunks)
+        .left
+        .map(err => AudioProcessorError(this, err.toString))
+    else
+      val monoChunks: Vector[MonoChunk] = chunks.collect {
+        case monoChunk: MonoChunk => monoChunk
+      }.toVector
+      Right(MonoTrack.fromValidated(sampleRate, monoChunks))
+
   /* Applies the effects on the given track. */
   protected def processTrack(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
-    val processedTrack = track.chunksAsList.
-      // It starts with an empty list and index 0.
-      foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))) { (accumulator, currentChunk) =>
-        for
-          /* Extracts the accumulator as a list (initially is Nil) and the first index. */
-          (acc, idx) <- accumulator
-          chunk <- processChunk(currentChunk, effects, idx) /* Extracts the chunk if is Right. */
-        yield
-          (chunk :: acc, idx + 1) /* Adds the chunk in front of the list, and it updates the index. */
-      }
+    val processedTrack = processedAudioTrack(track, effects)
 
     for
       (reversedChunks, _) <- processedTrack
@@ -69,29 +90,15 @@ trait AudioProcessor:
         case _ :MonoChunk => false
         case _ :StereoChunk => true
       })
-      //isStereo = chunks.exists(_.isInstanceOf[StereoChunk])
 
-      resultTrack <- if isStereo then
-        val stereoChunks: Vector[StereoChunk] = chunks.map[StereoChunk] {
-          case stereoChunk: StereoChunk => stereoChunk
-          case MonoChunk(samples) => StereoChunk(samples, samples)
-        }.toVector
-        StereoTrack
-          .fromValidated(track.sampleRate, stereoChunks)
-          .left
-          .map(err => AudioProcessorError(this, err.toString))
-      else
-        val monoChunks: Vector[MonoChunk] = chunks.collect {
-          case monoChunk: MonoChunk => monoChunk
-        }.toVector
-        Right(MonoTrack.fromValidated(track.sampleRate, monoChunks))
+      resultTrack <- trackMonoOrStereo(chunks, isStereo, track.sampleRate)
     yield resultTrack
 
   /* Applies the effects on the given chunk. */
   protected def processChunk(chunk: AudioChunk,
                              effects: List[AudioEffect],
                              chunkIndex: Int): Either[AudioError, AudioChunk] =
-    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)) {
+    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)):
       (currentChunk, effect) =>
         currentChunk.flatMap:
           chunky =>
@@ -100,7 +107,6 @@ trait AudioProcessor:
               // of effects need the chunk index to compute the final result.
               case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
               case standardEffect: StatelessAudioEffect => standardEffect(chunky)
-    }
 
 /**
  * AudioProcessor with no rules on how to apply effects.

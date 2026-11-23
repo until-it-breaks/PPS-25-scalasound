@@ -1,6 +1,5 @@
 package scalasound.model.processing
 
-import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
 
 /* *** GAIN EFFECT *** */

@@ -2,7 +2,7 @@ package scalasound.view.panels.effects
 
 import scalafx.scene.control.Slider
 import scalasound.model.processing.AudioEffect
-import scalasound.view.panels.effects.DistortionEnum.{Sin, Tanh}
+import scalasound.view.panels.effects.DistortionEnum.Tanh
 
 object EffectsLogic:
   /*

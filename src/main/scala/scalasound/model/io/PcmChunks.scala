@@ -47,26 +47,8 @@ private[io] object PcmChunks:
     *   the maximum number of frames per chunk, strictly positive
     */
   def decodeMono(bytes: Array[Byte], totalFrames: Int, maxFramesPerChunk: Int): Vector[MonoChunk] =
-    partitionIntoRanges(totalFrames, maxFramesPerChunk).map: range =>
-      MonoChunk(decodeChannel(bytes, range.startFrame, range.frameCount, channels = 1, channel = 0))
-
-  private def decodeChannel(
-      bytes: Array[Byte],
-      firstFrame: Int,
-      frames: Int,
-      channels: Int,
-      channel: Int
-  ): Vector[Float] =
-    Vector.tabulate(frames): frame =>
-      fromLittleEndianBytes(bytes, (firstFrame + frame) * channels + channel).toNormalised
-
-  private def partitionIntoRanges(totalFrames: Int, maxFramesPerChunk: Int): Vector[FrameRange] =
-    Vector
-      .range(0, totalFrames, maxFramesPerChunk)
-      .map: startFrame =>
-        val remainingFrames = totalFrames - startFrame
-        val chunkFrameCount = math.min(maxFramesPerChunk, remainingFrames)
-        FrameRange(startFrame, chunkFrameCount)
+    for FrameRange(startFrame, frameCount) <- partitionIntoRanges(totalFrames, maxFramesPerChunk)
+    yield MonoChunk(decodeChannel(bytes, startFrame, frameCount, channels = 1, channel = 0))
 
   /** Decodes interleaved stereo PCM bytes into chunks of at most `maxFramesPerChunk` frames, with
     * the two channels of every chunk aligned; the last chunk holds the remaining frames, without
@@ -84,10 +66,27 @@ private[io] object PcmChunks:
       totalFrames: Int,
       maxFramesPerChunk: Int
   ): Vector[StereoChunk] =
-    partitionIntoRanges(totalFrames, maxFramesPerChunk).map: range =>
-      StereoChunk(
-        decodeChannel(bytes, range.startFrame, range.frameCount, channels = 2, channel = 0),
-        decodeChannel(bytes, range.startFrame, range.frameCount, channels = 2, channel = 1)
-      )
+    for FrameRange(startFrame, frameCount) <- partitionIntoRanges(totalFrames, maxFramesPerChunk)
+    yield StereoChunk(
+      decodeChannel(bytes, startFrame, frameCount, channels = 2, channel = 0),
+      decodeChannel(bytes, startFrame, frameCount, channels = 2, channel = 1)
+    )
+
+  private def decodeChannel(
+      bytes: Array[Byte],
+      firstFrame: Int,
+      frames: Int,
+      channels: Int,
+      channel: Int
+  ): Vector[Float] =
+    Vector.tabulate(frames): frame =>
+      fromLittleEndianBytes(bytes, (firstFrame + frame) * channels + channel).toNormalised
+
+  private def partitionIntoRanges(totalFrames: Int, maxFramesPerChunk: Int): Vector[FrameRange] =
+    for
+      startFrame <- Vector.range(0, totalFrames, maxFramesPerChunk)
+      remainingFrames = totalFrames - startFrame
+      chunkFrameCount = math.min(maxFramesPerChunk, remainingFrames)
+    yield FrameRange(startFrame, chunkFrameCount)
 
   private final case class FrameRange(startFrame: Int, frameCount: Int)

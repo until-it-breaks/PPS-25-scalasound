@@ -20,13 +20,13 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   private def monoTrack(rate: Int, chunks: Seq[Int]*): MonoTrack =
     MonoTrack(rate, chunks.map[MonoChunk](c => MonoChunk(toFloats(c))).toVector).value
 
+  private def toFloats(ints: Seq[Int]): Vector[Float] = ints.map(_ / 32768f).toVector
+
   private def stereoTrack(rate: Int, chunks: (Seq[Int], Seq[Int])*): StereoTrack =
     StereoTrack(
       rate,
       chunks.map[StereoChunk] { case (l, r) => StereoChunk(toFloats(l), toFloats(r)) }.toVector
     ).value
-
-  private def toFloats(ints: Seq[Int]): Vector[Float] = ints.map(_ / 32768f).toVector
 
   private def exported(track: AudioTrack, name: String = "out.wav"): Array[Byte] =
     withTempDir { dir =>
@@ -42,7 +42,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
       Option(dir.toFile.listFiles()).foreach(_.foreach(_.delete()))
       Files.deleteIfExists(dir)
 
-  private def ramp(frames: Int): Vector[Int] =
+  private def pcmSampleSequence(frames: Int): Vector[Int] =
     Vector.tabulate(frames)(i => ((i * 13) % 20000) - 10000)
 
   private def parseHeader(bytes: Array[Byte]): Header =
@@ -77,7 +77,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   }
 
   it should "write a valid header with one channel, 16 bit PCM and consistent sizes" in {
-    val frames = ramp(1000)
+    val frames = pcmSampleSequence(1000)
     val bytes  = exported(monoTrack(22050, frames))
     val header = parseHeader(bytes)
 
@@ -129,7 +129,8 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   }
 
   it should "write a valid header with two channels and consistent sizes" in {
-    val bytes  = exported(stereoTrack(48000, (ramp(500), ramp(500).reverse)))
+    val bytes =
+      exported(stereoTrack(48000, (pcmSampleSequence(500), pcmSampleSequence(500).reverse)))
     val header = parseHeader(bytes)
 
     header shouldBe Header(
@@ -172,8 +173,8 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     tempDir =>
       val chunks: Vector[MonoChunk] =
         Vector(
-          MonoChunk(toFloats(ramp(1024))),
-          MonoChunk(toFloats(ramp(1024))),
+          MonoChunk(toFloats(pcmSampleSequence(1024))),
+          MonoChunk(toFloats(pcmSampleSequence(1024))),
           MonoChunk(Vector(0.1f, Float.NaN))
         )
 
@@ -204,9 +205,9 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
 
     val chunks: Vector[MonoChunk] =
       Vector(
-        MonoChunk(toFloats(ramp(1024))),
-        MonoChunk(toFloats(ramp(1024))),
-        MonoChunk(toFloats(ramp(300)))
+        MonoChunk(toFloats(pcmSampleSequence(1024))),
+        MonoChunk(toFloats(pcmSampleSequence(1024))),
+        MonoChunk(toFloats(pcmSampleSequence(300)))
       )
 
     val bytes = exported(MonoTrack(44100, chunks).value)
@@ -216,8 +217,8 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   it should "be exactly the concatenation of the encoded chunks, in stereo" in {
 
     val chunks: Vector[StereoChunk] = Vector(
-      StereoChunk(toFloats(ramp(1024)), toFloats(ramp(1024).reverse)),
-      StereoChunk(toFloats(ramp(300)), toFloats(ramp(300).reverse))
+      StereoChunk(toFloats(pcmSampleSequence(1024)), toFloats(pcmSampleSequence(1024).reverse)),
+      StereoChunk(toFloats(pcmSampleSequence(300)), toFloats(pcmSampleSequence(300).reverse))
     )
 
     val bytes = exported(StereoTrack(44100, chunks).value)
@@ -292,7 +293,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
 
   it should "overwrite an existing file without leaving stale bytes" in withTempDir { tempDir =>
     val path = tempDir.resolve("overwrite.wav")
-    WavAudioWriter.save(monoTrack(44100, ramp(100)), path) shouldBe Right(())
+    WavAudioWriter.save(monoTrack(44100, pcmSampleSequence(100)), path) shouldBe Right(())
     WavAudioWriter.save(monoTrack(44100, Seq(5, 6)), path) shouldBe Right(())
 
     Files.readAllBytes(path) shouldBe pcm16Wav(44100, 1, Seq(5, 6))

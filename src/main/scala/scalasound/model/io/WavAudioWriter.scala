@@ -73,21 +73,24 @@ object WavAudioWriter extends AudioWriter:
     )
 
   private[io] def calculateDataSize(frameCount: Long, channels: Int): Either[AudioSaveError, Long] =
-    Try(Math.multiplyExact(frameCount, (channels * BytesPerSample).toLong)).toOption
-      .filter(_ <= MaxDataSizeHandledByPCM)
-      .toRight(
-        FileTooLarge(
-          s"$frameCount frames on $channels channel(s) exceed the limit of $MaxDataSizeHandledByPCM data bytes"
-        )
+    (for
+      size <- Try(Math.multiplyExact(frameCount, (channels * BytesPerSample).toLong)).toOption
+      if size <= MaxDataSizeHandledByPCM
+    yield size).toRight(
+      FileTooLarge(
+        s"$frameCount frames on $channels channel(s) exceed the limit of $MaxDataSizeHandledByPCM data bytes"
       )
+    )
 
   private def validateFiniteSamples(track: AudioTrack): Either[AudioSaveError, Unit] =
-    track.chunks.iterator
-      .flatMap(_.channels.iterator.flatten)
-      .find(sample => !sample.isRepresentable)
-      .fold[Either[AudioSaveError, Unit]](Right(()))(bad =>
-        Left(InvalidSample(s"non-finite sample value: $bad"))
-      )
+    val firstInvalid = (for
+      chunk   <- track.chunks.iterator
+      channel <- chunk.channels.iterator
+      sample  <- channel.iterator
+      if !sample.isRepresentable
+    yield sample).nextOption()
+
+    firstInvalid.toLeft(()).left.map(bad => InvalidSample(s"non-finite sample value: $bad"))
 
   private def writeAudioToFile(
       path: Path,
@@ -96,7 +99,7 @@ object WavAudioWriter extends AudioWriter:
       chunks: Vector[AudioChunk]
   ): Either[AudioSaveError, Unit] =
     Using(AudioInputStream(createPcmInputStream(chunks), format, frameCount)): stream =>
-      AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile)
+      AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile) 
     match
       case Success(_)         => Right(())
       case Failure(exception) =>

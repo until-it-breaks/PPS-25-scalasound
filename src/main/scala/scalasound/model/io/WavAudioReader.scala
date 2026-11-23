@@ -46,9 +46,8 @@ object WavAudioReader extends AudioReader:
       case Failure(exception) => Left(fromThrowable(exception))
 
   private def readFromStream(stream: AudioInputStream): Either[AudioLoadError, RawAudio] =
-    WavFormat
-      .from(stream.getFormat)
-      .map(format => RawAudio(format, stream.getFrameLength, stream.readAllBytes()))
+    for format <- WavFormat.from(stream.getFormat)
+    yield RawAudio(format, stream.getFrameLength, stream.readAllBytes())
 
   private def fromThrowable(e: Throwable): AudioLoadError = e match
     case _: UnsupportedAudioFileException => UnsupportedFormat(describe(e))

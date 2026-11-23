@@ -28,7 +28,9 @@ class WavFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
   }
 
   it should "be accepted as stereo with its sample rate" in {
-    WavFormat.from(format(channels = 2)) shouldBe Right(WavFormat(ChannelLayout.Stereo, sampleRate(44100)))
+    WavFormat.from(format(channels = 2)) shouldBe Right(
+      WavFormat(ChannelLayout.Stereo, sampleRate(44100))
+    )
   }
 
   "An unsupported encoding" should "be rejected for 8 bit, 24 bit, unsigned and float PCM" in {
@@ -40,7 +42,9 @@ class WavFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
       format(encoding = AudioFormat.Encoding.ULAW, bits = 8)
     )
     unsupported.foreach: candidate =>
-      WavFormat.from(candidate) should matchPattern { case Left(AudioLoadError.UnsupportedFormat(_)) => }
+      WavFormat.from(candidate) should matchPattern {
+        case Left(AudioLoadError.UnsupportedFormat(_)) =>
+      }
   }
 
   "Big-endian samples" should "be rejected as unsupported" in {

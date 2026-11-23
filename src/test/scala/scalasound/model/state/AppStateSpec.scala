@@ -100,7 +100,7 @@ class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
   "removeAll" should "clear the list even if no element is inside" in:
     val base = AppState.initial
     base.effects shouldBe List.empty
-    base.handle(RemoveAll).effects shouldBe List.empty
+    base.handle(RemoveAllEffects).effects shouldBe List.empty
 
   it should "remove all the effects contained in the effects list" in:
     val effects = Seq(AudioEffect.volume(1.0f), AudioEffect.gain(1.0f))
@@ -109,7 +109,7 @@ class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
     }
     base.effects should not be List.empty
     base.effects.length shouldBe effects.length
-    base.handle(RemoveAll).effects shouldBe List.empty
+    base.handle(RemoveAllEffects).effects shouldBe List.empty
 
   "addEffect" should "add a new effect to the effects list" in:
     val base = AppState.initial

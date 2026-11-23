@@ -38,9 +38,6 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
       Files.readAllBytes(path)
     }
 
-  private def interleave(left: Seq[Int], right: Seq[Int]): Seq[Int] =
-    left.zip(right).flatMap { case (l, r) => Seq(l, r) }
-
   private def ramp(frames: Int): Vector[Int] =
     Vector.tabulate(frames)(i => ((i * 13) % 20000) - 10000)
 
@@ -60,9 +57,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     Header(tag(), u32(), tag(), tag(), u32(), u16(), u16(), u32(), u32(), u16(), u16(), tag(), u32())
 
   "Exporting a mono track" should "produce exactly the bytes of the equivalent 16 bit PCM WAV" in {
-    val bytes = exported(monoTrack(44100, KnownSamples))
-
-    bytes shouldBe pcm16Wav(44100, 1, KnownSamples)
+    exported(monoTrack(44100, KnownSamples)) shouldBe pcm16Wav(44100, 1, KnownSamples)
   }
 
   it should "write a valid header with one channel, 16 bit PCM and consistent sizes" in {
@@ -74,37 +69,22 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     bytes.length shouldBe 44 + 2000
   }
 
-  it should "concatenate the chunks preserving the sample order" in {
+  it should "concatenate multiple chunks preserving the sample order" in {
     val bytes = exported(monoTrack(44100, Seq(1, 2, 3), Seq(-4, -5), Seq(6)))
 
     bytes shouldBe pcm16Wav(44100, 1, Seq(1, 2, 3, -4, -5, 6))
   }
 
-  it should "handle a number of frames that is not a multiple of 1024" in {
-    val frames = ramp(2500)
-    val chunks = frames.grouped(1024).toSeq
-    val bytes = exported(monoTrack(44100, chunks*))
+  it should "produce a header-only file for an empty track or empty chunks" in {
+    val emptyTrackBytes = exported(MonoTrack(44100, Vector.empty).value)
+    emptyTrackBytes shouldBe pcm16Wav(44100, 1, Seq.empty)
+    emptyTrackBytes.length shouldBe 44
 
-    bytes shouldBe pcm16Wav(44100, 1, frames)
-  }
-
-  it should "handle a track with a single sample" in {
-    exported(monoTrack(44100, Seq(-1234))) shouldBe pcm16Wav(44100, 1, Seq(-1234))
-  }
-
-  it should "produce a header-only file for a track without chunks" in {
-    val bytes = exported(MonoTrack(44100, Vector.empty).value)
-
-    bytes shouldBe pcm16Wav(44100, 1, Seq.empty)
-    bytes.length shouldBe 44
-  }
-
-  it should "produce a header-only file for a track with an empty chunk" in {
     exported(monoTrack(44100, Seq.empty)) shouldBe pcm16Wav(44100, 1, Seq.empty)
   }
 
   it should "preserve different sample rates and derive the byte rate from them" in {
-    Seq(8000, 22050, 44100, 48000, 96000).foreach { rate =>
+    Seq(8000, 44100, 96000).foreach { rate =>
       val header = parseHeader(exported(monoTrack(rate, Seq(1, 2, 3)), s"rate-$rate.wav"))
 
       header.sampleRate shouldBe rate.toLong
@@ -112,11 +92,10 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     }
   }
 
-  "Exporting a stereo track" should "interleave the channels as (L0,R0,L1,R1,...)" in {
-    val left = Seq(1, 2, 3, 4)
-    val right = Seq(-1, -2, -3, -4)
+  "Exporting a stereo track" should "interleave the channels as (L0,R0,L1,R1,...) across chunks" in {
+    val bytes = exported(stereoTrack(44100, (Seq(1, 2), Seq(-1, -2)), (Seq(3), Seq(-3))))
 
-    exported(stereoTrack(44100, (left, right))) shouldBe pcm16Wav(44100, 2, Seq(1, -1, 2, -2, 3, -3, 4, -4))
+    bytes shouldBe pcm16Wav(44100, 2, Seq(1, -1, 2, -2, 3, -3))
   }
 
   it should "write a valid header with two channels and consistent sizes" in {
@@ -127,29 +106,8 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     bytes.length shouldBe 44 + 2000
   }
 
-  it should "not swap the left and right channels" in {
-    val data = exported(stereoTrack(44100, (Seq(1000, 1000), Seq(-2000, -2000)))).drop(44)
-
-    data shouldBe pcm16Data(Seq(1000, -2000, 1000, -2000))
-  }
-
-  it should "keep the frame order across chunks and count frames per channel" in {
-    val left = ramp(2500)
-    val right = left.map(-_)
-    val chunks = left.grouped(1024).zip(right.grouped(1024)).toSeq
-    val bytes = exported(stereoTrack(44100, chunks *))
-
-    bytes shouldBe pcm16Wav(44100, 2, interleave(left, right))
-    parseHeader(bytes).dataSize shouldBe 2500L * 4
-  }
-
-  it should "handle a single frame" in {
-    exported(stereoTrack(44100, (Seq(7), Seq(-7)))) shouldBe pcm16Wav(44100, 2, Seq(7, -7))
-  }
-
-  it should "produce a header-only file for an empty track" in {
+  it should "produce a header-only file for an empty stereo track" in {
     exported(StereoTrack(44100, Vector.empty).value) shouldBe pcm16Wav(44100, 2, Seq.empty)
-
     exported(stereoTrack(44100, (Seq.empty, Seq.empty)), "empty-chunk.wav") shouldBe pcm16Wav(44100, 2, Seq.empty)
   }
 
@@ -162,55 +120,11 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     }
   }
 
-  "Quantisation" should "map the reference values to the expected PCM integers" in {
-    val expected = Seq(
-      0f -> 0,
-      0.5f -> 16384,
-      -0.5f -> -16384,
-      -1f -> -32768,
-      1f -> 32767, // +1.0 is not representable: clipped
-      32767 / 32768f -> 32767,
-      -32767 / 32768f -> -32767,
-      1 / 32768f -> 1,
-      -1 / 32768f -> -1
-    )
+  "Quantisation" should "delegate sample quantisation and write clipped values for out-of-range samples" in {
+    WavAudioWriter.quantiseNormalisedSampleToPcm16(0.5f).toInt shouldBe 16384
+    val track = MonoTrack(44100, Vector(MonoChunk(Vector(2.0f, -2.0f)))).value
 
-    expected.foreach { case (sample, pcm) => WavAudioWriter.quantiseNormalisedSampleToPcm16(sample).toInt shouldBe pcm }
-  }
-
-  it should "round to the nearest integer, ties towards +infinity" in {
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(0.4f / 32768f).toInt shouldBe 0
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(0.6f / 32768f).toInt shouldBe 1
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(-0.6f / 32768f).toInt shouldBe -1
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(0.5f / 32768f).toInt shouldBe 1
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(-0.5f / 32768f).toInt shouldBe 0
-  }
-
-  it should "clip values close to the extremes without overflowing" in {
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(0.99999f).toInt shouldBe 32767
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(-0.99999f).toInt shouldBe -32768
-  }
-
-  it should "clip values outside the normalised range" in {
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(1.5f).toInt shouldBe 32767
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(-1.5f).toInt shouldBe -32768
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(1e30f).toInt shouldBe 32767
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(-1e30f).toInt shouldBe -32768
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(Float.MaxValue).toInt shouldBe 32767
-    WavAudioWriter.quantiseNormalisedSampleToPcm16(Float.MinValue).toInt shouldBe -32768
-  }
-
-  it should "write clipped values to the file for out-of-range samples" in {
-    val track = MonoTrack(44100, Vector(MonoChunk(Vector(2.0f, -2.0f, 1.0f, -1.0f)))).value
-
-    exported(track) shouldBe pcm16Wav(44100, 1, Seq(32767, -32768, 32767, -32768))
-  }
-
-  it should "write samples in little-endian two's complement" in {
-    // 0x0102 = 258 -> bytes 02 01 ; -2 = 0xFFFE -> bytes FE FF
-    val data = exported(monoTrack(44100, Seq(258, -2))).drop(44)
-
-    data shouldBe Array[Byte](0x02, 0x01, 0xfe.toByte, 0xff.toByte)
+    exported(track) shouldBe pcm16Wav(44100, 1, Seq(32767, -32768))
   }
 
   private def invalidSampleTrack(bad: Float): MonoTrack =

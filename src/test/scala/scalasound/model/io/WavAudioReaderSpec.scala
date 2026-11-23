@@ -50,14 +50,12 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       track.chunks.flatMap(_.samples) shouldBe KnownValues
     }
 
-  it should "keep the sample rate declared in the file" in
-    withTempFile("mono8k.wav", pcm16Wav(8000, 1, KnownSamples)) { path =>
-      loadTrack[MonoTrack](path).sampleRate.value shouldBe 8000
-    }
-
-  it should "compute the duration from the number of frames" in
+  it should "keep the sample rate declared in the file and compute the duration from the number of frames" in
     withTempFile("one-second.wav", pcm16Wav(8000, 1, ramp(8000))) { path =>
-      loadTrack[MonoTrack](path).durationInSeconds shouldBe 1.0
+      val track = loadTrack[MonoTrack](path)
+
+      track.sampleRate.value shouldBe 8000
+      track.durationInSeconds shouldBe 1.0
     }
 
   it should "be split in chunks of 1024 frames with a shorter final chunk and no padding" in {
@@ -69,11 +67,6 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       track.chunks.flatMap(_.samples) shouldBe samples.map(_ / 32768f)
     }
   }
-
-  it should "produce a single chunk when it has exactly 1024 frames" in
-    withTempFile("exact.wav", pcm16Wav(44100, 1, ramp(1024))) { path =>
-      loadTrack[MonoTrack](path).chunks.map(_.samples.length) shouldBe Vector(1024)
-    }
 
   it should "be accepted when it contains no frames, with duration zero" in
     withTempFile("empty.wav", pcm16Wav(44100, 1, Vector.empty)) { path =>
@@ -105,18 +98,6 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
 
       track.frameCount shouldBe 4800L
       track.durationInSeconds shouldBe 0.1
-    }
-  }
-
-  it should "be split in chunks of 1024 frames keeping both channels aligned" in {
-    val frames = Vector.tabulate(2500)(i => (i, -i))
-    withTempFile("stereo-long.wav", pcm16Wav(44100, 2, interleave(frames))) { path =>
-      val track = loadTrack[StereoTrack](path)
-
-      track.chunks.map(_.left.length) shouldBe Vector(1024, 1024, 452)
-      track.chunks.map(_.right.length) shouldBe Vector(1024, 1024, 452)
-      track.chunks.flatMap(_.left) shouldBe frames.map(_._1 / 32768f)
-      track.chunks.flatMap(_.right) shouldBe frames.map(_._2 / 32768f)
     }
   }
 

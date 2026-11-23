@@ -48,19 +48,3 @@ private[io] object Pcm16:
     val low  = bytes(sampleIndex * BytesPerSample) & 0xff
     val high = bytes(sampleIndex * BytesPerSample + 1) // keeps the sign
     ((high << 8) | low).toShort
-
-  /** Encodes PCM values as little-endian bytes: low byte first then high byte, for each value.
-    *
-    * @param samples
-    *   the PCM values, in the order they must appear in the file
-    * @return
-    *   two bytes per value
-    */
-  def toLittleEndianBytes(samples: Array[Short]): Array[Byte] =
-    Array.tabulate(samples.length * BytesPerSample)(index =>
-      byteOf(samples(index / BytesPerSample), index % BytesPerSample)
-    )
-
-  private def byteOf(sample: Short, position: Int): Byte = position match
-    case 0 => sample.toByte        // low byte
-    case _ => (sample >> 8).toByte // high byte

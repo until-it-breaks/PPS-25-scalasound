@@ -20,6 +20,11 @@ private[io] object Pcm16:
 
   extension (sample: Float)
 
+    /** Whether the sample has a PCM representation, that is whether it is neither `NaN` nor
+      * infinite. Finite samples outside [-1.0, 1.0) are representable too: they are clipped.
+      */
+    def isRepresentable: Boolean = java.lang.Float.isFinite(sample)
+
     /** Quantises a normalised sample to a signed 16-bit PCM value, clipping it to the representable
       * range.
       */

@@ -184,17 +184,31 @@ Casi limite:
 
 ### Lettura e scrittura dei file
 
-I trait `AudioReader` e `AudioWriter` separano il formato dal resto dell'applicazione; `WavAudioReader` e `WavAudioWriter` ne sono le implementazioni per il WAV PCM a 16 bit little-endian, mono e stereo. Entrambi restituiscono un `Either` con un errore da un insieme chiuso: `AudioLoadError` (file non trovato, formato non supportato, dati corrotti, errore di lettura) e `AudioSaveError` (errore di scrittura, traccia non valida, campione non valido, file troppo grande, nessuna traccia).
+I trait `AudioReader` e `AudioWriter` definiscono come si legge e si scrive una traccia, senza dipendere dal formato del file: `load(filePath)` restituisce una traccia e `save(track, path)` ne scrive una su file. `WavAudioReader` e `WavAudioWriter` ne sono le implementazioni per il WAV PCM a 16 bit little-endian, mono e stereo. Le operazioni sono bloccanti ed entrambe restituiscono un `Either` con un errore da un insieme chiuso: `AudioLoadError` (file non trovato, formato non supportato, dati corrotti, errore di lettura) e `AudioSaveError` (errore di scrittura, traccia non valida, campione non valido, file troppo grande, nessuna traccia).
+
+![Reader e writer](doc/img/05-detailed-design/classi-io.png){ width=80% }
+
+Il WAV è un formato non compresso: il file contiene un'intestazione con la descrizione del formato e poi i campioni, quindi si leggono e si scrivono senza codifica o decodifica. Il sottoinsieme supportato è il PCM con segno a 16 bit, con i campioni in ordine little-endian, a uno (mono) o due (stereo) canali, con i canali intercalati frame per frame. Sono rifiutati con `UnsupportedFormat` le altre codifiche (compresse, a virgola mobile, a 8 o 24 bit), i campioni big-endian e i file con più di due canali.
+
+Il diagramma seguente mostra le operazioni eseguite da `WavAudioReader` e `WavAudioWriter`. Entrambe i flussi procedono per verifiche successive, ciascuna delle quali può terminare con un errore: solo se tutte sono completate con successo si ottiene la traccia o il file.
+
+![Passi di lettura e scrittura](doc/img/05-detailed-design/lettura-scrittura.png){ width=65% }
 
 Scelte di design:
 
-- la lettura divide i campioni in chunk e li normalizza in [-1, 1) dividendo per 32768;
-- la scrittura li quantizza saturando i valori fuori scala.
+- gli errori sono valori e non eccezioni: l'esito è un dato che chi chiama può esaminare e gestire senza terminare l'applicazione;
+- si supporta un solo sottoinsieme del WAV e il formato resta isolato nei due trait. Se si intende supportarne altri basta creare implementazioni, senza modificare il resto del sistema.
+- le implementazioni WAV usano la Java Sound API; per formati popolari come MP3 servirebbe un'altra libreria;
+- lettura e scrittura sono una l'inversa dell'altra: la lettura normalizza i campioni in [-1, 1) dividendo per 32768, la scrittura li quantizza saturando i valori fuori scala, ad esempio quelli prodotti dagli effetti. L'intervallo è asimmetrico, quindi +1,0 viene limitato a 32767;
+- la lettura divide i campioni in chunk di 1024 frame, l'ultimo contiene i frame rimanenti e senza riempimento;
+- la scrittura esegue tutte le verifiche prima di scrivere un byte, quindi una traccia non valida non crea né modifica il file.
 
 Casi limite:
 
-- la scrittura rifiuta `NaN` e infiniti, una frequenza di campionamento oltre il limite del formato e una traccia che supera la dimensione massima del file;
-- un file di un formato diverso da WAV PCM a 16 bit è rifiutato con un errore, senza sostituire la traccia corrente.
+- un file WAV valido ma senza frame è accettato e produce una traccia senza chunk, di durata zero;
+- un file di un formato diverso da WAV PCM a 16 bit è rifiutato con un errore; dati incoerenti, cioè una lunghezza non multipla della dimensione del frame o frame dichiarati diversi da quelli presenti, risultano nell'errore `CorruptedData`;
+- la scrittura rifiuta campioni con valori `NaN` o infiniti, una frequenza di campionamento oltre il limite del formato, una traccia che supera la dimensione massima del file e una traccia che non è né mono né stereo;
+- se il file di destinazione esiste, viene sovrascritto.
 
 ## Controller
 

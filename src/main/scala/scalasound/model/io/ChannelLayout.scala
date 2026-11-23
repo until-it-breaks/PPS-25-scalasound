@@ -10,3 +10,9 @@ private[io] enum ChannelLayout(val channels: Int):
 
   /** The size in bytes of one frame: one 16 bit sample for each channel. */
   def frameSize: Int = channels * Pcm16.BytesPerSample
+
+private[io] object ChannelLayout:
+
+  /** The layout with the given number of channels, if it is supported. */
+  def fromChannelCount(channels: Int): Option[ChannelLayout] =
+    values.find(_.channels == channels)

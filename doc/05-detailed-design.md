@@ -96,24 +96,25 @@ Casi limite:
 
 ### Store dello stato
 
-`AppStateStore` è l'unico punto in cui lo stato viene letto e modificato. Viene creato una sola volta e la stessa istanza è condivisa da controller, player e view, che comunicano solo attraverso di esso. Le sue operazioni sono:
+`AppStateStore` è l'unico punto in cui `AppState` viene letto e modificato. Viene creato una sola volta alla composizione dell'applicazione e la stessa istanza è condivisa da `AudioPlayer`, Controller e View, che comunicano solo attraverso di esso. Internamente conserva lo stato in un `SignallingRef` di FS2. Un `Ref` di Cats Effect è un riferimento modificabile in modo atomico, sicuro da usare da più fibre senza lock espliciti né thread bloccati. Il `SignallingRef` lo estende con la capacità di segnalare ogni aggiornamento attraverso uno `Stream` di FS2, che lo store espone come `changes`. Le sue operazioni sono:
 
-- `current`, che restituisce lo stato corrente;
-- `dispatch(command)`, che applica il comando con `AppState.handle` in modo atomico e restituisce il nuovo stato;
-- `changes`, un flusso che emette lo stato corrente alla sottoscrizione e poi a ogni modifica.
+- `current`, che restituisce l'`AppState` corrente;
+- `dispatch(command)`, che applica il comando con `AppState.handle` e restituisce il `AppState`;
+- `changes`, uno `Stream` che emette lo stato corrente alla sottoscrizione e poi a ogni modifica;
+- flussi derivati da `changes`, basati su componenti parziali dell'`AppState`, che emettono solo quando tale porzione cambia.
 
-Dal punto di vista dei pattern, ogni azione è un valore (**Command**) che lo store applica, e i flussi pubblicati realizzano un **Observer**: gli interessati si iscrivono agli stessi flussi e vengono notificati dei cambiamenti senza conoscersi.
+Dal punto di vista dei pattern, ogni azione è un **Command** che lo store applica, e i flussi pubblicati realizzano un **Observer**: gli interessati si iscrivono agli stessi flussi e vengono notificati dei cambiamenti senza conoscersi. I flussi derivati permettono a ciascuno di ascoltare solo ciò che gli serve.
 
 Scelte di design:
 
-- lo store rappresenta l'unica fonte di verità. In questo modo tutti gli interessati vedono sempre lo stesso stato;
-- ogni modifica è atomica, perciò i comandi inviati da view, controller e player in concorrenza non si perdono né si sovrascrivono, senza bisogno di altri meccanismi di sincronizzazione;
+- lo store rappresenta l'unica fonte di verità dello stato dell'applicazione;
+- `AppState` è immutabile per sua natura, ma il riferimento che lo condivide non lo è: lo stato corrente è un valore che viene sostituito a ogni modifica. Se più componenti leggessero lo stato, calcolassero il successivo e lo riscrivessero in quel riferimento, una modifica potrebbe sovrascrivere l'altra (*lost update*). Per questo la concorrenza è gestita solo dallo store, che applica ogni comando in modo atomico all'ultimo stato disponibile.
 - chi osserva reagisce ai cambiamenti senza meccanismi di polling.
 
 Casi limite:
 
 - un osservatore lento può non ricevere gli stati intermedi, ma solo l'ultimo;
-- lo stato non è salvato: a ogni avvio dell'applicazione si riparte da `AppState.initial`.
+- l'`AppState` non è salvato su disco. A ogni avvio dell'applicazione si riparte da `AppState.initial`.
 
 ### Elaborazione audio
 

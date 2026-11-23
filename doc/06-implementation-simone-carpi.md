@@ -14,7 +14,7 @@ Il mio contributo al progetto si è focalizzato nelle seguenti aree:
 - **AudioADT**: parziale definizione e implementazione degli aspetti principali legati al dominio.
 - **Interfaccia grafica**: realizzazione completa dei pannelli che costituiscono la GUI e gestione della logica
   associata agli effetti.
-- **Testing**: definizione e implmentazione di tutti i test relativi agli effetti, ai processori e al controller.
+- **Testing**: definizione e implementazione di tutti i test relativi agli effetti, ai processori e al controller.
 
 ---
 
@@ -90,8 +90,7 @@ private[processing] final case class GainEffect(gain: Float) extends StatelessAu
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkGain.toLeft:
-      applyTransformation
-  (chunk, x => clamp(x * gain))
+      applyTransformation(chunk, x => clamp(x * gain))
   
   ...
 ```
@@ -133,9 +132,10 @@ enum AudioEffectType[+T <: AudioConfiguration](val name: String, val instance: T
 
 ### Processori Audio
 Il processore audio è il componente responsabile dell'applicazione sequenziale degli effetti sui singoli *chunk* e
-viene modellato tramite il `trait` `AudioProcessor`.
+viene modellato tramite il `trait` `AudioProcessor`. Il contratto contiene due implementazioni disitinte del metodo `apply`, 
+tramite overloading del metodo, per gestire sia per singoli chunk sia intere tracce.
+A seguito dei controlli preliminari sugli input, la logica di gestione degli effetti sul chunk, risulta la seguente:
 
-A seguito dei vari controlli preliminari eseguiti sugli input, la logica di gestione degli effetti sul chunk, risulta come segue:
 ```scala
 protected def processChunk(chunk: AudioChunk,
                              effects: List[AudioEffect],
@@ -149,12 +149,16 @@ protected def processChunk(chunk: AudioChunk,
               case standardEffect: StatelessAudioEffect => standardEffect(chunky)
     }
 ```
-Tramite il `foldLeft` vengono applicati in sequenza gli effetti sul *chunk* ricevuto in ingresso e con il supporto
-dell'approccio *monadico* degli `Either`, l'elaborazione si interrompe immediatamente propagando un `Left(AudioError)`.
-Inoltre, applicando l'exhaustive *pattern matching*, gli effetti vengono distinti in base alla necessità di usare l'indice per
-avere il riferimento temporale.
+Tramite il `foldLeft` vengono applicati in sequenza gli effetti sul *chunk* ricevuto in ingresso e, con il supporto
+dell'approccio *monadico* degli `Either`, l'elaborazione si interrompe immediatamente al primo errore propagando un `Left(AudioError)`.
+Inoltre, applicando l'exhaustive *pattern matching*, gli effetti vengono distinti in base alla necessità o meno di usare l'indice per
+avere il riferimento temporale, permettendo di applicare la trasformazione evitando problemi legati al tipo.
 
-Invece, per l'elaborazione della traccia, si è 
+Per l'elaborazione della traccia (`AudioTrack`) è stato applicato un approccio simile a quello precedentemente mostrato, iterando sulla collezione di *chunk* che
+compongono la traccia. Tramite una operazione di riduzione con accumulatore (`foldLeft`), su ogni elemento viene invocato il metodo protetto `processChunk` per applicare i filtri. 
+Questo procedimento permette di creare una nuova lista inserendo i chunk in testa (per mezzo dell'operatore *cons* `::`), riducendone il costo computazionale con inserimento a complessità costante,
+e sfrutta le *for-comprehension* per ottenere un approccio più dichiarativo ed incisivo. Questo zucchero sintattico permette di gestire gli `Either`, estraendo in modo sicuro i `Right(AudioChunk)`
+e propagando eventuali `Left(AudioError)`.
 
 ```scala
 protected def processTrack(track: AudioTrack, 
@@ -171,14 +175,18 @@ protected def processTrack(track: AudioTrack,
     ...
 ```
 
-Nel processore `AudioProcessorWithRules`, al fine di applicare con logica gli effetti selezionati dall'utente, è stato deciso
-di definire un ordinamento interno sugli effetti disponibili. Per definire questo meccanismo, è stato introdotto un `enum` privato (`EffectPriority`), utilizzando la proprietà `.ordinal` (identifica l'indice
-numerico dell'effetto all'interno dell'enum) è stata creata una "mappa" effetto-priorità dell'effetto. Inoltre, con la contextual abstraction di Scala 3, quindi l'uso
-del meccanismo dei given, è stata fornita una istanza di `Ordering[AudioEffect]` che viene passata implicitamente dal compilatore al metodo `.sorted` delle liste per ordinare gli effetti ricevuti.
+Il `trait` `AudioProcessor` viene specializzato in due sottotipi distinti: `SimpleAudioProcessor` e `AudioProcessorWithRules`, entrambi definiti come implementazioni concrete
+stateless modellate come *singleton* (`object`).
+
+Nel processore `AudioProcessorWithRules`, al fine di applicare secondo una logica gli effetti selezionati dall'utente, è stato
+definito un ordinamento interno sugli effetti disponibili. Per realizzare questo meccanismo, è stato introdotto un `enum` privato (`EffectPriority`), utilizzando la proprietà `.ordinal` (che identifica l'indice
+numerico dell'effetto all'interno dell'enum), è stata creata una associazione effetto-priorità. Inoltre, con la *contextual abstraction* di Scala 3, ovvero
+il meccanismo dei `given`, è stata fornita una istanza di `Ordering[AudioEffect]` che viene passata implicitamente dal compilatore al metodo `.sorted` delle liste per ordinare gli effetti ricevuti.
 
 ```scala
 object AudioProcessorWithRules extends AudioProcessor:
- given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
+  
+  given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
 
   private def orderingByPriority(effect: AudioEffect): Int = effect match
     case IdentityEffect => EffectPriority.IdentityEffect.ordinal
@@ -198,4 +206,32 @@ object AudioProcessorWithRules extends AudioProcessor:
 
 ---
 
-### Logica degli Effetti (GUI)
+### Logica degli effetti
+`EffectsLogic` si occupa di gestire i widget, nello specifico sliders e bottoni, degli effetti che l'utente può applicare in tempo reale all'interno dell'applicazione.
+Il compito di questa componente è di inviare al relativo controller le azioni dell'utente e adattare i cambiamenti di stato nelle *label* dei widget.
+Data la massiccia presenza di *slider* nel pannello, per evitare duplicazioni di codice è stato aggiunto un **extension method** incapsulato nel *companion object* `EffectsLogic`:
+
+```scala
+  extension (slider: Slider)
+
+    private def sliderValue: Float = slider.value.value.toFloat
+
+    private def sliderListener(onUpdate: Float => Unit): Unit =
+      slider.valueChanging.onChange { (_, wasChanging, isChanging) =>
+        if wasChanging && !isChanging then onUpdate(slider.sliderValue)
+      }
+      slider.onMouseReleased = _ =>
+        if !slider.valueChanging.value then onUpdate(slider.sliderValue)
+```
+Il metodo `sliderListener` definito come una **higher-order functions** accetta una funzione di callback (`onUpdate: Float => Unit`).
+Questo approccio permette ai singoli componenti di poter definire l'azione da eseguire quando un evento viene intercettato. Per evitare di inviare un segnale
+continuo durante il movimento cursore, è stata combinata la proprietà `valueChanging` che  si occupa di analizzare `wasChanging && !isChanging` al termine di un trascinamento,
+con l'evento `onMouseReleased` e il controllo di `!slider.valueChanging.value` per gestire i clic diretti. In questo modo, l'invio del comando al controller *wrapped* viene attivato **una sola volta** a interazione completata.
+
+Inoltre, per rendere più comprensibile la presenza del filtro di *SoftClipping*, è stata introdotta un'ulteriore *extension* denominata `isSoftClipping`,
+la quale mappa il filtro `DistortionEnum` di input in un valore booleano.
+
+```scala
+  extension (filter: DistortionEnum)
+    private def isSoftClipping: Boolean = filter == Tanh
+```

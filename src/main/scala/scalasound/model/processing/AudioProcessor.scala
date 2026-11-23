@@ -65,7 +65,11 @@ trait AudioProcessor:
        * If the outcome is positive then the result track is an StereoTrack
        * otherwise a MonoTrack.
        */
-      isStereo = chunks.exists(_.isInstanceOf[StereoChunk])
+      isStereo = chunks.exists({
+        case _ :MonoChunk => false
+        case _ :StereoChunk => true
+      })
+      //isStereo = chunks.exists(_.isInstanceOf[StereoChunk])
 
       resultTrack <- if isStereo then
         val stereoChunks: Vector[StereoChunk] = chunks.map[StereoChunk] {

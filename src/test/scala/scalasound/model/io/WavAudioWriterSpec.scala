@@ -20,13 +20,13 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   private def monoTrack(rate: Int, chunks: Seq[Int]*): MonoTrack =
     MonoTrack(rate, chunks.map[MonoChunk](c => MonoChunk(toFloats(c))).toVector).value
 
+  private def toFloats(ints: Seq[Int]): Vector[Float] = ints.map(_ / 32768f).toVector
+
   private def stereoTrack(rate: Int, chunks: (Seq[Int], Seq[Int])*): StereoTrack =
     StereoTrack(
       rate,
       chunks.map[StereoChunk] { case (l, r) => StereoChunk(toFloats(l), toFloats(r)) }.toVector
     ).value
-
-  private def toFloats(ints: Seq[Int]): Vector[Float] = ints.map(_ / 32768f).toVector
 
   private def exported(track: AudioTrack, name: String = "out.wav"): Array[Byte] =
     withTempDir { dir =>
@@ -129,7 +129,8 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   }
 
   it should "write a valid header with two channels and consistent sizes" in {
-    val bytes  = exported(stereoTrack(48000, (pcmSampleSequence(500), pcmSampleSequence(500).reverse)))
+    val bytes =
+      exported(stereoTrack(48000, (pcmSampleSequence(500), pcmSampleSequence(500).reverse)))
     val header = parseHeader(bytes)
 
     header shouldBe Header(

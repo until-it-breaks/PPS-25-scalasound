@@ -8,7 +8,7 @@ import scalasound.model.domain.{AudioDomainError, MonoTrack, StereoTrack}
 
 class AudioTrackSpec extends AnyFlatSpec with Matchers with EitherValues:
 
-  private def mono(n: Int): MonoChunk = MonoChunk(Vector.fill(n)(0f))
+  private def mono(n: Int): MonoChunk     = MonoChunk(Vector.fill(n)(0f))
   private def stereo(n: Int): StereoChunk = StereoChunk(Vector.fill(n)(0f), Vector.fill(n)(0f))
 
   "A mono track with one chunk" should "last 'frames / sampleRate' seconds" in {
@@ -40,5 +40,11 @@ class AudioTrackSpec extends AnyFlatSpec with Matchers with EitherValues:
 
   "A stereo track" should "reject chunks whose channels have different lengths" in {
     StereoTrack(44100, Vector(StereoChunk(Vector(0f, 0f), Vector(0f)))) shouldBe
-      Left(AudioDomainError.DifferentLengthsStereoChannels(chunkIndex = 0, leftLength = 2, rightLength = 1))
+      Left(
+        AudioDomainError.DifferentLengthsStereoChannels(
+          chunkIndex = 0,
+          leftLength = 2,
+          rightLength = 1
+        )
+      )
   }

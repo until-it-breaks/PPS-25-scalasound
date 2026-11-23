@@ -1,7 +1,7 @@
 package scalasound.model.io
 
-import AudioLoadError.*
 import scalasound.model.domain.SampleRate
+import scalasound.model.io.AudioLoadError.*
 
 import javax.sound.sampled.AudioFormat
 
@@ -34,7 +34,7 @@ private[io] object WavFormat:
   private def ensurePcm16Encoding(format: AudioFormat): Either[AudioLoadError, Unit] =
     (format.getEncoding, format.getSampleSizeInBits) match
       case (AudioFormat.Encoding.PCM_SIGNED, Pcm16.BitsPerSample) => Right(())
-      case (encoding, bits) =>
+      case (encoding, bits)                                       =>
         Left(UnsupportedFormat(s"only 16 bit signed PCM is supported, found $encoding $bits bit"))
 
   private def ensureLittleEndian(format: AudioFormat): Either[AudioLoadError, Unit] =

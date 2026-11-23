@@ -115,24 +115,21 @@ private[controller] final class LoadSaveControllerImpl(
       case Left(throwable) => ImportState.Failed(AudioLoadError.ReadFailure(throwable.description))
 
   override def save(path: Path): IO[Unit] =
-    runInBackground {
-      store.current.flatMap { state =>
+    runInBackground:
+      store.current.flatMap: state =>
         state.importState match
           case ImportState.Importing => IO.unit
           case _                     =>
             val targetPath = LoadSaveController.withWavExtension(path)
             startIfIdle(exportBusy)(runExport(state.track, state.effects, targetPath))
-      }
-    }
 
   private def runInBackground(task: IO[Unit]): IO[Unit] =
     supervisor.supervise(task).void
 
   private def startIfIdle(busy: Ref[IO, Boolean])(task: IO[Unit]): IO[Unit] =
-    busy.getAndSet(true).flatMap {
+    busy.getAndSet(true).flatMap:
       case true  => IO.unit
       case false => task.guarantee(busy.set(false))
-    }
 
   private def runExport(
       snapshot: Option[AudioTrack],
@@ -173,18 +170,16 @@ private[controller] final class LoadSaveControllerImpl(
         ExportState.Failed(AudioSaveError.WriteFailure(path, throwable.description))
 
   override def acknowledgeImport: IO[Unit] =
-    store.current.map(_.importState).flatMap {
+    store.current.map(_.importState).flatMap:
       case ImportState.Imported(_) | ImportState.Failed(_) =>
         store.dispatch(Command.UpdateImport(ImportState.Idle)).void
       case _ => IO.unit
-    }
 
   override def acknowledgeExport: IO[Unit] =
-    store.current.map(_.exportState).flatMap {
+    store.current.map(_.exportState).flatMap:
       case ExportState.Exported | ExportState.Failed(_) =>
         store.dispatch(Command.UpdateExport(ExportState.Idle)).void
       case _ => IO.unit
-    }
 
   extension (throwable: Throwable)
     private def description: String =

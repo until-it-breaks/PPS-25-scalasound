@@ -5,8 +5,8 @@
 All'interno del package radice `scalasound`, il codice si articola nella seguente struttura:
 
 - **`model`**:
-  - `model.domain`: le classi di dominio `AudioChunk` (mono e stereo) e `AudioTrack` (mono e stereo).
-  - `model.state`: lo stato globale immutabile e i comandi che lo modificano, e lo store reattivo.
+  - `model.domain`: le classi di dominio `AudioChunk` e `AudioTrack`.
+  - `model.state`: lo stato globale immutabile, i comandi che lo modificano, e lo store reattivo.
   - `model.io`: lettura e scrittura dei file audio, con le implementazioni per il formato WAV e i relativi errori.
   - `model.player`: il motore di riproduzione e l'output audio.
   - `model.processing`: gli effetti, i processori audio e i relativi errori.
@@ -25,7 +25,7 @@ Il dominio è stato progettato dall'intero gruppo ed è evoluto nel tempo. L'aud
 - `AudioChunk` è un'enumerazione con due casi: `MonoChunk`, con un solo vettore di campioni, e `StereoChunk`, con i canali sinistro e destro separati. È l'unità alla base dell'elaborazione, della riproduzione e delle operazioni di importazione ed esportazione.
 - `AudioTrack` è il trait che rappresenta una traccia: espone la frequenza di campionamento e la sequenza ordinata di chunk che lo compone. Ha due implementazioni: `MonoTrack`, composta solo da `MonoChunk`, e `StereoTrack`, composta solo da `StereoChunk` in cui i canali sinistro e destro hanno la stessa lunghezza. In entrambe la frequenza di campionamento deve essere positiva.
 
-Sia `AudioChunk` sia `AudioTrack` espongono `frameCount`, il numero di frame contenuti. Un frame raccoglie i campioni di tutti i canali relativi allo stesso istante.
+Sia `AudioChunk` sia `AudioTrack` espongono `frameCount`, il numero di frame contenuti. Un frame comprende i campioni di tutti i canali relativi allo stesso istante: un campione in una traccia mono, due (sinistro e destro) in una stereo. Ad esempio, un chunk stereo con 1024 campioni per canale contiene 1024 frame, cioè 2048 campioni in totale.
 
 \newpage
 
@@ -33,9 +33,9 @@ Sia `AudioChunk` sia `AudioTrack` espongono `frameCount`, il numero di frame con
 
 Scelte di design:
 
-- la traccia composta da una sequenza di chunk di dimensione fissa (1024 frame quando importata). Questo permette di elaborare e riprodurre il flusso audio un blocco alla volta, solo quando necessario;
-- i campioni sono `Float` normalizzati in [-1, 1): tutti gli effetti lavorano su un'unica scala, indipendentemente dalla risoluzione in bit del file di provenienza, e il calcolo in virgola mobile non ha  problemi di overflow con gli interi a 16 bit (un guadagno potrebbe superare il valore massimo). Il `Float` inoltre occupa metà della memoria rispetto al `Double`;
-- `chunks` e i campioni (`samples`, `left`, `right`) sono contenuti in `Vector`, la sequenza immutabile di Scala con accesso per indice efficiente, che facilita l'operazione di seek. In questo modo spostare lo stato di avanzamento in un punto qualsiasi della traccia non richiede di percorrere i chunk precedenti, come invece accadrebbe con una `List`.
+- la traccia è composta da una sequenza di chunk di dimensione fissa (1024 frame quando importata). Questo permette di elaborare e riprodurre il flusso audio un blocco alla volta, solo quando necessario;
+- i campioni sono `Float` normalizzati in [-1, 1): tutti gli effetti lavorano su un'unica scala, indipendentemente dalla risoluzione in bit del file di provenienza, e il calcolo in virgola mobile non ha problemi di overflow con gli interi a 16 bit (un guadagno potrebbe superare il valore massimo). Il `Float` inoltre occupa metà della memoria rispetto al `Double`;
+- `chunks` e i campioni (`samples`, `left`, `right`) sono contenuti in `Vector`, la sequenza immutabile di Scala con accesso per indice efficiente, che facilita l'operazione di seek. In questo modo spostare la riproduzione in un punto qualsiasi della traccia non richiede di percorrere i chunk precedenti, come invece accadrebbe con una `List`.
 
 Casi limite:
 
@@ -46,44 +46,53 @@ Casi limite:
 
 ### Stato e comandi
 
-Lo stato globale è contenuto nella `case class` immutabile `AppState`, composta dai seguenti campi:
+Lo stato dell'applicazione è contenuto nella `case class` immutabile `AppState`, composta da:
 
-| Campo | Tipo | Significato |
-|----------------|------------------------|--------------------------------------------|
-| `playbackState` | `PlaybackState` | fase della riproduzione: `Stopped`, `Playing` o `Paused` |
-| `track` | `Option[AudioTrack]` | traccia caricata, se presente |
-| `chunkIndex` | `Int` | stato di avanzamento della riproduzione, come indice del chunk corrente |
-| `effects` | `List[AudioEffect]` | effetti attivi, al più uno per tipo |
-| `importState` | `ImportState` | ciclo dell'importazione: `Idle`, `Importing`, `Imported(track)` o `Failed(error)` |
-| `exportState` | `ExportState` | ciclo dell'esportazione: `Idle`, `Exporting`, `Exported` o `Failed(error)` |
+| Campo | Tipo | Significato | Valore iniziale |
+|----------------|------------------------|--------------------------------------------|----------------|
+| `playbackState` | `PlaybackState` | fase della riproduzione: `Stopped`, `Playing` o `Paused` | `Stopped` |
+| `track` | `Option[AudioTrack]` | traccia caricata, se presente | `None` |
+| `chunkIndex` | `Int` | indice del chunk da riprodurre | `0` |
+| `effects` | `List[AudioEffect]` | effetti attivi, al più uno per tipo | `List.empty` |
+| `importState` | `ImportState` | ciclo dell'importazione: `Idle`, `Importing`, `Imported(track)` o `Failed(error)` | `Idle` |
+| `exportState` | `ExportState` | ciclo dell'esportazione: `Idle`, `Exporting`, `Exported` o `Failed(error)` | `Idle` |
 
-Lo stato iniziale non ha traccia né effetti, ha la riproduzione `Stopped`, lo stato di avanzamento a zero e importazione ed esportazione in stato `Idle`. Ogni modifica è espressa da un `Command` (`Play`, `Pause`, `Stop`, `NextChunk`, `SeekToIndex`, `AddEffect`, `RemoveAll`, `UpdateImport`, `UpdateExport`) e applicata dalla funzione `AppState.handle`, che restituisce un nuovo `AppState` senza alterare il precedente.
+Lo stato iniziale ha i valori indicati nell'ultima colonna: nessuna traccia né effetto, riproduzione ferma e importazione ed esportazione a riposo. Lo stato non viene mai modificato: la funzione `AppState.handle` riceve un comando (`Command`) e restituisce una nuova versione di `AppState`, lasciando invariata quella precedente.
+
+I comandi disponibili e il loro effetto sui campi di `AppState` sono:
+
+- `Play`: imposta `playbackState` a `Playing`, ma solo se `track` contiene una traccia;
+- `Pause`: imposta `playbackState` a `Paused`, ma solo se la riproduzione è in corso;
+- `Stop`: imposta `playbackState` a `Stopped` e riporta `chunkIndex` a zero, in qualunque stato;
+- `NextChunk`: incrementa `chunkIndex` di uno, ma solo durante la riproduzione;
+- `SeekToIndex(index)`: imposta `chunkIndex` a `index`, riportato al primo o all'ultimo chunk se esce dall'intervallo valido; non cambia `playbackState` e, senza traccia, non ha effetto;
+- `AddEffect(effect)`: inserisce `effect` in `effects` al posto di quello dello stesso tipo, quindi nella lista c'è al massimo un effetto per tipo;
+- `RemoveAllEffects`: svuota `effects`;
+- `UpdateImport(state)`: imposta `importState` a `state`; se `state` è `Imported(track)`, sostituisce anche `track` con la nuova traccia, imposta `playbackState` a `Stopped` e `chunkIndex` a zero, lasciando invariati gli `effects`;
+- `UpdateExport(state)`: imposta `exportState` a `state`, senza toccare gli altri campi.
+
+\newpage
+
+La riproduzione è possibile solo se è stata caricata una traccia e passa attraverso tre fasi, `Stopped`, `Playing` e `Paused`, secondo le transizioni mostrate nel diagramma.
 
 ![Stati della riproduzione audio](doc/img/05-detailed-design/stati-riproduzione.png){ width=70% }
 
-Ogni comando ha un effetto preciso sullo stato, definito in `handle`:
+Le operazioni di importazione ed esportazione procedono per fasi, registrate nello stato (`importState` ed `exportState`) e lette dalla View per mostrare l'avanzamento all'utente. Seguono lo stesso ciclo, rappresentato da semplici valori dello stato: `Idle`, operazione in corso, esito (riuscita o fallita) e ritorno a `Idle` quando l'esito viene confermato.
 
-- `Play` porta la riproduzione in `Playing`, ma solo se è caricata una traccia;
-- `Pause` porta la riproduzione in `Paused`, ma solo se è in corso;
-- `Stop` porta la riproduzione in `Stopped` e riporta l'indice a zero;
-- `NextChunk` fa avanzare l'indice di un chunk, ma solo durante la riproduzione;
-- `SeekToIndex` imposta l'indice, limitandolo all'intervallo valido della traccia;
-- `AddEffect` aggiunge un effetto sostituendo quello dello stesso tipo, quindi nella lista c'è al massimo un effetto per tipo, mentre `RemoveAll` la svuota;
-- `UpdateImport` con `Imported` sostituisce la traccia, ferma la riproduzione, riporta l'indice a zero e mantiene gli effetti già scelti; con gli altri stati aggiorna solo lo stato di importazione, e `UpdateExport` fa lo stesso con quello di esportazione.
-
-Importazione ed esportazione seguono lo stesso ciclo, rappresentato da semplici valori dello stato: `Idle`, operazione in corso, esito (riuscita o fallita) e ritorno a `Idle` quando l'esito viene confermato.
-
-![Stati di importazione ed esportazione](doc/img/05-detailed-design/stati-import-export.png){ width=95% }
+![Stati di importazione ed esportazione](doc/img/05-detailed-design/stati-import-export.png){ width=75% }
 
 Scelte di design:
 
-- poiché `handle` non ha effetti collaterali, un comando non applicabile restituisce lo stato invariato invece di un errore.
+- la posizione nella traccia è rappresentata principalmente dall'indice del chunk da riprodurre (`chunkIndex`) e non da un tempo in secondi, che si ricava dall'indice solo quando serve; le richieste espresse in secondi sono convertite in indice dal livello dei controller. Inoltre, se la dimensione dei chunk è ben configurata, l'indice offre una risoluzione molto più fine del secondo: con chunk di 1024 frame a 44100 Hz, ad esempio, ogni chunk dura circa 23 ms;
+- l'esito di un'importazione o di un'esportazione, riuscito o fallito, resta nello stato finché non viene riconosciuto e solo allora si torna a `Idle`. In questo modo si forza il riconoscimento dell'esito;
+- gli effetti sono configurati dall'utente e non sono legati alla traccia. Per questo motivo l'importazione di un nuovo file li lascia invariati;
+- l'importazione di una nuova traccia ferma la riproduzione e riporta `chunkIndex` a zero, così il nuovo file non parte da un indice che aveva senso solo per la traccia precedente;
+- un comando che non si può applicare allo stato corrente non produce un errore: `handle` restituisce lo stato invariato.
 
 Casi limite:
 
-- `Play` senza traccia, `Pause` da fermo o `NextChunk` in pausa non modificano lo stato;
-- un `SeekToIndex` fuori dall'intervallo viene portato al primo o all'ultimo chunk, e su una traccia assente non ha effetto.
-
+- `Play` durante la riproduzione non modifica lo stato, e `Stop` da fermo azzera soltanto `chunkIndex` (utile dopo un seek). Entrambi si possono inviare più volte senza conseguenze;
+- un `SeekToIndex` fuori dall'intervallo viene portato al primo o all'ultimo chunk. Se la traccia è assente non ha effetto.
 
 ### Store dello stato
 
@@ -197,7 +206,7 @@ Casi limite:
 I controller espongono alla view le operazioni dell'utente e le traducono in comandi per lo store.
 
 - `PlaybackController` (play, pause, stop, seek) non contiene logica di stato: invia il comando corrispondente. Il seek converte i secondi nell'indice del chunk che contiene quel punto, riportando i valori fuori traccia al primo o all'ultimo chunk.
-- `EffectsController` invia `AddEffect` e `RemoveAll`.
+- `EffectsController` invia `AddEffect` e `RemoveAllEffects`.
 - `LoadSaveController` è l'unico che gestisce operazioni lente. `load` e `save` restituiscono un `IO` che avvia l'operazione in background sotto un `Supervisor` e termina subito; la lettura, oppure l'elaborazione seguita dalla scrittura, è eseguita in `IO.blocking`. In esportazione il controller legge dallo stato la traccia e gli effetti attivi, ne ottiene la versione elaborata con l'`AudioProcessor` e la passa all'`AudioWriter`.
 
 ![Sequenza dell'importazione](doc/img/05-detailed-design/sequenza-importazione.png){ width=100% }

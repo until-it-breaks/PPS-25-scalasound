@@ -120,46 +120,37 @@ Casi limite:
 
 ![Effetti e processori](doc/img/05-detailed-design/effetti-processore.png){ width=95% }
 
-`AudioEffect` è un trait sealed con due sottotipi, che distinguono gli effetti in base a ciò che serve per calcolarli:
+`AudioEffect` rappresenta una trasformazione che, dato un `AudioChunk`, ne restituisce un altro. È un trait sealed con due sottotipi, che distinguono gli effetti in base a ciò che serve per calcolarli:
 
-- `StatelessAudioEffect`, per gli effetti che dipendono solo dal chunk (`apply(chunk)`): identità, gain, distorsione, pan e volume;
-- `TimeAudioEffect`, per quelli che dipendono anche dalla posizione nel brano (`apply(chunk, chunkIndex)`): eco e autopan.
+- `StatelessAudioEffect`, per gli effetti che dipendono solo dal chunk stesso (`apply(chunk)`): Identity, Gain, Distortion, Pan e Volume;
+- `TimeAudioEffect`, per quelli che dipendono anche dalla posizione nella traccia (`apply(chunk, chunkIndex)`): Echo e Autopan.
 
-Ogni effetto restituisce `Either[AudioError, AudioChunk]`: un parametro fuori dai limiti produce un errore come valore, e non un'eccezione. Le classi concrete sono interne al package e si ottengono dalle factory del companion (`AudioEffect.gain(...)`).
+Ogni effetto restituisce `Either[AudioError, AudioChunk]`: un parametro fuori dai limiti produce un errore come valore, e non un'eccezione.
 
-L'enumerazione `AudioEffectType` elenca gli effetti disponibili e associa a ciascuno la propria configurazione (`AudioConfiguration`, con `ParameterConfiguration` che indica minimo, massimo e valore predefinito di ogni parametro). In questo modo limiti e valori predefiniti sono definiti in un solo punto e usati sia dagli effetti sia dalla view.
+L'enumerazione `AudioEffectType` elenca gli effetti disponibili e associa a ciascuno la propria configurazione (`AudioConfiguration`, con `ParameterConfiguration` che indica minimo, massimo e valore predefinito di ogni parametro). In questo modo limiti e valori predefiniti sono definiti in un solo punto e usati sia dagli effetti stessi che dalla View.
 
-Gli effetti calcolano, per ogni chunk, quanto segue (i campioni sono in [-1, 1)):
+Parametri, intervalli e comportamento di ciascun effetto sono descritti nei requisiti funzionali.
 
-| Effetto | Parametri | Operazione |
-|---------|-----------|------------|
-| Identity | nessuno | restituisce il chunk invariato |
-| Gain | fattore, [0, 2] | moltiplica ogni campione per il fattore e limita il risultato a [-1, 1] |
-| Volume | livello, [0, 1] | moltiplica ogni campione per il livello |
-| Distortion | intensità, [0, 10]; funzione `tanh` o `sin` | applica la funzione a `campione × intensità`. La view invia `tanh` o `sin` secondo la scelta dell'utente; il valore predefinito delle factory è `tanh` |
-| Pan | posizione, [-1, 1] | porta il segnale in stereo (un chunk mono è duplicato) e moltiplica i due canali per coefficienti ricavati dall'angolo `posizione × 45°`: sinistro `√2/2 · (cos − sin)` e destro `√2/2 · (cos + sin)`, così la potenza resta costante |
-| Autopan | frequenza, [0, 20] Hz; frequenza di campionamento | come il pan, ma la posizione oscilla in modo sinusoidale alla frequenza data; il tempo di ogni campione si ricava dall'indice del chunk |
-| Echo | attenuazione, [0, 0.9]; ritardo, [10, 1000] ms; frequenza di campionamento | tiene un buffer circolare per canale lungo `ritardo × frequenza` campioni. Ogni campione in uscita è `x + attenuazione × campione ritardato`, limitato a [-1, 1] e riscritto nel buffer |
-
-`AudioProcessor` applica una lista di effetti a un chunk o a una traccia (template method): verifica gli ingressi e delega a `processChunk` e `processTrack`. Ogni effetto temporale riceve l'indice del chunk. Esistono due varianti:
+`AudioProcessor` applica una lista di `AudioEffect` ad un `AudioChunk` o ad una `AudioTrack`. Ne esistono due varianti:
 
 - `SimpleAudioProcessor` applica gli effetti nell'ordine in cui sono dati;
-- `AudioProcessorWithRules` li ordina prima per priorità (identità, gain, distorsione, eco, pan, autopan, volume), così il risultato non dipende dall'ordine in cui l'utente li ha attivati. L'applicazione usa questa variante.
+- `AudioProcessorWithRules` li ordina prima per priorità (Identity, Gain, Distortion, Echo, Pan, Autopan, Volume), in tal modo il risultato non dipende dall'ordine in cui l'utente li ha attivati. L'applicazione usa questa variante.
+
+Chi lo usa sceglie una delle due varianti e chiama `apply`, che esiste con due signature: `apply(chunk, effects, chunkIndex)`, usata per la riproduzione in tempo reale a blocchi, e `apply(track, effects)`, usata per l'esportazione. Entrambe restituiscono un `Either` con un `AudioError` oppure con l'`AudioChunk` o l'`AudioTrack` elaborati. L'indice serve agli effetti temporali; nella signature per traccia è il processore a ricavarlo, scorrendo i chunk in sequenza. Ciascuna verifica gli input e poi delega a `processChunk` o a `processTrack`, che le varianti possono ridefinire. Ad esempio, `AudioProcessorWithRules` li ridefinisce per ordinare gli effetti in input.
 
 Scelte di design:
 
-- per aggiungere un effetto si estende uno dei due sottotipi, lo si aggiunge ad `AudioEffectType` e gli si assegna una priorità, senza modifiche a player e controller;
-- la gerarchia sealed fa verificare al compilatore che ogni effetto nuovo sia trattato come stateless o come temporale, ed evita di dover passare un indice a effetti che non ne hanno bisogno;
-- l'ordine fisso ha una motivazione sonora, spiegata nei requisiti: il guadagno precede la distorsione, l'eco ne ripete il suono già distorto, pan e autopan spostano nello spazio anche le ripetizioni e il volume regola per ultimo il livello finale;
-- quando un effetto fallisce, l'elaborazione si interrompe e l'errore, che riporta il nome dell'effetto, arriva al chiamante.
+- per implementare un nuovo effetto si estende uno dei due sottotipi (`StatelessAudioEffect` o `TimeAudioEffect`), lo si registra in `AudioEffectType` e gli si assegna una priorità.
+- l'ordine fisso ha una motivazione sonora, spiegata nei requisiti: il guadagno precede la distorsione perché più il segnale in ingresso è forte, più la distorsione lo satura; l'eco ripete il suono già distorto; pan e autopan spostano nello spazio stereofonico anche le ripetizioni mentre il volume regola per ultimo il livello finale;
+- quando l'applicazione di un effetto fallisce, l'elaborazione si interrompe e l'errore, che riporta il nome dell'effetto, arriva al chiamante.
 
 Casi limite:
 
 - con lista di effetti vuota il chunk è restituito invariato;
 - un chunk o una traccia vuoti sono rifiutati con un errore;
 - un effetto sconosciuto (non presente in `AudioEffectType`) è accettato e applicato per ultimo;
-- se un chunk elaborato diventa stereo, l'intera traccia lo diventa;
-- l'eco è l'unico effetto con stato mutabile: tiene un buffer circolare per canale, di dimensione pari al ritardo in campioni. Sostituire l'effetto (per esempio muovendo il cursore) crea un nuovo buffer, quindi la coda dell'eco precedente si interrompe.
+- Pan e Autopan sono gli unici effetti che trasformano un chunk mono in stereo. Quando una traccia è elaborata per intero, basta che un chunk diventi stereo perché lo diventi l'intera traccia;
+- Echo è l'unico effetto con stato mutabile. Tale effetto utilizza un buffer circolare per canale, di dimensione pari al ritardo in campioni. Sostituire l'effetto (per esempio modificandone un parametro) crea un nuovo buffer.
 
 ### Motore di riproduzione
 

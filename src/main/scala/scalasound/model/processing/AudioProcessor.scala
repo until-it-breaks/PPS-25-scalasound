@@ -40,7 +40,7 @@ trait AudioProcessor:
 
   /* Applies the effects on the given track. */
   protected def processTrack(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
-    val processedTrack = track.getVectors.
+    val processedTrack = track.chunksAsList.
       // It starts with an empty list and index 0.
       foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))) { (accumulator, currentChunk) =>
         for
@@ -76,12 +76,15 @@ trait AudioProcessor:
           case stereoChunk: StereoChunk => stereoChunk
           case MonoChunk(samples) => StereoChunk(samples, samples)
         }.toVector
-        Right(StereoTrack(track.sampleRate, stereoChunks))
+        StereoTrack
+          .fromValidated(track.sampleRate, stereoChunks)
+          .left
+          .map(err => AudioProcessorError(this, err.toString))
       else
         val monoChunks: Vector[MonoChunk] = chunks.collect {
           case monoChunk: MonoChunk => monoChunk
         }.toVector
-        Right(MonoTrack(track.sampleRate, monoChunks))
+        Right(MonoTrack.fromValidated(track.sampleRate, monoChunks))
     yield resultTrack
 
   /* Applies the effects on the given chunk. */

@@ -56,7 +56,7 @@ class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
       * start go to the first chunk, positions past the end go to the last one.
       */
     private def chunkIndexAt(positionSeconds: Double): Int =
-      val targetFrame = (positionSeconds * track.sampleRate).toLong.max(0L)
+      val targetFrame = (positionSeconds * track.sampleRate.value).toLong.max(0L)
       @tailrec
       def loop(index: Int, framesBefore: Long): Int =
         track.chunks.lift(index) match

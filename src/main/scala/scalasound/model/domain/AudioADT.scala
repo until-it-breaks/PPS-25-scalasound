@@ -2,6 +2,39 @@ package scalasound.model.domain
 
 import AudioChunk.{MonoChunk, StereoChunk}
 
+/** Represents domain validation errors that can occur when constructing audio tracks. */
+enum AudioDomainError:
+
+  /** The provided sample rate is invalid (non-positive).
+   *
+   *  @param rate the invalid sample rate value
+   */
+  case InvalidSampleRate(rate: Int)
+
+  /** The stereo channels, in a chunk, have different lengths.
+   *
+   *  @param chunkIndex the index of the chunk with channels of different lengths
+   *  @param leftLength the length of the left channel
+   *  @param rightLength the length of the right channel
+   */
+  case DifferentLengthsStereoChannels(chunkIndex: Int, leftLength: Int, rightLength: Int)
+
+opaque type SampleRate = Int
+
+object SampleRate:
+
+  /**
+   * Creates a [[SampleRate]] if the given value is strictly positive.
+   *
+   * @param value the sampling rate in hertz
+   * @return `Right(SampleRate)` if positive, or `Left(AudioDomainError.InvalidSampleRate)` otherwise
+   */
+  def from(value: Int): Either[AudioDomainError, SampleRate] =
+    Either.cond(value > 0, value, AudioDomainError.InvalidSampleRate(value))
+
+  extension (sampleRate: SampleRate)
+    def value: Int = sampleRate
+
 /**
  * Represents a block of audio samples for either a mono or a stereo signal.
  *
@@ -54,7 +87,7 @@ enum AudioChunk:
    * Return the content of a chunk in a list.
    * @return the list of float.
    */
-  def getVectors: List[Vector[Float]] = this match
+  def channels: List[Vector[Float]] = this match
     case MonoChunk(samples) => List(samples)
     case StereoChunk(left, right) => List(left, right)
 
@@ -73,7 +106,7 @@ trait AudioTrack:
    * The number of audio samples per second for each channel.
    * The sampling rate is represented in hertz (Hz)
    */
-  def sampleRate: Int
+  def sampleRate: SampleRate
 
   /**
    * The vector of chunks that composing the corresponding track.
@@ -101,7 +134,7 @@ trait AudioTrack:
    * @return the duration in seconds
    */
   def durationInSeconds: Double =
-    frameCount.toDouble / sampleRate
+    frameCount.toDouble / sampleRate.value
 
   /**
    * Checks the emptiness of the track.
@@ -114,7 +147,7 @@ trait AudioTrack:
    * Return the content of a track in a list.
    * @return the list of float.
    */
-  def getVectors: List[AudioChunk] = this.chunks.toList
+  def chunksAsList: List[AudioChunk] = this.chunks.toList
 
 
 /**
@@ -123,18 +156,28 @@ trait AudioTrack:
  * The duration is calculated from the total number of audio frames
  * and the sampling rate, rather than from the number of chunks.
  *
- * @param sampleRate the sampling rate in hertz; must be positive
+ * @param sampleRate the validated positive sampling rate in hertz
  * @param chunks     the ordered sequence of mono audio chunks
  */
-case class MonoTrack(sampleRate: Int, chunks: Vector[MonoChunk]) extends AudioTrack:
+final case class MonoTrack private (sampleRate: SampleRate, chunks: Vector[MonoChunk]) extends AudioTrack
 
-  // TODO: MODIFICARE I REQUIRE.
-  require(
-    sampleRate > 0,
-    s"sampleRate must be positive, got $sampleRate"
-  )
+object MonoTrack:
+  /**
+   * Constructs a [[MonoTrack]], validating that the sample rate is positive.
+   *
+   * @param sampleRate the sampling rate in hertz; must be positive
+   * @param chunks     the ordered sequence of mono audio chunks
+   * @return `Right(MonoTrack)` if valid, or `Left(AudioDomainError)` otherwise
+   */
+  def apply(sampleRate: Int, chunks: Vector[MonoChunk]): Either[AudioDomainError, MonoTrack] =
+    SampleRate.from(sampleRate).map(validRate => new MonoTrack(validRate, chunks))
 
-end MonoTrack
+  /**
+   * Constructs a [[MonoTrack]] from an already validated [[SampleRate]].
+   */
+  def fromValidated(sampleRate: SampleRate, chunks: Vector[MonoChunk]): MonoTrack =
+    new MonoTrack(sampleRate, chunks)
+
 
 /**
  * Represents a stereo audio track composed of stereo chunks.
@@ -142,20 +185,37 @@ end MonoTrack
  * Each stereo frame contains one left-channel sample and one
  * right-channel sample. Consequently, the frame count is the length
  * of either channel, not the sum of both channel lengths.
- * @param sampleRate the sampling rate in hertz; must be positive
+ *
+ * @param sampleRate the validated positive sampling rate in hertz
  * @param chunks     the ordered sequence of stereo audio chunks
  */
-case class StereoTrack(sampleRate: Int, chunks: Vector[StereoChunk]) extends AudioTrack:
+final case class StereoTrack private (sampleRate: SampleRate, chunks: Vector[StereoChunk]) extends AudioTrack
 
-  // TODO: MODIFICARE I REQUIRE
-  require(
-    sampleRate > 0,
-    s"sampleRate must be positive, got $sampleRate"
-  )
+object StereoTrack:
+  /**
+   * Constructs a [[StereoTrack]], validating that the sample rate is positive
+   * and that all stereo chunks have balanced left and right channel lengths.
+   *
+   * @param sampleRate the sampling rate in hertz; must be positive
+   * @param chunks     the ordered sequence of stereo audio chunks
+   * @return `Right(StereoTrack)` if valid, or `Left(AudioDomainError)` otherwise
+   */
+  def apply(sampleRate: Int, chunks: Vector[StereoChunk]): Either[AudioDomainError, StereoTrack] =
+    for
+      validRate <- SampleRate.from(sampleRate)
+      _         <- validateChunks(chunks)
+    yield new StereoTrack(validRate, chunks)
 
-  require(
-    chunks.forall(c => c.left.length == c.right.length),
-    "left and right channels of every stereo chunk must have the same length"
-  )
+  /**
+   * Constructs a [[StereoTrack]] from an already validated [[SampleRate]],
+   * still ensuring channel length consistency across chunks.
+   */
+  def fromValidated(sampleRate: SampleRate, chunks: Vector[StereoChunk]): Either[AudioDomainError, StereoTrack] =
+    validateChunks(chunks).map(_ => new StereoTrack(sampleRate, chunks))
 
-end StereoTrack
+  private def validateChunks(chunks: Vector[StereoChunk]): Either[AudioDomainError, Unit] =
+    chunks.zipWithIndex
+      .find { case (chunk, _) => chunk.left.length != chunk.right.length }
+      .fold[Either[AudioDomainError, Unit]](Right(())) { case (badChunk, idx) =>
+        Left(AudioDomainError.DifferentLengthsStereoChannels(idx, badChunk.left.length, badChunk.right.length))
+      }

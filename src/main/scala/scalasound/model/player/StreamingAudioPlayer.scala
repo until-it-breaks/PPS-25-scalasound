@@ -59,7 +59,7 @@ private final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOu
       case Some((track, chunk)) =>
         for
           processed <- process(chunk, state)
-          _         <- out.write(processed, track.sampleRate)
+          _         <- out.write(processed, track.sampleRate.value)
           _         <- store.dispatch(Command.NextChunk)
         yield ()
       case None =>

@@ -30,7 +30,7 @@ Il dominio è stato progettato dall'intero gruppo. L'audio è rappresentato da d
 - `AudioChunk` è un'enumerazione con due casi: `MonoChunk`, con un solo vettore di campioni, e `StereoChunk`, con i canali sinistro e destro separati. È l'unità alla base dell'elaborazione, della riproduzione e delle operazioni di importazione ed esportazione.
 - `AudioTrack` è il trait che rappresenta un brano: espone la frequenza di campionamento e il vettore di chunk che lo compone. Ha due implementazioni, `MonoTrack` (composta da chunk mono) e `StereoTrack` (composta da chunk stereo), che verificano le precondizioni alla costruzione con `require`.
 
-![Gerarchia di tracce e chunk](doc/img/design_dominio.png){ width=80% }
+![Gerarchia di tracce e chunk](doc/img/05-detailed-design/dominio.png){ width=80% }
 
 Scelte di design:
 
@@ -58,7 +58,7 @@ Lo stato globale è contenuto nella `case class` immutabile `AppState`, composta
 
 Lo stato iniziale non ha traccia né effetti, ha la riproduzione `Stopped`, la testina a zero e importazione ed esportazione in stato `Idle`. Ogni modifica è espressa da un `Command` (`Play`, `Pause`, `Stop`, `NextChunk`, `SeekToIndex`, `AddEffect`, `RemoveAll`, `UpdateImport`, `UpdateExport`) e applicata dalla funzione `AppState.handle`, che restituisce un nuovo `AppState` senza alterare il precedente.
 
-![Stati della riproduzione audio](doc/img/design_stati_riproduzione.png){ width=70% }
+![Stati della riproduzione audio](doc/img/05-detailed-design/stati-riproduzione.png){ width=70% }
 
 Ogni comando ha un effetto preciso sullo stato, definito in `handle`:
 
@@ -72,7 +72,7 @@ Ogni comando ha un effetto preciso sullo stato, definito in `handle`:
 
 Importazione ed esportazione seguono lo stesso ciclo, rappresentato da semplici valori dello stato: `Idle`, operazione in corso, esito (riuscita o fallita) e ritorno a `Idle` quando l'esito viene confermato.
 
-![Stati di importazione ed esportazione](doc/img/design_stati_import_export.png){ width=95% }
+![Stati di importazione ed esportazione](doc/img/05-detailed-design/stati-import-export.png){ width=95% }
 
 Scelte di design: 
 
@@ -107,7 +107,7 @@ Casi limite:
 
 ### Elaborazione audio
 
-![Effetti e processori](doc/img/design_effetti_processore.png){ width=95% }
+![Effetti e processori](doc/img/05-detailed-design/effetti-processore.png){ width=95% }
 
 `AudioEffect` è un trait sealed con due sottotipi, che distinguono gli effetti in base a ciò che serve per calcolarli:
 
@@ -154,11 +154,11 @@ Casi limite:
 
 `AudioPlayer` non ha uno stato proprio: osserva lo store e agisce di conseguenza. Riceve alla creazione, un `AudioProcessor` che applica gli effetti a ogni chunk e un `AudioOutput` che lo porta in uscita, e conosce solo i loro contratti. Perciò `SimpleAudioProcessor` e `AudioProcessorWithRules`, cosi come `AudioOutput.console` e `AudioOutput.speakers`, sono intercambiabili senza modificare il player. Lo store gli viene fornito quando viene avviato, con `run(store)`.
 
-![Dipendenze di AudioPlayer](doc/img/design_player_dipendenze.png){ width=95% }
+![Dipendenze di AudioPlayer](doc/img/05-detailed-design/dipendenze-player.png){ width=95% }
 
 `StreamingAudioPlayer` ascolta il flusso `changes` e reagisce solo ai cambi della coppia (`playbackState`, `chunkIndex`). Per ogni stato `Playing` prende il chunk in posizione `chunkIndex`, lo elabora con `AudioProcessor.apply` usando gli `effects` correnti, lo manda in output con `AudioOutput.write` e invia `NextChunk` allo store; il nuovo `chunkIndex` che ne risulta fa partire la riproduzione del chunk successivo.
 
-![Flusso di una riproduzione](doc/img/design_flusso_riproduzione.png){ width=100% }
+![Flusso di una riproduzione](doc/img/05-detailed-design/flusso-riproduzione.png){ width=100% }
 
 La riproduzione procede un chunk alla volta: il player non elabora la traccia in anticipo, ma prepara ogni chunk subito prima di mandarlo in uscita. Per questo gli effetti e la posizione possono cambiare mentre la traccia suona, e il risultato si sente dal chunk successivo. Il vincolo è che l'elaborazione di un chunk resti più breve della sua durata (circa 23 ms per 1024 frame a 44100 Hz), altrimenti l'audio si interrompe; la risposta a una modifica non è comunque istantanea, perché una piccola quantità di audio è già stata consegnata all'uscita.
 
@@ -198,7 +198,7 @@ I controller espongono alla view le operazioni dell'utente e le traducono in com
 - `EffectsController` invia `AddEffect` e `RemoveAll`.
 - `LoadSaveController` è l'unico che gestisce operazioni lente. `load` e `save` ritornano subito e lavorano in background sotto un `Supervisor`, con la lettura, oppure l'elaborazione seguita dalla scrittura, eseguite in `IO.blocking`. In esportazione il controller legge dallo stato la traccia e gli effetti attivi, ne ottiene la versione elaborata con l'`AudioProcessor` e la passa all'`AudioWriter`.
 
-![Sequenza dell'importazione](doc/img/design_sequenza_importazione.png){ width=100% }
+![Sequenza dell'importazione](doc/img/05-detailed-design/sequenza-importazione.png){ width=100% }
 
 Scelte di design per `LoadSaveController`:
 
@@ -257,7 +257,7 @@ L'applicazione usa tre contesti di esecuzione, che comunicano soltanto attravers
 - le **fibre di Cats Effect**, sul pool di calcolo, eseguono i metodi in `PlaybackController`, `EffectsController` e `LoadSaveController`, il ciclo di `StreamingAudioPlayer` e gli osservatori della view (`TrackBoxLogic.observe`, `LoadSaveObserver.observe`), che si iscrivono ai flussi dello store;
 - il **pool dei compiti bloccanti** esegue le operazioni che attendono il sistema, con `IO.blocking`: `WavAudioReader` e `WavAudioWriter` per i file e `SpeakerAudioOutput` per la scrittura sulla linea audio.
 
-![Contesti di esecuzione e passaggi tra di essi](doc/img/design_contesti_esecuzione.png){ width=80% }
+![Contesti di esecuzione e passaggi tra di essi](doc/img/05-detailed-design/contesti-esecuzione.png){ width=80% }
 
 Ne derivano tre regole:
 

@@ -68,9 +68,8 @@ private[processing] final case class EchoEffect(alpha: Float,
   private val echoBufferRight: Array[Float] = Array.fill(nSamples)(0.0f)
 
   override def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk] =
-    checkAlpha.orElse(checkSamples).orElse(checkFrequency) match
-      case Some(error) => Left(error)
-      case None => Right(resultChunk(chunk, chunkIndex * chunk.frameCount))
+    checkAlpha.orElse(checkSamples).orElse(checkFrequency).toLeft:
+      resultChunk(chunk, chunkIndex * chunk.frameCount)
 
   private def resultChunk(chunk: AudioChunk, index: Int): AudioChunk =
     chunk match

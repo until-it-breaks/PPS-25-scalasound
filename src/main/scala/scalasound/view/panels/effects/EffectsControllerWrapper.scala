@@ -5,9 +5,9 @@ import scalasound.controller.EffectsController
 import scalasound.model.processing.AudioEffect
 
 /**
- * Proxy for the [[EffectsController]] hiding the `IO` effect execution.
+ * Wrapper for the [[EffectsController]] hiding the `IO` effect execution.
  */
-trait EffectsControllerProxy:
+trait EffectsControllerWrapper:
 
   /**
    * Adds a new effect to the current effect
@@ -23,16 +23,16 @@ trait EffectsControllerProxy:
    */
   def removeAll(): Unit
 
-object EffectsControllerProxy:
+object EffectsControllerWrapper:
   /**
    * @param controller the [[EffectsController]] that needs to be wrapped.
-   * @return a new EffectsControllerProxy.
+   * @return a new EffectsControllerWrapper.
    */
-  def apply(controller: EffectsController)(using IORuntime): EffectsControllerProxy =
-    EffectsControllerProxyImpl(controller)
+  def apply(controller: EffectsController)(using IORuntime): EffectsControllerWrapper =
+    EffectsControllerWrapperImpl(controller)
 
-/* Hidden implementation of the proxy. */
-private final class EffectsControllerProxyImpl(controller: EffectsController)(using IORuntime) extends EffectsControllerProxy:
+/* Hidden implementation of the wrapper. */
+private final class EffectsControllerWrapperImpl(controller: EffectsController)(using IORuntime) extends EffectsControllerWrapper:
 
   override def addEffect(effect: AudioEffect): Unit =
     controller.addEffect(effect).unsafeRunAndForget()

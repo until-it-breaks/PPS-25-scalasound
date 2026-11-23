@@ -76,10 +76,8 @@ private[processing] final case class PanEffect(pan: Float) extends StatelessAudi
      */
 
     checkPan.toLeft:
-      val (lch, rch) = chunk match
-        case MonoChunk(samples) => (samples, samples)
-        case StereoChunk(left, right) => (left, right)
-
-      StereoChunk(
-        lch.map(x => x * leftPan),
-        rch.map(x => x * rightPan))
+      chunk match
+        case MonoChunk(samples) =>
+          StereoChunk(samples.map(_ * leftPan), samples.map(_ * rightPan))
+        case StereoChunk(left, right) =>
+          StereoChunk(left.map(_ * leftPan), right.map(_ * rightPan))

@@ -2,7 +2,7 @@ package scalasound.view.panels.effects
 
 import scalafx.scene.control.Slider
 import scalasound.model.processing.AudioEffect
-import scalasound.view.panels.effects.DistortionEnum.{Sin, Tanh}
+import scalasound.view.panels.effects.DistortionEnum.Tanh
 
 object EffectsLogic:
   /*
@@ -15,16 +15,14 @@ object EffectsLogic:
 
     private def sliderListener(onUpdate: Float => Unit): Unit =
       slider.valueChanging.onChange { (_, wasChanging, isChanging) =>
-        if wasChanging && !isChanging then onUpdate(slider.value.value.toFloat)
+        if wasChanging && !isChanging then onUpdate(slider.sliderValue)
       }
       slider.onMouseReleased = _ =>
-        if !slider.valueChanging.value then onUpdate(slider.value.value.toFloat)
+        if !slider.valueChanging.value then onUpdate(slider.sliderValue)
 
   extension (filter: DistortionEnum)
     /* Checks if the distortion to be applied is SoftClipping or not. */
-    private def isSoftClipping: Boolean = filter match
-      case Tanh => true
-      case Sin => false
+    private def isSoftClipping: Boolean = filter == Tanh
 
 /** Execute commands on effects asynchronously. Event actions
   * are triggered when the sliders values change, and only once when
@@ -33,7 +31,7 @@ object EffectsLogic:
   * @param controller
   *   the controller responsible for handling operations based on the effects.
   */
-final class EffectsLogic(controller: EffectsControllerProxy):
+final class EffectsLogic(controller: EffectsControllerWrapper):
 
   import EffectsLogic.*
 
@@ -60,20 +58,19 @@ final class EffectsLogic(controller: EffectsControllerProxy):
   /*
    * Handles the logic of volume and gain sliders.
    */
-  private def volumeGainLogic(vg: VolumeGainBox): Unit =
-    vg.volumeSlider.sliderListener(v => controller.addEffect(AudioEffect.volume(v)))
-    vg.gainSlider.sliderListener(v => controller.addEffect(AudioEffect.gain(v)))
+  private def volumeGainLogic(volumeGain: VolumeGainBox): Unit =
+    volumeGain.volumeSlider.sliderListener(v => controller.addEffect(AudioEffect.volume(v)))
+    volumeGain.gainSlider.sliderListener(v => controller.addEffect(AudioEffect.gain(v)))
 
   /*
    * Handles the logic of distortion and pan sliders, plus the distortion filter button.
    */
-  private def distortionPanLogic(dp: DistortionPanBox): Unit =
-    val distortionFilter = dp.distortionFilter
-    distortionFilter.onChange { (_, _, newFilter) =>
-      updateDistortion(dp.distortionSlider.sliderValue, newFilter)
-    }
-    dp.distortionSlider.sliderListener(v => updateDistortion(v, distortionFilter.value))
-    dp.panSlider.sliderListener(v => controller.addEffect(AudioEffect.pan(v)))
+  private def distortionPanLogic(distortionPan: DistortionPanBox): Unit =
+    val distortionFilter = distortionPan.distortionFilter
+    distortionFilter.onChange: (_, _, newFilter) =>
+      updateDistortion(distortionPan.distortionSlider.sliderValue, newFilter)
+    distortionPan.distortionSlider.sliderListener(v => updateDistortion(v, distortionFilter.value))
+    distortionPan.panSlider.sliderListener(v => controller.addEffect(AudioEffect.pan(v)))
 
   /*
    * Defines how to treat the clipping function when a
@@ -85,18 +82,17 @@ final class EffectsLogic(controller: EffectsControllerProxy):
   /*
    * Handles the logic of echo and autopan sliders.
    */
-  private def echoAutopanLogic(ea: EchoAutopanBox): Unit =
-    val alphaSlider = ea.alphaSlider
-    val delaySlider = ea.delaySlider
-    alphaSlider.sliderListener(_ => updateEcho(alphaSlider, delaySlider))
-    delaySlider.sliderListener(_ => updateEcho(alphaSlider, delaySlider))
-    ea.autopanSlider.sliderListener(v => controller.addEffect(AudioEffect.autopan(v)))
+  private def echoAutopanLogic(echoAutopan: EchoAutopanBox): Unit =
+    val alphaSlider = echoAutopan.alphaSlider
+    val delaySlider = echoAutopan.delaySlider
+    val update = () => updateEcho(alphaSlider.sliderValue, delaySlider.sliderValue.toInt)
+    alphaSlider.sliderListener(_ => update())
+    delaySlider.sliderListener(_ => update())
+    echoAutopan.autopanSlider.sliderListener(v => controller.addEffect(AudioEffect.autopan(v)))
 
   /*
    * Defines how to treat the echo effect when one of
    * the two parameters, alpha or delay, changes.
    */
-  private def updateEcho(alphaSlider: Slider, delaySlider: Slider): Unit =
-    val alpha = alphaSlider.sliderValue
-    val delay = delaySlider.sliderValue.toInt
+  private def updateEcho(alpha: Float, delay: Int): Unit =
     controller.addEffect(AudioEffect.echo(alpha, delay))

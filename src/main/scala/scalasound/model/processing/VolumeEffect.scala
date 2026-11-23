@@ -1,6 +1,5 @@
 package scalasound.model.processing
 
-import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
 
 /* *** VOLUME EFFECT *** */
@@ -35,9 +34,4 @@ private[processing] final case class VolumeEffect(volume: Float) extends Statele
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkVolume.toLeft:
       if volume == DefaultVolume then chunk
-      else
-        chunk match
-          case MonoChunk(samples) =>
-            MonoChunk(samples.map(x => x * volume))
-          case StereoChunk(left, right) =>
-            StereoChunk(left.map(l => l * volume), right.map(r => r * volume))
+      else applyTransformation(chunk, x => x * volume)

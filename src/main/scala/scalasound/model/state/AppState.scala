@@ -30,7 +30,7 @@ enum Command:
   case Pause
   case Stop
   case NextChunk
-  case RemoveAll
+  case RemoveAllEffects
   case AddEffect(effect: AudioEffect)
   case SeekToIndex(index: Int)
   case UpdateImport(state: ImportState)
@@ -84,7 +84,7 @@ final case class AppState(
       case Pause               => handlePause()
       case Stop                => handleStop()
       case NextChunk           => handleNextChunk()
-      case RemoveAll           => handleRemoveAll()
+      case RemoveAllEffects    => handleRemoveAllEffects()
       case AddEffect(effect)   => handleAddEffect(effect)
       case SeekToIndex(index)  => handleSeek(index)
       case UpdateImport(state) => handleImport(state)
@@ -108,9 +108,9 @@ final case class AppState(
       case Playing => copy(chunkIndex = chunkIndex + 1)
       case _       => this
 
-  private def handleRemoveAll(): AppState =
+  private def handleRemoveAllEffects(): AppState =
     copy(effects = List.empty)
-  
+
   private def handleAddEffect(effect: AudioEffect): AppState =
     copy(effects = effect :: effects.filterNot(_.hasSameEffectTypeOf(effect)))
 
@@ -121,15 +121,6 @@ final case class AppState(
         val maxIndex = math.max(0, track.chunks.length - 1)
         val clamped  = math.max(0, math.min(index, maxIndex))
         copy(chunkIndex = clamped)
-
-  def currentPositionSeconds: Double =
-    track.fold(0.0) { track =>
-      val framesBeforeCurrent = track.chunks.view
-        .take(chunkIndex)
-        .map(_.frameCount.toLong)
-        .sum
-      framesBeforeCurrent.toDouble / track.sampleRate.value
-    }
 
   private def handleImport(state: ImportState): AppState =
     state match
@@ -145,6 +136,15 @@ final case class AppState(
 
   private def handleExport(state: ExportState): AppState =
     copy(exportState = state)
+
+  def currentPositionSeconds: Double =
+    track.fold(0.0) { track =>
+      val framesBeforeCurrent = track.chunks.view
+        .take(chunkIndex)
+        .map(_.frameCount.toLong)
+        .sum
+      framesBeforeCurrent.toDouble / track.sampleRate.value
+    }
 
 object AppState:
   /** Initial application state. */

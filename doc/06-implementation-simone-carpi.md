@@ -52,7 +52,7 @@ trait StatelessAudioEffect extends AudioEffect:
 trait TimeAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
 ```
-
+\
 Per poter gestire al meglio la creazione degli effetti (disaccoppiandola dall'effettiva implementazione, si è deciso di applicare il **Factory Pattern** all'interno del
 companion object di `AudioEffect`. Questo approccio fornisce un unico punto di ingresso per le chiamate e la relativa istanziazione, riducendo il numero di possibili
 dipendenze.
@@ -69,13 +69,13 @@ object AudioEffect:
   def distortion(distortionValue: Float, isSoftClipping: Boolean = true): StatelessAudioEffect =
     DistortionEffect(distortionValue, isSoftClipping)
 
-  def echo(alpha: Float, delay: Int, sampleRate: Float = 44100f): TimeAudioEffect =
+  def echo(alpha: Float, delay: Int, sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
     EchoEffect(alpha, delay, sampleRate)
 
   def pan(panValue: Float): StatelessAudioEffect =
     PanEffect(panValue)
 
-  def autopan(autopanValue: Float, sampleRate: Float = 44100f): TimeAudioEffect =
+  def autopan(autopanValue: Float, sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
     AutopanEffect(autopanValue, sampleRate)
 
   def volume(volumeValue: Float): StatelessAudioEffect =
@@ -94,7 +94,7 @@ private[processing] final case class GainEffect(gain: Float) extends StatelessAu
   
   ...
 ```
-
+\
 A fianco di ogni `case class` è stato definito un proprio **Companion Object**, incaricato di contenere costanti, metodi
 di utilità, e il range accettabile dei parametri inseriti per il corrispettivo effetto. Grazie all'adozione del
 *Factory Pattern* e al modificatore di visibilità dei relativi effetti `private[processing]`, i dettagli
@@ -112,21 +112,42 @@ private[processing] object GainEffect extends AudioConfiguration:
   ...
 ```
 
-Infine, per preservare la *type-safety* a ciascun effetto, evitando l'uso dei cast espliciti (`.asInstanceOf[...]`),
+Per preservare la *type-safety* a ciascun effetto, evitando l'uso dei cast espliciti (`.asInstanceOf[...]`),
 è stato definito un **enum parametrico**, il cui tipo `+T` lo rende convariante con **Upper Type Bound** `AudioConfiguration`. Siccome
 ogni companion object degli effetti estende *AudioConfiguration*, i singoli `case` dell'enum fanno riferimento ai relativi singleton. 
 Questo meccanismo viene utilizzato per poter estrarre in modo più diretto e sicuro i
 vincoli per i relativi parametri che compongono la trasformazione.
 
 ```scala
-enum AudioEffectType[+T <: AudioConfiguration](val name: String, val instance: T):
-  case Identity extends AudioEffectType("Identity", IdentityEffect)
-  case Gain extends AudioEffectType("Gain", GainEffect)
+enum AudioEffectType[+T <: AudioConfiguration](
+    val name: String,
+    private[processing] val instance: T
+):
+  case Identity   extends AudioEffectType("Identity", IdentityEffect)
+  case Gain       extends AudioEffectType("Gain", GainEffect)
   case Distortion extends AudioEffectType("Distortion", DistortionEffect)
-  case Echo extends AudioEffectType("Echo", EchoEffect)
-  case Pan extends AudioEffectType("Pan", PanEffect)
-  case Autopan extends AudioEffectType("Autopan", AutopanEffect)
-  case Volume extends AudioEffectType("Volume", VolumeEffect)
+  case Echo       extends AudioEffectType("Echo", EchoEffect)
+  case Pan        extends AudioEffectType("Pan", PanEffect)
+  case Autopan    extends AudioEffectType("Autopan", AutopanEffect)
+  case Volume     extends AudioEffectType("Volume", VolumeEffect)
+```
+\
+Infine, per evitare di fare *pattern matching* ogni volta che occorre determinare il tipo dell'effetto,
+è stato introdotto un *extension method* opportuno su `AudioEffect`, che restituisce il `AudioEffectType` appropriato. 
+Sfruttando `PartialFunction.condOpt`, l'effetto in ingresso viene racchiuso in un `Some(AudioEffectType)` se corrisponde ad uno
+dei casi noti, mentre restituirà un `None` per tutti gli effetti non specificati.
+
+```scala
+  extension (effect: AudioEffect)
+    def effectType: Option[AudioEffectType[?]] =
+      PartialFunction.condOpt(effect):
+        case IdentityEffect      => AudioEffectType.Identity
+        case _: GainEffect       => AudioEffectType.Gain
+        case _: DistortionEffect => AudioEffectType.Distortion
+        case _: EchoEffect       => AudioEffectType.Echo
+        case _: PanEffect        => AudioEffectType.Pan
+        case _: AutopanEffect    => AudioEffectType.Autopan
+        case _: VolumeEffect     => AudioEffectType.Volume
 ```
 ---
 
@@ -140,20 +161,20 @@ A seguito dei controlli preliminari sugli input, la logica di gestione degli eff
 protected def processChunk(chunk: AudioChunk,
                              effects: List[AudioEffect],
                              chunkIndex: Int): Either[AudioError, AudioChunk] =
-    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)) {
+    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)):
       (currentChunk, effect) =>
         currentChunk.flatMap:
           chunky =>
             effect match
               case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
               case standardEffect: StatelessAudioEffect => standardEffect(chunky)
-    }
 ```
 Tramite il `foldLeft` vengono applicati in sequenza gli effetti sul *chunk* ricevuto in ingresso e, con il supporto
 dell'approccio *monadico* degli `Either`, l'elaborazione si interrompe immediatamente al primo errore propagando un `Left(AudioError)`.
 Inoltre, applicando l'exhaustive *pattern matching*, gli effetti vengono distinti in base alla necessità o meno di usare l'indice per
 avere il riferimento temporale, permettendo di applicare la trasformazione evitando problemi legati al tipo.
 
+\
 Per l'elaborazione della traccia (`AudioTrack`) è stato applicato un approccio simile a quello precedentemente mostrato, iterando sulla collezione di *chunk* che
 compongono la traccia. Tramite una operazione di riduzione con accumulatore (`foldLeft`), su ogni elemento viene invocato il metodo protetto `processChunk` per applicare i filtri. 
 Questo procedimento permette di creare una nuova lista inserendo i chunk in testa (per mezzo dell'operatore *cons* `::`), riducendone il costo computazionale con inserimento a complessità costante,
@@ -161,20 +182,20 @@ e sfrutta le *for-comprehension* per ottenere un approccio più dichiarativo ed 
 e propagando eventuali `Left(AudioError)`.
 
 ```scala
-protected def processTrack(track: AudioTrack, 
-                           effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
-    val processedTrack = track.getVectors.
-      foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))) { 
-        (accumulator, currentChunk) =>
-          for
-            (acc, idx) <- accumulator
-            chunk <- processChunk(currentChunk, effects, idx)
-          yield
-            (chunk :: acc, idx + 1)
-      }
-    ...
+private def processedAudioTrack(track: AudioTrack, 
+                                effects: List[AudioEffect]
+                               ): Either[AudioError, (List[AudioChunk], Int)] =
+  track.chunksAsList.
+    foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))):
+      (accumulator, currentChunk) =>
+        for
+          (acc, idx) <- accumulator
+          chunk <- processChunk(currentChunk, effects, idx)
+        yield
+          (chunk :: acc, idx + 1)
 ```
 
+\
 Il `trait` `AudioProcessor` viene specializzato in due sottotipi distinti: `SimpleAudioProcessor` e `AudioProcessorWithRules`, entrambi definiti come implementazioni concrete
 stateless modellate come *singleton* (`object`).
 

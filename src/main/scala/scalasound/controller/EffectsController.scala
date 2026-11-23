@@ -3,7 +3,7 @@ package scalasound.controller
 import cats.effect.IO
 import scalasound.model.processing.AudioEffect
 import scalasound.model.state.AppStateStore
-import scalasound.model.state.Command.{AddEffect, RemoveAll}
+import scalasound.model.state.Command.{AddEffect, RemoveAllEffects}
 
 /**
  * The operations that the user can perform to
@@ -45,4 +45,4 @@ private final class EffectsControllerImpl(store: AppStateStore) extends EffectsC
     store.dispatch(AddEffect(effect)).void
 
   override def removeAll(): IO[Unit] =
-    store.dispatch(RemoveAll).void
+    store.dispatch(RemoveAllEffects).void

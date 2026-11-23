@@ -51,7 +51,7 @@ Lo stato dell'applicazione è contenuto nella `case class` immutabile `AppState`
 | Campo | Tipo | Significato | Valore iniziale |
 |----------------|------------------------|--------------------------------------------|----------------|
 | `playbackState` | `PlaybackState` | fase della riproduzione: `Stopped`, `Playing` o `Paused` | `Stopped` |
-| `track` | `Option[AudioTrack]` | traccia caricata, se presente | `None` |
+| `track` | `Option[AudioTrack]` | traccia caricata, se presente: è quella di riferimento per elaborazione, riproduzione ed eventuale esportazione | `None` |
 | `chunkIndex` | `Int` | indice del chunk da riprodurre | `0` |
 | `effects` | `List[AudioEffect]` | effetti attivi, al più uno per tipo | `List.empty` |
 | `importState` | `ImportState` | ciclo dell'importazione: `Idle`, `Importing`, `Imported(track)` o `Failed(error)` | `Idle` |
@@ -154,30 +154,33 @@ Casi limite:
 
 ### Motore di riproduzione
 
-`AudioPlayer` non ha uno stato proprio: osserva lo store e agisce di conseguenza. Riceve alla creazione un `AudioProcessor` che applica gli effetti a ogni chunk e un `AudioOutput` che lo porta in uscita, e conosce solo i loro contratti. Perciò `SimpleAudioProcessor` e `AudioProcessorWithRules`, così come `AudioOutput.console` e `AudioOutput.speakers`, sono intercambiabili senza modificare il player. Lo store gli viene fornito quando viene avviato, con `run(store)`.
+`AudioPlayer` è il contratto del motore di riproduzione: ha il solo metodo `run(store)`, che restituisce uno `Stream` che descrive il ciclo di vita del player, cioè l'ascolto dell'`AppState` e la riproduzione dei chunk. La sua implementazione, `StreamingAudioPlayer`, non ha uno stato proprio poichè osserva l'`AppStateStore` e agisce di conseguenza, elaborando ogni chunk subito prima di suonarlo. Riceve alla creazione un `AudioProcessor` che applica gli effetti a ogni chunk e un `AudioOutput` che lo porta in uscita. Lo store gli viene fornito solo quando viene avviato, con `run(store)`.
 
-![Dipendenze di AudioPlayer](doc/img/05-detailed-design/dipendenze-player.png){ width=95% }
+![Dipendenze del motore di riproduzione](doc/img/05-detailed-design/dipendenze-player.png){ width=95% }
 
-`StreamingAudioPlayer` ascolta il flusso `changes` e reagisce solo ai cambi della coppia (`playbackState`, `chunkIndex`). Per ogni stato `Playing` prende il chunk in posizione `chunkIndex`, lo elabora con `AudioProcessor.apply` usando gli `effects` correnti, lo manda in output con `AudioOutput.write` e invia `NextChunk` allo store; il nuovo `chunkIndex` che ne risulta fa partire la riproduzione del chunk successivo.
+Anche il trait `AudioOutput` ha un solo metodo, `write(chunk, sampleRate)`. Nell'applicazione è usata l'implementazione `SpeakerAudioOutput`, che riproduce il suono attraverso la libreria Java Sound, effettuando la conversione in byte PCM e scrivendo i campioni su una linea audio con un buffer di circa 200 ms. La scrittura si blocca solo quando il buffer è pieno, finché la riproduzione non libera spazio. È disponibile anche `AudioOutput.console`, che stampa i metadati dei chunk in console. Di per sé non è ritmata, perché `write` termina subito, ma la si può rendere tale facendola attendere la durata di ogni chunk.
+
+`StreamingAudioPlayer` elabora i chunk seguendo l'approccio just-in-time: non processa la traccia in anticipo, ma prepara ogni chunk subito prima di mandarlo in uscita. Una modifica degli effetti o un riposizionamento si applica quindi già dal chunk successivo. Supponendo che come `AudioOutput` sia usato `SpeakerAudioOutput`, il ritmo non deriva da un timer ma dall'output stesso, che accetta un nuovo chunk solo quando ha spazio nel buffer.
+
+Nello specifico, `StreamingAudioPlayer` ascolta il flusso `changes` e reagisce solo ai cambiamenti di `playbackState` e di `chunkIndex` in `AppState`. Quando `playbackState` diventa `Playing`, esso prende il chunk in posizione `chunkIndex`, lo elabora con `AudioProcessor` usando gli `effects` correnti, lo manda in output attraverso `AudioOutput` e invia `NextChunk` allo store. Il ciclo riparte ogni volta che `chunkIndex` è diverso dal precedente, per effetto di `NextChunk` o di `SeekToIndex`, e finisce quando `playbackState` non è più `Playing` o quando la traccia è arrivata all'ultimo chunk, nel qual caso il player stesso invia `Stop` allo store.
+
+![Stati di `StreamingAudioPlayer`](doc/img/05-detailed-design/stati-player.png){ width=90% }
+
+Il diagramma di sequenza seguente mostra la riproduzione di una traccia dall'invio di `Play` allo store fino all'ultimo chunk, quando il player invia `Stop`.
 
 ![Flusso di una riproduzione](doc/img/05-detailed-design/flusso-riproduzione.png){ width=100% }
 
-La riproduzione procede un chunk alla volta: il player non elabora la traccia in anticipo, ma prepara ogni chunk subito prima di mandarlo in uscita. Per questo gli effetti e la posizione possono cambiare mentre la traccia suona, e il risultato si sente dal chunk successivo. Il vincolo è che l'elaborazione di un chunk resti più breve della sua durata (circa 23 ms per 1024 frame a 44100 Hz), altrimenti l'audio si interrompe; la risposta a una modifica non è comunque istantanea, perché una piccola quantità di audio è già stata consegnata all'uscita.
-
-`AudioOutput` ha un solo metodo, `write(chunk, sampleRate)`. `AudioOutput.console` stampa i metadati del chunk in console, mentre `AudioOutput.speakers` produce il suono attraverso la libreria Java Sound: converte i campioni in PCM a 16 bit little-endian e li scrive con `IO.blocking` su una linea audio con un buffer di circa 200 ms, che resta aperta finché non cambiano frequenza di campionamento o numero di canali. L'estensione `paced` aggiunge, dopo la scrittura, un'attesa pari alla durata del chunk, per dare il ritmo reale a un output che non lo impone, come la console.
-
 Scelte di design:
 
-- il player è modellato come un flusso (`Stream` di FS2) perché la riproduzione è una sequenza di chunk nel tempo: si descrive il ciclo "elabora, riproduci, avanza" invece di gestire a mano indici e attese. Il flusso dello stato notifica solo quando qualcosa cambia, quindi non servono controlli periodici, e con `changesBy` e `switchMap` ogni cambio di stato o di posizione interrompe il flusso in corso e ne fa partire uno nuovo;
-- `Pause`, `Stop` e `SeekToIndex` interrompono l'elaborazione del chunk in corso e fanno ripartire il ciclo dal nuovo stato;
-- il ritmo della riproduzione deriva da `AudioOutput.write`, che termina solo quando l'output può accettare il chunk, e non da un timer. Il player resta quindi poco avanti rispetto a quanto si sente.
+- l'`AudioPlayer` è modellato come un flusso (`Stream` di FS2) perché la riproduzione è una sequenza di chunk nel tempo descritta dal ciclo "elabora, riproduci, avanza" invece di gestire a mano indici e attese.
+- l'elaborazione è just-in-time: una modifica degli effetti o un riposizionamento si sente già dal chunk successivo. In cambio l'elaborazione di un chunk deve restare più breve della sua durata. `AudioPlayer` è un trait e `StreamingAudioPlayer` ne è una sola implementazione, quindi in futuro si può aggiungere una soluzione con buffer, che elabora in anticipo alcuni chunk per assorbire i momenti in cui l'elaborazione è più lenta della riproduzione ed evitare le interruzioni.
 
 Casi limite:
 
-- se `AudioProcessor.apply` restituisce un `Left` con un `AudioError`, l'errore viene stampato in console e si riproduce il chunk originale, poiché un effetto malfunzionante non deve rendere silente la riproduzione;
-- se l'output fallisce con un'eccezione, la riproduzione passa a `Stopped` e il player resta attivo, pronto a ripartire;
-- alla fine della traccia il player stesso invia `Stop`, che riporta `chunkIndex` a zero;
-- la linea audio di `AudioOutput.speakers` viene chiusa solo quando il formato cambia: alla chiusura dell'applicazione non è rilasciata esplicitamente.
+- se l'elaborazione di un chunk è più lenta della sua durata (circa 23 ms per 1024 frame a 44100 Hz), il buffer dell'output si svuota e la riproduzione procede a scatti;
+- se invece la CPU è abbastanza potente, il buffer è quasi sempre pieno e una modifica non si sente subito, perché il buffer non viene svuotato. Dopo una modifica degli effetti ma anche impartendo i comandi `Pause` o `SeekToIndex`, in uscita si sentono comunque al massimo circa 200 ms di audio, cioè circa nove chunk da 1024 frame a 44100 Hz, già elaborati con le impostazioni precedenti;
+- se `AudioProcessor` restituisce un `AudioError`, l'errore viene stampato in console e si riproduce il chunk originale, poiché un effetto malfunzionante non deve interrompere la riproduzione;
+- se la riproduzione di un chunk fallisce con un'eccezione (per esempio nell'`AudioOutput`), l'errore viene stampato in console, la riproduzione passa a `Stopped` con `chunkIndex` a zero e il player resta attivo, pronto a ripartire.
 
 ### Lettura e scrittura dei file
 

@@ -3,12 +3,11 @@ package scalasound.controller
 import cats.effect.std.Supervisor
 import cats.effect.{IO, Ref, Resource}
 import scalasound.model.domain.AudioTrack
-import scalasound.model.io.{AudioLoadError, AudioReader, AudioSaveError, AudioWriter}
+import scalasound.model.io.{AudioFormatRegistry, AudioLoadError, AudioSaveError}
 import scalasound.model.processing.{AudioEffect, AudioProcessor, AudioProcessorWithRules}
 import scalasound.model.state.{AppStateStore, Command, ExportState, ImportState}
 
 import java.nio.file.Path
-import java.util.Locale
 
 /** The operations a user can perform to import and export audio tracks: load a file and save the
   * current track.
@@ -16,6 +15,8 @@ import java.util.Locale
 trait LoadSaveController:
 
   /** Starts loading the audio file at the given path in the background.
+    *
+    * The extension of the audio file selects the reader.
     *
     * The import state goes from `Idle` to `Importing` and then to `Imported(track)` or
     * `Failed(error)`.
@@ -27,6 +28,9 @@ trait LoadSaveController:
 
   /** Starts saving the currently loaded track (with active effects applied) to the given path in
     * the background.
+    *
+    * The extension of the path selects the writer; a path without an extension is saved in the
+    * default format of the registry.
     *
     * The export state goes from `Idle` to `Exporting` and then to `Exported` or `Failed(error)`.
     *
@@ -48,17 +52,14 @@ object LoadSaveController:
     *
     * @param store
     *   the [[AppStateStore]] that holds the current track and receives the state updates
-    * @param reader
-    *   reads the audio files
-    * @param writer
-    *   writes the audio files
+    * @param formats
+    *   the [[AudioFormatRegistry]] that selects the reader or the writer of a file from its extension
     * @param processor
     *   applies the active effects before exporting
     */
   def make(
       store: AppStateStore,
-      reader: AudioReader,
-      writer: AudioWriter,
+      formats: AudioFormatRegistry,
       processor: AudioProcessor = AudioProcessorWithRules
   ): Resource[IO, LoadSaveController] =
     for
@@ -67,30 +68,16 @@ object LoadSaveController:
       exportBusy <- Resource.eval(Ref.of[IO, Boolean](false))
     yield LoadSaveControllerImpl(
       store,
-      reader,
-      writer,
+      formats,
       processor,
       supervisor,
       importBusy,
       exportBusy
     )
 
-  /** Returns the given path ending with `.wav`, appending the extension only if it is missing.
-    *
-    * @param path
-    *   the path chosen by the user
-    */
-  def withWavExtension(path: Path): Path =
-    (for
-      fileName <- Option(path.getFileName)
-      name = fileName.toString
-      if !name.toLowerCase(Locale.ROOT).endsWith(".wav")
-    yield path.resolveSibling(s"$name.wav")).getOrElse(path)
-
 private[controller] final class LoadSaveControllerImpl(
     store: AppStateStore,
-    reader: AudioReader,
-    writer: AudioWriter,
+    formats: AudioFormatRegistry,
     processor: AudioProcessor,
     supervisor: Supervisor[IO],
     importBusy: Ref[IO, Boolean],
@@ -103,9 +90,15 @@ private[controller] final class LoadSaveControllerImpl(
   private def runImport(path: Path): IO[Unit] =
     for
       _      <- store.dispatch(Command.UpdateImport(ImportState.Importing))
-      result <- IO.blocking(reader.load(path.toString)).attempt
+      result <- IO.blocking(loadFrom(path)).attempt
       _      <- store.dispatch(Command.UpdateImport(toImportState(result)))
     yield ()
+
+  private def loadFrom(path: Path): Either[AudioLoadError, AudioTrack] =
+    for
+      reader <- formats.readerFor(path).left.map(AudioLoadError.UnresolvedFormat.apply)
+      track <- reader.load(path.toString)
+    yield track
 
   private def toImportState(
       result: Either[Throwable, Either[AudioLoadError, AudioTrack]]
@@ -121,9 +114,7 @@ private[controller] final class LoadSaveControllerImpl(
         state <- store.current
         _     <- state.importState match
           case ImportState.Importing => IO.unit
-          case _                     =>
-            val targetPath = LoadSaveController.withWavExtension(path)
-            startIfIdle(exportBusy)(runExport(state.track, state.effects, targetPath))
+          case _ => startIfIdle(exportBusy)(runExport(state.track, state.effects, path))
       yield ()
 
   private def runInBackground(task: IO[Unit]): IO[Unit] =
@@ -156,11 +147,12 @@ private[controller] final class LoadSaveControllerImpl(
       path: Path
   ): Either[AudioSaveError, Unit] =
     for
+      target <- formats.writerFor(path).left.map(AudioSaveError.UnresolvedFormat.apply)
       processed <- processor
         .apply(track, effects)
         .left
         .map(error => AudioSaveError.InvalidTrack(error.toString))
-      _ <- writer.save(processed, path)
+      _ <- target.writer.save(processed, target.path)
     yield ()
 
   private def toExportState(

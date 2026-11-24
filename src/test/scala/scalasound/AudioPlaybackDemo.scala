@@ -6,7 +6,7 @@ import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.SimpleAudioProcessor
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{Duration, DurationInt, SECONDS}
 
 object AudioPlaybackDemo extends IOApp.Simple:
 
@@ -24,7 +24,7 @@ object AudioPlaybackDemo extends IOApp.Simple:
 
       _ <- IO.println(s"[DEMO] Track loaded successfully!")
       _ <- IO.println(s"       - Sample Rate: ${track.sampleRate} Hz")
-      _ <- IO.println(f"       - Duration: ${track.durationInSeconds}%.2f seconds")
+      _ <- IO.println(f"       - Duration: ${track.duration.toUnit(SECONDS)}%.2f seconds")
       _ <- IO.println(s"       - Total Frames: ${track.frameCount}")
       _ <- IO.println(s"       - Total Chunks: ${track.chunks.length}")
       _ <- IO.println("[DEMO] Starting streaming audio player in the background...")
@@ -82,6 +82,10 @@ object AudioPlaybackDemo extends IOApp.Simple:
     yield ()
 
   private def printPosition(store: AppStateStore, label: String): IO[Unit] =
-    store.current.flatMap { s =>
-      IO.println(f"[$label] -> chunk ${s.chunkIndex}, ${s.currentPositionSeconds}%.2f s")
-    }
+    for
+      state <- store.current
+      position = state.track match
+        case None        => Duration.Zero
+        case Some(track) => track.positionAt(state.chunkIndex)
+      _ <- IO.println(f"[$label] -> chunk ${state.chunkIndex}, ${position.toUnit(SECONDS)}%.2f s")
+    yield ()

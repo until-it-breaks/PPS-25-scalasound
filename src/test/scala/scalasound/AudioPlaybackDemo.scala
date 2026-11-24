@@ -69,7 +69,7 @@ object AudioPlaybackDemo extends IOApp.Simple:
             _ <- printPosition(store, "After Seek")
 
             _ <- IO.println("[DEMO] -> Waiting for track playback to finish...")
-            _ <- store.playbackChanges
+            _ <- store.playbackStateChanges
               .dropWhile(_ != PlaybackState.Playing)
               .filter(_ == PlaybackState.Stopped)
               .take(1)

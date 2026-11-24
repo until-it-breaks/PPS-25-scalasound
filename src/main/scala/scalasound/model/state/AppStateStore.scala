@@ -6,10 +6,10 @@ import fs2.Stream
 import fs2.concurrent.SignallingRef
 import scalasound.model.domain.AudioTrack
 
-given Eq[PlaybackState]      = Eq.fromUniversalEquals
-given Eq[ImportState]        = Eq.fromUniversalEquals
-given Eq[ExportState]        = Eq.fromUniversalEquals
-given Eq[Option[AudioTrack]] = Eq.fromUniversalEquals
+given Eq[PlaybackState]             = Eq.fromUniversalEquals
+given Eq[ImportState]               = Eq.fromUniversalEquals
+given Eq[ExportState]               = Eq.fromUniversalEquals
+given Eq[(Option[AudioTrack], Int)] = Eq.fromUniversalEquals
 
 /** Storage abstraction for managing [[AppState]] and exposing real-time change streams. */
 trait AppStateStore:
@@ -25,12 +25,12 @@ trait AppStateStore:
   def changes: Stream[IO, AppState]
 
   /** A dedicated stream for playback state changes only. */
-  def playbackChanges: Stream[IO, PlaybackState] =
+  def playbackStateChanges: Stream[IO, PlaybackState] =
     changes.map(_.playbackState).changes
 
-  /** A dedicated stream for loaded track changes only. */
-  def trackChanges: Stream[IO, Option[AudioTrack]] =
-    changes.map(_.track).changes
+  /** A dedicated stream for the loaded track and the chunk the play head is on. */
+  def playheadChanges: Stream[IO, (Option[AudioTrack], Int)] =
+    changes.map(state => (state.track, state.chunkIndex)).changes
 
   /** A dedicated stream for import state changes only. */
   def importStateChanges: Stream[IO, ImportState] =

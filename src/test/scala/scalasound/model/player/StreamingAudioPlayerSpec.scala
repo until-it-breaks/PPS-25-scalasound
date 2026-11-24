@@ -61,7 +61,7 @@ class StreamingAudioPlayerSpec extends CatsEffectSuite:
   ).fold(e => fail(e.toString), identity)
 
   private def untilStopped(store: AppStateStore): IO[Unit] =
-    store.playbackChanges
+    store.playbackStateChanges
       .dropWhile(_ != PlaybackState.Playing)
       .find(_ == PlaybackState.Stopped)
       .compile

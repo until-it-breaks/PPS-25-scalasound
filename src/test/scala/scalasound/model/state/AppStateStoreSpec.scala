@@ -22,8 +22,8 @@ class AppStateStoreSpec extends CatsEffectSuite:
   private val otherTrack =
     MonoTrack(48000, Vector(MonoChunk(Vector.empty))).fold(e => fail(e.toString), identity)
 
-  /** A fake store whose `changes` stream is a fixed list of states. Used to test `playbackChanges`
-    * / `trackChanges`, which only transform `changes`.
+  /** A fake store whose `changes` stream is a fixed list of states. Used to test the derived streams,
+    * which only transform `changes`.
     */
   private def storeEmitting(states: AppState*): AppStateStore =
     new AppStateStore:
@@ -59,14 +59,14 @@ class AppStateStoreSpec extends CatsEffectSuite:
     yield assertEquals(first.playbackState, PlaybackState.Playing)
   }
 
-  test("playbackChanges should drop repeated playback states") {
+  test("playbackStateChanges should drop repeated playback states") {
     val store = storeEmitting(
       base,
       base.copy(playbackState = PlaybackState.Playing),
       base.copy(playbackState = PlaybackState.Playing, chunkIndex = 1), // not a playback change
       base.copy(playbackState = PlaybackState.Paused)
     )
-    store.playbackChanges.compile.toList.map { result =>
+    store.playbackStateChanges.compile.toList.map { result =>
       assertEquals(
         result,
         List(PlaybackState.Stopped, PlaybackState.Playing, PlaybackState.Paused)
@@ -74,15 +74,20 @@ class AppStateStoreSpec extends CatsEffectSuite:
     }
   }
 
-  test("trackChanges should drop repeated tracks") {
+  test("playheadChanges should emit only when the track or the chunk index change") {
     val store = storeEmitting(
       base,
+      base.copy(playbackState = PlaybackState.Playing), // same track and chunk
       base.copy(track = Some(dummyTrack)),
-      base.copy(track = Some(dummyTrack), chunkIndex = 1), // same track
-      base.copy(track = Some(otherTrack))
+      base.copy(track = Some(dummyTrack), chunkIndex = 1),
+      base.copy(track = Some(dummyTrack), chunkIndex = 1, playbackState = PlaybackState.Paused),
+      base.copy(track = Some(otherTrack), chunkIndex = 1) // another track, same chunk index
     )
-    store.trackChanges.compile.toList.map { result =>
-      assertEquals(result, List(None, Some(dummyTrack), Some(otherTrack)))
+    store.playheadChanges.compile.toList.map { result =>
+      assertEquals(
+        result,
+        List((None, 0), (Some(dummyTrack), 0), (Some(dummyTrack), 1), (Some(otherTrack), 1))
+      )
     }
   }
 

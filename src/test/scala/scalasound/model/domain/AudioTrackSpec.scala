@@ -13,6 +13,18 @@ class AudioTrackSpec extends AnyFlatSpec with Matchers with EitherValues:
   private def mono(n: Int): MonoChunk     = MonoChunk(Vector.fill(n)(0f))
   private def stereo(n: Int): StereoChunk = StereoChunk(Vector.fill(n)(0f), Vector.fill(n)(0f))
 
+  "A chunk" should "be empty when all its channels have no samples" in:
+    mono(0).isEmpty shouldBe true
+    stereo(0).isEmpty shouldBe true
+
+  it should "not be empty when it has samples" in:
+    mono(1).isEmpty shouldBe false
+    stereo(1).isEmpty shouldBe false
+
+  it should "not be empty when only one channel of a stereo chunk has samples" in:
+    StereoChunk(Vector(0f), Vector.empty).isEmpty shouldBe false
+    StereoChunk(Vector.empty, Vector(0f)).isEmpty shouldBe false
+
   "A mono track with one chunk" should "last 'frames / sampleRate' seconds" in:
     MonoTrack(44100, Vector(mono(22050))).value.duration shouldBe 500.millis
 

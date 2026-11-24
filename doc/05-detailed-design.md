@@ -212,28 +212,50 @@ Casi limite:
 
 ## Controller
 
-I controller espongono alla view le operazioni dell'utente e le traducono in comandi per lo store.
+I controller sono il livello che collega la View al Model. Essi rispecchiano le azioni che l'utente può compiere sull'applicazione e le traducono in comandi per l'`AppStateStore`. Ne sono presenti uno per ciascun gruppo di azioni: riproduzione, effetti, importazione ed esportazione. I loro metodi restituiscono un valore `IO` di Cats Effect, che descrive l'azione (per esempio l'invio di un comando allo store) ma non la esegue. L'effetto avviene solo quando chi chiama il metodo esegue l'`IO`. La View lo fa con `unsafeRunAndForget`, che lo avvia su una fibra del runtime di Cats Effect e restituisce subito il controllo, senza bloccare il chiamante.
 
-- `PlaybackController` (play, pause, stop, seek) non contiene logica di stato: invia il comando corrispondente. Il seek converte i secondi nell'indice del chunk che contiene quel punto, riportando i valori fuori traccia al primo o all'ultimo chunk.
-- `EffectsController` invia `AddEffect` e `RemoveAllEffects`.
-- `LoadSaveController` è l'unico che gestisce operazioni lente. `load` e `save` restituiscono un `IO` che avvia l'operazione in background sotto un `Supervisor` e termina subito; la lettura, oppure l'elaborazione seguita dalla scrittura, è eseguita in `IO.blocking`. In esportazione il controller legge dallo stato la traccia e gli effetti attivi, ne ottiene la versione elaborata con l'`AudioProcessor` e la passa all'`AudioWriter`.
+Il compito di ciascun controller è il seguente:
 
-![Sequenza dell'importazione](doc/img/05-detailed-design/sequenza-importazione.png){ width=100% }
+- `PlaybackController` permette di controllare la riproduzione con play, pause, stop e seek. Il seek riceve una posizione in secondi, la converte nell'indice del chunk corrispondente (il primo o l'ultimo, se è fuori dalla traccia) e invia `SeekToIndex` con tale indice allo store.
+- `EffectsController` permette di aggiungere un effetto e di rimuoverli tutti, inviando `AddEffect` e `RemoveAllEffects`.
+- `LoadSaveController` permette di importare un file audio come traccia corrente e di esportare la traccia con gli effetti attivi. È l'unico controller con una logica complessa, poichè gestisce operazioni bloccanti. Esso interagisce con `AudioReader`, `AudioWriter` e `AudioProcessor`, e modifica lo stato impartendo i comandi `UpdateImport` e `UpdateExport` allo store. Per questo è descritto nella sezione seguente.
 
-L'esportazione segue lo stesso schema con tre differenze: legge dallo store la traccia e gli effetti attivi al momento della richiesta, fa elaborare la traccia dall'`AudioProcessor` prima di passarla all'`AudioWriter`, e non parte se un'importazione è in corso.
+\newpage
 
-Scelte di design per `LoadSaveController`:
+![Controller e metodi esposti](doc/img/05-detailed-design/controller-metodi.png){ width=70% }
 
-- un salvataggio lavora su una copia dell'`AppState` presa alla richiesta: il file contiene la traccia e gli effetti presenti in quel momento, anche se nel frattempo ne viene caricata un'altra o gli effetti cambiano;
-- se non ci sono effetti attivi l'elaborazione restituisce la traccia invariata, che viene scritta così com'è;
-- gli errori restituiti da reader, processore e writer e le eccezioni impreviste finiscono tutti in `Failed`, quindi la view riceve sempre un esito;
-- una richiesta di importazione o di esportazione è ignorata se un'operazione dello stesso tipo è già in corso, e un salvataggio è ignorato anche durante un'importazione; il controllo si basa su un `Ref` per ciascun tipo di operazione;
-- l'utente riporta lo stato a `Idle` con `acknowledgeImport` e `acknowledgeExport`, che hanno effetto solo se l'operazione è conclusa.
+### Importazione ed esportazione
+
+`LoadSaveController` riceve dall'esterno lo store, `AudioReader`, `AudioWriter` e `AudioProcessor`, e offre quattro operazioni:
+
+- `load(path)` importa il file audio indicato e lo rende la traccia corrente;
+- `save(path)` esporta la traccia corrente, con gli effetti attivi, nel file indicato;
+- `acknowledgeImport` e `acknowledgeExport` confermano l'esito di un'importazione o di un'esportazione, riportando lo stato a `Idle`.
+
+`load` e `save` avviano l'operazione in background e restituiscono subito il controllo, mentre il progresso e l'esito sono osservabili nell'`AppState`. Nell'applicazione sono usati `WavAudioReader`, `WavAudioWriter` e `AudioProcessorWithRules`.
+
+Durante l'importazione `importState` passa da `Idle` a `Importing` e poi a `Imported(track)` o `Failed(error)`. A lettura finita il controller aggiorna l'`AppState` con la nuova traccia, che ferma la riproduzione e mantiene gli effetti, oppure con l'errore.
+
+![Sequenza dell'importazione](doc/img/05-detailed-design/sequenza-importazione.png){ width=80% }
+
+Durante l'esportazione `exportState` passa da `Idle` a `Exporting` e poi a `Exported` o `Failed(error)`. L'esportazione segue lo stesso schema con tre differenze: legge dallo store la traccia e gli effetti correnti, fa elaborare la traccia dall'`AudioProcessor` prima di passarla all'`AudioWriter`, e non parte se un'importazione è in corso.
+
+![Sequenza dell'esportazione](doc/img/05-detailed-design/sequenza-esportazione.png){ width=75% }
+
+\newpage
+
+Scelte di design:
+
+- l'esportazione lavora su una copia dell'`AppState` presa alla richiesta. Il file di output contiene quindi la traccia elaborata con gli effetti presenti in quel momento, anche se durante l'operazione l'utente carica un'altra traccia o cambia gli effetti;
+- se non ci sono effetti attivi l'elaborazione restituisce la traccia originale;
+- gli errori restituiti da reader, processore e writer e le eccezioni impreviste finiscono tutti nello stato `Failed`, quindi l'osservatore degli stati di importazione ed esportazione riceve sempre un esito e reagire di conseguenza;
+- una richiesta di importazione o di esportazione è ignorata se un'operazione dello stesso tipo è già in corso. Inoltre una richiesta di esportazione è ignorata se è in corso un'importazione.
 
 Casi limite:
 
-- un salvataggio senza traccia caricata produce `Failed(NoTrackLoaded)`;
-- se manca l'estensione `.wav`, viene aggiunta; un file esistente è sovrascritto.
+- un'esportazione senza traccia caricata porta l'`AppState` nello stato `Failed`;
+- durante l'esportazione, se manca l'estensione `.wav` viene aggiunta e un file esistente con lo stesso nome viene sovrascritto;
+- alla chiusura dell'applicazione un'importazione o un'esportazione ancora in corso viene interrotta e non attesa.
 
 ## View
 
@@ -268,25 +290,7 @@ Casi limite:
 - `Echo` e `Autopan` sono creati dalla view senza la frequenza di campionamento della traccia, quindi usano il valore predefinito delle factory (44100 Hz);
 - se l'utente annulla un selettore di file non viene inviata nessuna richiesta.
 
-## Aspetti trasversali
-
-### Interfacce principali
-
-I componenti si conoscono solo attraverso i contratti seguenti: chi li usa non dipende dalle realizzazioni.
-
-| Interfaccia | Operazioni | Note |
-|--------------------|----------------------------------|------------------|
-| `AudioReader` | `load(filePath: String): Either[AudioLoadError, AudioTrack]` | operazione bloccante |
-| `AudioWriter` | `save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit]` | operazione bloccante |
-| `AudioProcessor` | `apply(chunk: AudioChunk, effects: List[AudioEffect], chunkIndex: Int): Either[AudioError, AudioChunk]`; `apply(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, AudioTrack]` | con lista di effetti vuota restituisce l'ingresso invariato |
-| `AudioOutput` | `write(chunk: AudioChunk, sampleRate: Int): IO[Unit]` | la scrittura termina quando l'uscita ha accettato il chunk |
-| `AudioPlayer` | `run(store: AppStateStore): Stream[IO, Unit]` | il flusso restituito, una volta avviato, osserva lo store e riproduce |
-| `AppStateStore` | `current: IO[AppState]`; `dispatch(command: Command): IO[AppState]`; `changes: Stream[IO, AppState]`; `playbackChanges`, `trackChanges`, `importStateChanges`, `exportStateChanges` | i flussi derivati emettono solo quando la parte di stato cambia davvero |
-| `PlaybackController` | `play`, `pause`, `stop`: `IO[Unit]`; `seek(positionSeconds: Double): IO[Unit]` | il posizionamento è in secondi |
-| `EffectsController` | `addEffect(effect: AudioEffect): IO[Unit]`; `removeAll(): IO[Unit]` | |
-| `LoadSaveController` | `load(path: Path)`, `save(path: Path)`, `acknowledgeImport`, `acknowledgeExport`: `IO[Unit]` | `load` e `save` avviano l'operazione in background e terminano subito |
-
-### Concorrenza e thread
+## Concorrenza e thread
 
 L'applicazione usa tre contesti di esecuzione, che comunicano soltanto attraverso `AppStateStore`:
 
@@ -302,7 +306,7 @@ Ne derivano tre regole:
 - le operazioni bloccanti non occupano mai il pool di calcolo, quindi il player e gli altri flussi continuano a girare;
 - lo stato condiviso è uno solo, `AppStateStore`, che serializza le modifiche in modo atomico.
 
-### Composizione dell'applicazione
+## Composizione dell'applicazione
 
 `AppSetup.make` costruisce il grafo degli oggetti in una `Resource`: store, controller, logiche della view, avvio del player in background e osservatori. Al termine, la `Resource` rilascia tutto in ordine. `Main` è un `def main` ordinario: alloca le dipendenze, lancia l'applicazione ScalaFX e rilascia le risorse alla chiusura.
 

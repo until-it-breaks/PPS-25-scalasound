@@ -2,6 +2,9 @@ package scalasound.model.domain
 
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 
+import scala.annotation.tailrec
+import scala.concurrent.duration.*
+
 /** Represents domain validation errors that can occur when constructing audio tracks. */
 enum AudioDomainError:
 
@@ -111,14 +114,50 @@ trait AudioTrack:
     */
   def chunks: Vector[AudioChunk]
 
-  /** Returns the total duration of the track in seconds. The duration is calculated by dividing the
-    * total number of frames by the sampling rate.
+  /** Returns the total duration of the track.
     *
     * @return
-    *   the duration in seconds
+    *   the duration of the track
     */
-  def durationInSeconds: Double =
-    frameCount.toDouble / sampleRate.value
+  def duration: FiniteDuration = positionAt(chunks.length)
+
+  /** Returns the time elapsed from the start of the track to the start of the chunk with the given
+    * index, which is the total duration of the chunks that precede it.
+    *
+    * An index equal to the number of chunks gives the duration of the whole track.
+    *
+    * @param chunkIndex
+    *   the index of the chunk
+    * @return
+    *   the position of the chunk start within the track
+    */
+  def positionAt(chunkIndex: Int): FiniteDuration =
+    val framesBefore = chunks.view.take(chunkIndex).map(_.frameCount.toLong).sum
+    FiniteDuration(framesBefore * 1_000_000_000L / sampleRate.value, NANOSECONDS)
+
+  /** Returns the index of the chunk that is playing at the given position.
+    *
+    * A position exactly on the boundary between two chunks belongs to the chunk that starts there.
+    * Positions before the start of the track give the first chunk, and positions past the end give
+    * the last one. A track without chunks always gives 0.
+    *
+    * @param position
+    *   the time elapsed from the start of the track
+    * @return
+    *   the index of the chunk that contains the position
+    */
+  def chunkIndexAt(position: FiniteDuration): Int =
+    val targetFrame = (position.toNanos * sampleRate.value / 1_000_000_000L).max(0L)
+    @tailrec
+    def loop(index: Int, framesBefore: Long): Int =
+      chunks.lift(index) match
+        case None =>
+          (chunks.length - 1).max(0)
+        case Some(chunk) if targetFrame < framesBefore + chunk.frameCount =>
+          index
+        case Some(chunk) =>
+          loop(index + 1, framesBefore + chunk.frameCount)
+    loop(0, 0L)
 
   /** Returns the total number of audio frames across all chunks.
     *

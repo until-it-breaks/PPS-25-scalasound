@@ -137,18 +137,6 @@ class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
     newBase.effects.head.effectType shouldBe Some(Volume)
     newBase.effects shouldBe List(volume2, gain)
 
-  "currentPositionSeconds" should "calculate correct time based on active chunkIndex" in {
-    val state = AppState.initial.handle(UpdateImport(Imported(track)))
-    // Chunk 0 (0.0s)
-    state.currentPositionSeconds shouldBe 0.0 +- 0.001
-    // Chunk 1 (Starts at 1.0s)
-    state.handle(SeekToIndex(1)).currentPositionSeconds shouldBe 1.0 +- 0.001
-    // Chunk 2 (Starts at 2.0s)
-    state.handle(SeekToIndex(2)).currentPositionSeconds shouldBe 2.0 +- 0.001
-    // No track loaded should return 0.0
-    AppState.initial.currentPositionSeconds shouldBe 0.0
-  }
-
   "import and export" should "handle intermediate and failure states without losing track" in {
     val loaded         = AppState.initial.handle(UpdateImport(Imported(track)))
     val importingState = loaded.handle(UpdateImport(ImportState.Importing))

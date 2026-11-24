@@ -30,3 +30,13 @@ enum AudioLoadError:
     *   a description of the I/O failure
     */
   case ReadFailure(reason: String)
+
+  /** No reader could be selected for the path, so the file was not opened.
+    *
+    * Unlike [[UnsupportedFormat]], which is about the content of a file that a reader inspected,
+    * this is about the path: its extension is missing, unknown or has no reader.
+    *
+    * @param cause
+    *   a description of why no reader could be selected
+    */
+  case UnresolvedFormat(cause: FormatResolutionError)

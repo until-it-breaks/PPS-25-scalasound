@@ -35,10 +35,12 @@ object AppSetup:
     )
 
   private def startPlayer(store: AppStateStore): Resource[IO, Unit] =
-    AudioPlayer
-      .streaming(AudioProcessorWithRules, AudioOutput.speakers)
-      .run(store)
-      .compile
-      .drain
-      .background
-      .map(_ => ())
+    for
+      out <- AudioOutput.speakers
+      _   <- AudioPlayer
+        .streaming(AudioProcessorWithRules, out)
+        .run(store)
+        .compile
+        .drain
+        .background
+    yield ()

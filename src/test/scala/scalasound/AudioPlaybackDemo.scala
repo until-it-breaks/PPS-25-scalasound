@@ -29,17 +29,16 @@ object AudioPlaybackDemo extends IOApp.Simple:
       _ <- IO.println(s"       - Total Chunks: ${track.chunks.length}")
       _ <- IO.println("[DEMO] Starting streaming audio player in the background...")
 
-      // Pick one output:
-      //   AudioOutput.speakers          real playback; the sound card paces the stream
-      //   AudioOutput.console           prints chunk info, no pacing (runs through the file instantly)
-      //   AudioOutput.console.paced     prints chunk info at real-time speed (headless demo)
-      //   AudioOutput.speakers.paced    works, but not recommended: the line already blocks, so you'd double the delay
-      player = AudioPlayer.streaming(SimpleAudioProcessor, AudioOutput.speakers)
-      _ <- player
-        .run(store)
-        .compile
-        .drain
-        .background
+      // Pick one output (a Resource, so the sound line is closed when the demo ends):
+      //   AudioOutput.speakers                      real playback; the sound card paces the stream
+      //   Resource.pure(AudioOutput.console)        prints chunk info, no pacing (runs through the file instantly)
+      //   Resource.pure(AudioOutput.console.paced)  prints chunk info at real-time speed (headless demo)
+      //   AudioOutput.speakers.map(_.paced)         works, but not recommended: the line already blocks, so you'd double the delay
+      output = AudioOutput.speakers
+      _ <- output
+        .flatMap(out =>
+          AudioPlayer.streaming(SimpleAudioProcessor, out).run(store).compile.drain.background
+        )
         .use { _ =>
           for
             _ <- IO.println("[DEMO] -> Dispatching Command.UpdateImport (Track Loaded)")

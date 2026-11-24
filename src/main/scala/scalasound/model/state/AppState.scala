@@ -137,15 +137,6 @@ final case class AppState(
   private def handleExport(state: ExportState): AppState =
     copy(exportState = state)
 
-  def currentPositionSeconds: Double =
-    track.fold(0.0) { track =>
-      val framesBeforeCurrent = track.chunks.view
-        .take(chunkIndex)
-        .map(_.frameCount.toLong)
-        .sum
-      framesBeforeCurrent.toDouble / track.sampleRate.value
-    }
-
 object AppState:
   /** Initial application state. */
   val initial: AppState = AppState(

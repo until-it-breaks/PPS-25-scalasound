@@ -40,13 +40,13 @@ object PlaybackController:
 
 private final class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
 
-  def play: IO[Unit] = store.dispatch(Play).void
+  override def play: IO[Unit] = store.dispatch(Play).void
 
-  def pause: IO[Unit] = store.dispatch(Pause).void
+  override def pause: IO[Unit] = store.dispatch(Pause).void
 
-  def stop: IO[Unit] = store.dispatch(Stop).void
+  override def stop: IO[Unit] = store.dispatch(Stop).void
 
-  def seek(position: FiniteDuration): IO[Unit] =
+  override def seek(position: FiniteDuration): IO[Unit] =
     for
       state <- store.current
       _     <- state.track match

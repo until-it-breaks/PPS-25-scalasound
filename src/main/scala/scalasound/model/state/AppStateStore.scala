@@ -10,6 +10,7 @@ given Eq[PlaybackState]             = Eq.fromUniversalEquals
 given Eq[ImportState]               = Eq.fromUniversalEquals
 given Eq[ExportState]               = Eq.fromUniversalEquals
 given Eq[(Option[AudioTrack], Int)] = Eq.fromUniversalEquals
+given Eq[(PlaybackState, Int)]      = Eq.fromUniversalEquals
 
 /** Storage abstraction for managing [[AppState]] and exposing real-time change streams. */
 trait AppStateStore:
@@ -27,6 +28,12 @@ trait AppStateStore:
   /** A dedicated stream for playback state changes only. */
   def playbackStateChanges: Stream[IO, PlaybackState] =
     changes.map(_.playbackState).changes
+
+  /** A dedicated stream of the states in which playback has to act: the current state, then each
+    * state whose playback state or chunk index differs from the previous one.
+    */
+  def playbackProgressChanges: Stream[IO, AppState] =
+    changes.changesBy(state => (state.playbackState, state.chunkIndex))
 
   /** A dedicated stream for the loaded track and the chunk the play head is on. */
   def playheadChanges: Stream[IO, (Option[AudioTrack], Int)] =

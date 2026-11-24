@@ -6,14 +6,8 @@ import fs2.Stream
 import munit.CatsEffectSuite
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.MonoTrack
-import scalasound.model.state.{
-  AppState,
-  AppStateStore,
-  Command,
-  ExportState,
-  ImportState,
-  PlaybackState
-}
+import scalasound.model.processing.AudioEffect
+import scalasound.model.state.*
 
 class AppStateStoreSpec extends CatsEffectSuite:
 
@@ -71,6 +65,26 @@ class AppStateStoreSpec extends CatsEffectSuite:
         result,
         List(PlaybackState.Stopped, PlaybackState.Playing, PlaybackState.Paused)
       )
+    }
+  }
+
+  test("playbackProgressChanges should emit only when the playback state or the chunk index change") {
+    val playing = base.copy(playbackState = PlaybackState.Playing)
+    val store = storeEmitting(
+      base,
+      base.copy(effects = List(AudioEffect.volume(0.5f))), // same playback state and chunk
+      playing,
+      playing.copy(effects = List(AudioEffect.volume(0.5f))), // same playback state and chunk
+      playing.copy(chunkIndex = 1),
+      playing.copy(chunkIndex = 1, playbackState = PlaybackState.Paused)
+    )
+    store.playbackProgressChanges.compile.toList.map { result =>
+      assertEquals(result.map(s => (s.playbackState, s.chunkIndex)), List(
+        (PlaybackState.Stopped, 0),
+        (PlaybackState.Playing, 0),
+        (PlaybackState.Playing, 1),
+        (PlaybackState.Paused, 1)
+      ))
     }
   }
 

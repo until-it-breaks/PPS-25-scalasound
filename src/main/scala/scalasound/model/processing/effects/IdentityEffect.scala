@@ -1,6 +1,7 @@
-package scalasound.model.processing
+package scalasound.model.processing.effects
 
 import scalasound.model.domain.AudioChunk
+import scalasound.model.processing.{AudioConfiguration, AudioError, StatelessAudioEffect}
 
 /* *** IDENTITY EFFECT *** */
 private[processing] case object IdentityEffect extends StatelessAudioEffect, AudioConfiguration:

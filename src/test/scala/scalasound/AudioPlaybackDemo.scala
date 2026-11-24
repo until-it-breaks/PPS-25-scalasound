@@ -3,7 +3,7 @@ package scalasound
 import cats.effect.{IO, IOApp}
 import scalasound.model.io.WavAudioReader
 import scalasound.model.player.{AudioOutput, AudioPlayer}
-import scalasound.model.processing.SimpleAudioProcessor
+import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
 
 import scala.concurrent.duration.DurationInt
@@ -34,7 +34,7 @@ object AudioPlaybackDemo extends IOApp.Simple:
       //   AudioOutput.console           prints chunk info, no pacing (runs through the file instantly)
       //   AudioOutput.console.paced     prints chunk info at real-time speed (headless demo)
       //   AudioOutput.speakers.paced    works, but not recommended: the line already blocks, so you'd double the delay
-      player = AudioPlayer.streaming(SimpleAudioProcessor, AudioOutput.speakers)
+      player = AudioPlayer.streaming(AudioProcessor.simple, AudioOutput.speakers)
       _ <- player
         .run(store)
         .compile

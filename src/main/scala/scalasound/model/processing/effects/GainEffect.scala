@@ -1,6 +1,7 @@
-package scalasound.model.processing
+package scalasound.model.processing.effects
 
 import scalasound.model.domain.AudioChunk
+import scalasound.model.processing.*
 
 /* *** GAIN EFFECT *** */
 private[processing] object GainEffect extends AudioConfiguration:

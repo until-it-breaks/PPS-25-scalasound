@@ -4,7 +4,7 @@ import cats.effect.std.Supervisor
 import cats.effect.{IO, Ref, Resource}
 import scalasound.model.domain.AudioTrack
 import scalasound.model.io.{AudioLoadError, AudioReader, AudioSaveError, AudioWriter}
-import scalasound.model.processing.{AudioEffect, AudioProcessor, AudioProcessorWithRules}
+import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.state.{AppStateStore, Command, ExportState, ImportState}
 
 import java.nio.file.Path
@@ -59,7 +59,7 @@ object LoadSaveController:
       store: AppStateStore,
       reader: AudioReader,
       writer: AudioWriter,
-      processor: AudioProcessor = AudioProcessorWithRules
+      processor: AudioProcessor = AudioProcessor.withRules
   ): Resource[IO, LoadSaveController] =
     for
       supervisor <- Supervisor[IO](await = false)

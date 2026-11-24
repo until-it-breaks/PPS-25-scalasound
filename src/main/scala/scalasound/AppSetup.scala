@@ -5,7 +5,7 @@ import cats.effect.unsafe.IORuntime
 import scalasound.controller.{EffectsController, LoadSaveController, PlaybackControllerImpl}
 import scalasound.model.io.{WavAudioReader, WavAudioWriter}
 import scalasound.model.player.{AudioOutput, AudioPlayer}
-import scalasound.model.processing.AudioProcessorWithRules
+import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.AppStateStore
 import scalasound.view.AppDependencies
 import scalasound.view.panels.effects.{EffectsControllerWrapper, EffectsLogic}
@@ -28,7 +28,7 @@ object AppSetup:
 
   private def startPlayer(store: AppStateStore): Resource[IO, Unit] =
     AudioPlayer
-      .streaming(AudioProcessorWithRules, AudioOutput.speakers)
+      .streaming(AudioProcessor.withRules, AudioOutput.speakers)
       .run(store)
       .compile
       .drain

@@ -6,6 +6,8 @@ import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Pan, Volume}
+import scalasound.model.processing.effects.{AutopanEffect, GainEffect}
+import scalasound.model.processing.processors.{AudioProcessorWithRules, SimpleAudioProcessor}
 
 /**
  * Test class containing all the checks for the different audio processors

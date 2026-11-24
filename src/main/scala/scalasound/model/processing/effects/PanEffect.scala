@@ -1,7 +1,8 @@
-package scalasound.model.processing
+package scalasound.model.processing.effects
 
-import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
+import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.model.processing.*
 
 /* *** PAN EFFECT *** */
 private[processing] object PanEffect extends AudioConfiguration:

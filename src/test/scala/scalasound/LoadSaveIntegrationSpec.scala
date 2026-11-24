@@ -6,7 +6,7 @@ import munit.CatsEffectSuite
 import scalafx.scene.control.Alert.AlertType
 import scalasound.controller.{EffectsController, LoadSaveController}
 import scalasound.model.io.{WavAudioReader, WavAudioWriter}
-import scalasound.model.processing.{AudioEffect, AudioProcessorWithRules}
+import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.state.{AppStateStore, ExportState, ImportState}
 import scalasound.view.panels.loadsave.LoadSaveLogic
 
@@ -122,7 +122,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
       val recorder = AlertRecorder()
 
       val activeEffect  = AudioEffect.gain(0.0f)
-      val expectedTrack = AudioProcessorWithRules
+      val expectedTrack = AudioProcessor.withRules
         .apply(track, List(activeEffect))
         .getOrElse(fail("Failed to apply effect in test setup."))
 

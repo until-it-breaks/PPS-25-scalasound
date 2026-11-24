@@ -6,6 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
 import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Pan, Volume}
+import scalasound.model.processing.effects.{AutopanEffect, EchoEffect}
 
 /**
  * Test class containing all the checks for the effects applied on an audio chunk.

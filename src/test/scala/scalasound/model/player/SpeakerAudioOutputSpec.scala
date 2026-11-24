@@ -3,9 +3,10 @@ package scalasound.model.player
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk
-import scalasound.model.player.SpeakerAudioOutput.toPcmBytes
+import scalasound.model.player.SpeakerAudioOutput.{Format, toPcmBytes}
 
 import java.nio.{ByteBuffer, ByteOrder}
+import javax.sound.sampled.AudioFormat
 
 class SpeakerAudioOutputSpec extends AnyFlatSpec with Matchers:
 
@@ -58,4 +59,32 @@ class SpeakerAudioOutputSpec extends AnyFlatSpec with Matchers:
 
   it should "produce no bytes for an empty chunk" in {
     AudioChunk.MonoChunk(Vector.empty).toPcmBytes shouldBe empty
+  }
+
+  "Format.bufferBytes" should "hold 200 ms of mono audio" in {
+    // 1 channel * 2 bytes * 44100 frames/s * 0.2 s
+    Format(44100, 1).bufferBytes shouldBe 17640
+  }
+
+  it should "double for stereo" in {
+    Format(44100, 2).bufferBytes shouldBe 35280
+  }
+
+  it should "scale with the sample rate" in {
+    Format(48000, 1).bufferBytes shouldBe 19200
+  }
+
+  "Format.toAudioFormat" should "describe 16-bit signed little-endian PCM" in {
+    val format = Format(44100, 2).toAudioFormat
+    format.getEncoding shouldBe AudioFormat.Encoding.PCM_SIGNED
+    format.getSampleSizeInBits shouldBe 16
+    format.getSampleRate shouldBe 44100f
+    format.getFrameRate shouldBe 44100f
+    format.getChannels shouldBe 2
+    format.isBigEndian shouldBe false
+  }
+
+  it should "use 2 bytes per frame for mono and 4 for stereo" in {
+    Format(44100, 1).toAudioFormat.getFrameSize shouldBe 2
+    Format(44100, 2).toAudioFormat.getFrameSize shouldBe 4
   }

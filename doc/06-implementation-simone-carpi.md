@@ -205,24 +205,31 @@ numerico dell'effetto all'interno dell'enum), è stata creata una associazione e
 il meccanismo dei `given`, è stata fornita una istanza di `Ordering[AudioEffect]` che viene passata implicitamente dal compilatore al metodo `.sorted` delle liste per ordinare gli effetti ricevuti.
 
 ```scala
-object AudioProcessorWithRules extends AudioProcessor:
-  
+private enum EffectPriority:
+  case IdentityEffect
+  case GainEffect
+  ...
+
+private[processing] object AudioProcessorWithRules extends AudioProcessor:
+
   given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
 
   private def orderingByPriority(effect: AudioEffect): Int = effect match
     case IdentityEffect => EffectPriority.IdentityEffect.ordinal
     case _: GainEffect => EffectPriority.GainEffect.ordinal
     ...
-
+  
+  private def sortEffects(effects: List[AudioEffect]): List[AudioEffect] =
+    if effects.length <= 1 then effects else effects.sorted
+  
   override protected def processChunk(chunk: AudioChunk,
                                       effects: List[AudioEffect],
                                       chunkIndex: Int): Either[AudioError, AudioChunk] =
-    super.processChunk(chunk, effects.sorted, chunkIndex)
-
-  private enum EffectPriority:
-    case IdentityEffect
-    case GainEffect
-    ...
+    super.processChunk(chunk, sortEffects(effects), chunkIndex)
+  
+  override protected def processTrack(track: AudioTrack,
+                                      effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
+    super.processTrack(track, sortEffects(effects))
 ```
 
 

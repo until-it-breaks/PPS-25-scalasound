@@ -76,9 +76,8 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
       val tempFile = Files.createTempFile("scalasound-wav-", ".wav")
 
       try
-        Using.resource(url.openStream()) { input =>
+        Using.resource(url.openStream()): input =>
           Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING)
-        }
 
         tempFile.toFile.deleteOnExit()
         tempFile.toAbsolutePath.toString
@@ -112,22 +111,20 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
   for fixture <- fixtures do
     val name = s"The WAV file ${fixture.resource.drop(1)}"
 
-    name should "be imported as a stereo track with the sample rate of the source" in {
+    name should "be imported as a stereo track with the sample rate of the source" in:
       val track = loadStereo(fixture.resource)
 
       track.sampleRate.value shouldBe sampleRate
-    }
 
-    name should "contain every frame of the source and a duration consistent with them" in {
+    name should "contain every frame of the source and a duration consistent with them" in:
       val track = loadStereo(fixture.resource)
 
       track.frameCount shouldBe fixture.frames.toLong
       track.chunks.map(_.left.length.toLong).sum shouldBe fixture.frames.toLong
       track.chunks.map(_.right.length.toLong).sum shouldBe fixture.frames.toLong
-      Math.abs(track.durationInSeconds - fixture.frames.toDouble / sampleRate) < 1e-9 shouldBe true
-    }
+      Math.abs(track.duration.toNanos - fixture.frames.toDouble * 1e9 / sampleRate) < 1.0 shouldBe true
 
-    name should "have well formed chunks: aligned channels, only the last one shorter" in {
+    name should "have well formed chunks: aligned channels, only the last one shorter" in:
       val chunks = loadStereo(fixture.resource).chunks
       chunks should not be empty
 
@@ -137,20 +134,17 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
 
       chunks.init.forall(_.left.length == chunkSize) shouldBe true
       chunks.last.left.length should (be > 0 and be <= chunkSize)
-    }
 
-    name should "match the reference samples at the start, middle and end of the track" in {
+    name should "match the reference samples at the start, middle and end of the track" in:
       val track = loadStereo(fixture.resource)
       val left  = fromNormalisedFloatToInt16(track.chunks.flatMap(_.left))
       val right = fromNormalisedFloatToInt16(track.chunks.flatMap(_.right))
 
-      fixture.spots.foreach { spot =>
+      fixture.spots.foreach: spot =>
         (left(spot.frameIndex), right(spot.frameIndex)) shouldBe
           (spot.leftSample, spot.rightSample)
-      }
-    }
 
-    name should "match the reference SHA-256 of the whole left and right sample sequences" in {
+    name should "match the reference SHA-256 of the whole left and right sample sequences" in:
       val track = loadStereo(fixture.resource)
 
       sha256OfInt16LittleEndian(
@@ -159,12 +153,10 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
       sha256OfInt16LittleEndian(
         fromNormalisedFloatToInt16(track.chunks.flatMap(_.right))
       ) shouldBe fixture.rightSha256
-    }
 
-    name should "only contain normalized samples in [-1.0, 1.0)" in {
+    name should "only contain normalized samples in [-1.0, 1.0)" in:
       val track = loadStereo(fixture.resource)
 
       track.chunks.forall(c =>
         (c.left ++ c.right).forall(s => s >= -1.0f && s < 1.0f)
       ) shouldBe true
-    }

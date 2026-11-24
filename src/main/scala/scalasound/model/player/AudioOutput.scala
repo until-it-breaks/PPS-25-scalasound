@@ -1,6 +1,6 @@
 package scalasound.model.player
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import scalasound.model.domain.AudioChunk
 
 import scala.concurrent.duration.{FiniteDuration, NANOSECONDS}
@@ -25,12 +25,20 @@ object AudioOutput:
   val console: AudioOutput = (chunk, sampleRate) =>
     IO.println(s"Playing ${chunk.kind} chunk with ${chunk.frameCount} frames @ $sampleRate Hz")
 
-  /** Plays chunks via the system sound card. */
-  def speakers: AudioOutput = SpeakerAudioOutput()
+  /** Plays chunks via the system sound card.
+    *
+    * The sound line is opened on the first write and closed when the resource is released. Each
+    * write blocks until the line's buffer has room for the chunk, so the audio advances at
+    * real-time speed.
+    */
+  def speakers: Resource[IO, AudioOutput] = SpeakerAudioOutput.make
 
   extension (out: AudioOutput)
     /** Returns an output that writes through `out`, then sleeps for the chunk's playback duration,
       * so the stream advances at real-time speed.
+      *
+      * Meant for outputs that return immediately, such as the console. Outputs that already block
+      * until the audio has been consumed, such as the speakers, do not need it.
       */
     def paced: AudioOutput = (chunk, sampleRate) =>
       for

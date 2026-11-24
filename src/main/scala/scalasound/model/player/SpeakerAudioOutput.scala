@@ -1,16 +1,17 @@
 package scalasound.model.player
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import scalasound.model.domain.AudioChunk
 
 import java.nio.{ByteBuffer, ByteOrder}
 import javax.sound.sampled.{AudioFormat, AudioSystem, SourceDataLine}
 
 /** An [[AudioOutput]] that plays [[AudioChunk]]s to the speakers using the Java Sound API.
-  *
-  * Keeps one [[SourceDataLine]] open and reuses it while the format (sample rate and channel count)
-  * stays the same; a format change drains and replaces it.
-  */
+ *
+ * Keeps one [[SourceDataLine]] open and reuses it while the format (sample rate and channel count)
+ * stays the same; a format change drains and replaces it. The line is closed by [[close]], which
+ * runs when the resource created by [[SpeakerAudioOutput.make]] is released.
+ */
 private final class SpeakerAudioOutput extends AudioOutput:
   import SpeakerAudioOutput.*
 
@@ -27,6 +28,13 @@ private final class SpeakerAudioOutput extends AudioOutput:
         line.write(bytes, 0, bytes.length)
       }
     yield ()
+
+  /** Plays the audio still in the line's buffer, then closes the line. */
+  private def close: IO[Unit] =
+    IO.blocking {
+      active.foreach(current => release(current.line))
+      active = None
+    }
 
   private def lineFor(format: Format): SourceDataLine =
     active.filter(_.format == format) match
@@ -50,6 +58,11 @@ private final class SpeakerAudioOutput extends AudioOutput:
     line.close()
 
 private object SpeakerAudioOutput:
+
+  /** Creates a [[SpeakerAudioOutput]] that closes its sound line when the resource is released. */
+  def make: Resource[IO, AudioOutput] =
+    Resource.make[IO, SpeakerAudioOutput](IO(SpeakerAudioOutput()))(_.close)
+
   private val BitsPerSample  = 16
   private val BytesPerSample = BitsPerSample / 8
   private val MaxAmplitude   = Short.MaxValue.toFloat
@@ -57,7 +70,7 @@ private object SpeakerAudioOutput:
 
   private final case class ActiveLine(format: Format, line: SourceDataLine)
 
-  private final case class Format(sampleRate: Int, channels: Int):
+  private[player] final case class Format(sampleRate: Int, channels: Int):
     def bufferBytes: Int = channels * BytesPerSample * sampleRate * BufferMillis / 1000
 
     def toAudioFormat: AudioFormat =

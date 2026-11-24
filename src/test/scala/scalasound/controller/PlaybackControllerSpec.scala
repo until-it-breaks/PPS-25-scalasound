@@ -5,6 +5,8 @@ import munit.CatsEffectSuite
 import scalasound.model.domain.{AudioChunk, MonoTrack}
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
 
+import scala.concurrent.duration.*
+
 class PlaybackControllerSpec extends CatsEffectSuite:
 
   private val sampleRate     = 1000
@@ -20,7 +22,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
     for
       store <- AppStateStore.make
       _     <- store.dispatch(Command.UpdateImport(ImportState.Imported(track)))
-    yield (store, PlaybackControllerImpl(store))
+    yield (store, PlaybackController(store))
 
   test("play starts playback when a track is loaded") {
     for
@@ -33,7 +35,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("play does nothing when no track is loaded") {
     for
       store <- AppStateStore.make
-      _     <- PlaybackControllerImpl(store).play
+      _     <- PlaybackController(store).play
       state <- store.current
     yield assertEquals(state.playbackState, PlaybackState.Stopped)
   }
@@ -41,7 +43,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("pause keeps the position") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(2.5)
+      _                   <- controller.seek(2500.millis)
       _                   <- controller.play
       _                   <- controller.pause
       state               <- store.current
@@ -53,7 +55,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("stop resets the play head to the start") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(2.5)
+      _                   <- controller.seek(2500.millis)
       _                   <- controller.play
       _                   <- controller.stop
       state               <- store.current
@@ -65,7 +67,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("seek moves to the chunk that corresponds to that given time in seconds") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(2.5)
+      _                   <- controller.seek(2500.millis)
       state               <- store.current
     yield assertEquals(state.chunkIndex, 2) // 2.5 s falls in chunk 2
   }
@@ -73,7 +75,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("seek to a chunk boundary picks the chunk that starts there") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(3.0)
+      _                   <- controller.seek(3.seconds)
       state               <- store.current
     yield assertEquals(state.chunkIndex, 3)
   }
@@ -81,8 +83,8 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("seek to 0 goes to the first chunk") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(2.5)
-      _                   <- controller.seek(0.0)
+      _                   <- controller.seek(2500.millis)
+      _                   <- controller.seek(Duration.Zero)
       state               <- store.current
     yield assertEquals(state.chunkIndex, 0)
   }
@@ -90,7 +92,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("seek past the end goes to the last chunk") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(100.0)
+      _                   <- controller.seek(100.seconds)
       state               <- store.current
     yield assertEquals(state.chunkIndex, chunkCount - 1)
   }
@@ -98,8 +100,8 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("seek to a negative position goes to the first chunk") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(2.5)
-      _                   <- controller.seek(-5.0)
+      _                   <- controller.seek(2500.millis)
+      _                   <- controller.seek((-5).seconds)
       state               <- store.current
     yield assertEquals(state.chunkIndex, 0)
   }
@@ -107,7 +109,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("seek works while stopped and does not start playback") {
     for
       (store, controller) <- setupWithTrack
-      _                   <- controller.seek(1.5)
+      _                   <- controller.seek(1500.millis)
       state               <- store.current
     yield
       assertEquals(state.playbackState, PlaybackState.Stopped)
@@ -117,7 +119,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   test("seek does nothing when no track is loaded") {
     for
       store <- AppStateStore.make
-      _     <- PlaybackControllerImpl(store).seek(10.0)
+      _     <- PlaybackController(store).seek(10.seconds)
       state <- store.current
     yield assertEquals(state.chunkIndex, 0)
   }

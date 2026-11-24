@@ -96,7 +96,7 @@ Casi limite:
 
 ### Store dello stato
 
-`AppStateStore` è l'unico punto in cui `AppState` viene letto e modificato. Viene creato una sola volta alla composizione dell'applicazione e la stessa istanza è condivisa da `AudioPlayer`, Controller e View, che comunicano solo attraverso di esso. Internamente conserva lo stato in un `SignallingRef` di FS2. Un `Ref` di Cats Effect è un riferimento modificabile in modo atomico, sicuro da usare da più fibre senza lock espliciti né thread bloccati. Il `SignallingRef` lo estende con la capacità di segnalare ogni aggiornamento attraverso uno `Stream` di FS2, che lo store espone come `changes`. Le sue operazioni sono:
+`AppStateStore` è l'unico punto in cui `AppState` viene letto e modificato. Viene creato una sola volta all'avvio dell'applicazione e la stessa istanza è condivisa da `AudioPlayer`, Controller e View, che comunicano solo attraverso di esso. Internamente conserva lo stato in un `SignallingRef` di FS2. Un `Ref` di Cats Effect è un riferimento modificabile in modo atomico, sicuro da usare da più fibre senza lock espliciti né thread bloccati. Il `SignallingRef` lo estende con la capacità di segnalare ogni aggiornamento attraverso uno `Stream` di FS2, che lo store espone come `changes`. Le sue operazioni sono:
 
 - `current`, che restituisce l'`AppState` corrente;
 - `dispatch(command)`, che applica il comando con `AppState.handle` e restituisce il `AppState`;
@@ -140,7 +140,7 @@ Chi lo usa sceglie una delle due varianti e chiama `apply`, che esiste con due s
 
 Scelte di design:
 
-- per implementare un nuovo effetto si estende uno dei due sottotipi (`StatelessAudioEffect` o `TimeAudioEffect`), lo si registra in `AudioEffectType` e gli si assegna una priorità.
+- per implementare un nuovo effetto si estende uno dei due sottotipi (`StatelessAudioEffect` o `TimeAudioEffect`), lo si registra in `AudioEffectType` e gli si assegna una priorità;
 - l'ordine fisso ha una motivazione sonora, spiegata nei requisiti: il guadagno precede la distorsione perché più il segnale in ingresso è forte, più la distorsione lo satura; l'eco ripete il suono già distorto; pan e autopan spostano nello spazio stereofonico anche le ripetizioni mentre il volume regola per ultimo il livello finale;
 - quando l'applicazione di un effetto fallisce, l'elaborazione si interrompe e l'errore, che riporta il nome dell'effetto, arriva al chiamante.
 
@@ -154,7 +154,7 @@ Casi limite:
 
 ### Motore di riproduzione
 
-`AudioPlayer` è il contratto del motore di riproduzione: ha il solo metodo `run(store)`, che restituisce uno `Stream` che descrive il ciclo di vita del player, cioè l'ascolto dell'`AppState` e la riproduzione dei chunk. La sua implementazione, `StreamingAudioPlayer`, non ha uno stato proprio poichè osserva l'`AppStateStore` e agisce di conseguenza, elaborando ogni chunk subito prima di suonarlo. Riceve alla creazione un `AudioProcessor` che applica gli effetti a ogni chunk e un `AudioOutput` che lo porta in uscita. Lo store gli viene fornito solo quando viene avviato, con `run(store)`.
+`AudioPlayer` è il contratto del motore di riproduzione: ha il solo metodo `run(store)`, che restituisce uno `Stream` che descrive il ciclo di vita del player, cioè l'ascolto dell'`AppState` e la riproduzione dei chunk. La sua implementazione, `StreamingAudioPlayer`, non ha uno stato proprio poiché osserva l'`AppStateStore` e agisce di conseguenza, elaborando ogni chunk subito prima di suonarlo. Riceve alla creazione un `AudioProcessor` che applica gli effetti a ogni chunk e un `AudioOutput` che lo porta in uscita. Lo store gli viene fornito solo quando viene avviato, con `run(store)`.
 
 ![Dipendenze del motore di riproduzione](doc/img/05-detailed-design/dipendenze-player.png){ width=95% }
 
@@ -218,7 +218,7 @@ Il compito di ciascun controller è il seguente:
 
 - `PlaybackController` permette di controllare la riproduzione con play, pause, stop e seek. Il seek riceve una posizione in secondi, la converte nell'indice del chunk corrispondente (il primo o l'ultimo, se è fuori dalla traccia) e invia `SeekToIndex` con tale indice allo store.
 - `EffectsController` permette di aggiungere un effetto e di rimuoverli tutti, inviando `AddEffect` e `RemoveAllEffects`.
-- `LoadSaveController` permette di importare un file audio come traccia corrente e di esportare la traccia con gli effetti attivi. È l'unico controller con una logica complessa, poichè gestisce operazioni bloccanti. Esso interagisce con `AudioReader`, `AudioWriter` e `AudioProcessor`, e modifica lo stato impartendo i comandi `UpdateImport` e `UpdateExport` allo store. Per questo è descritto nella sezione seguente.
+- `LoadSaveController` permette di importare un file audio come traccia corrente e di esportare la traccia con gli effetti attivi. È l'unico controller con una logica complessa, poiché gestisce operazioni bloccanti. Esso interagisce con `AudioReader`, `AudioWriter` e `AudioProcessor`, e modifica lo stato impartendo i comandi `UpdateImport` e `UpdateExport` allo store. Per questo è descritto nella sezione seguente.
 
 \newpage
 
@@ -259,55 +259,30 @@ Casi limite:
 
 ## View
 
-La view non modifica lo stato: ascolta gli stream dello store e invia richieste ai controller. Ogni pannello è diviso in due parti: i widget, che descrivono solo l'aspetto, e una classe di logica, che li collega ai controller e li aggiorna in base allo stato.
+L'interfaccia è realizzata con ScalaFX, un wrapper Scala di JavaFX, ed è una finestra unica, divisa in tre zone, una per ciascuna funzionalità: importazione ed esportazione, riproduzione e controllo degli effetti. Ogni zona ospita un pannello, composto da elementi grafici, che descrivono solo l'aspetto, e da una classe di logica, che li collega ai controller e li aggiorna in base ai flussi di stato provenienti dall'`AppStateStore`.
 
-| Pannello | Widget | Logica |
-|--------------------|--------------------------------|--------------------------|
-| Riproduzione | `TrackBox` | `TrackBoxLogic` |
-| Effetti | `EffectsPanelContainer` | `EffectsLogic` |
-| Importazione ed esportazione | `TitlePane` | `LoadSaveLogic` |
+| Zona | Elementi grafici | Logica | Contenuto                                                                |
+|----------|------------------------------|----------------------|--------------------------------------|
+| In alto | `TitlePane` | `LoadSaveLogic` | titolo, stato di importazione ed esportazione, pulsanti Import ed Export |
+| Al centro | `TrackBox` | `TrackBoxLogic` | stato di avanzamento e comandi di riproduzione                           |
+| In basso | `EffectsPanelContainer` | `EffectsLogic` | controlli degli effetti                                                  |
 
-La finestra è un `BorderPane` a tre zone:
+Le classi di logica seguono uno schema comune. Il metodo `attach` collega gli elementi grafici ai controller, così ogni azione dell'utente diventa una chiamata a un controller. Il metodo `observe` invece effettua l'iscrizione ai flussi dello store e aggiorna l'interfaccia grafica a ogni cambiamento di stato. È un `IO` che non termina finché i flussi restano aperti, quindi si tratta di un effetto da avviare in background. In `LoadSaveLogic` si occupa di esporre gli esiti di importazione ed esportazione e di abilitare o disabilitare i pulsanti in coerenza con lo stato, mentre in `TrackBoxLogic` aggiorna la barra che rappresenta l'avanzamento della traccia. `EffectsLogic` non ha tale metodo, perché si limita a tradurre le azioni su pulsanti e cursori in effetti da aggiungere. Poiché `observe` è eseguito in background su una fibra e contiene la logica di aggiornamento dell'interfaccia grafica, tali modifiche vanno eseguite sul thread JavaFX, e quindi inoltrate con `Platform.runLater` o altri meccanismi equivalenti.
 
-- in alto `TitlePane`, con il titolo, un'etichetta di stato per importazione ed esportazione e i pulsanti Import ed Export;
-- al centro `TrackBox`, con la timeline, le etichette del tempo iniziale e finale e i pulsanti Play, Pause e Stop;
-- in basso `EffectsPanelContainer`, con tre riquadri e il pulsante che ripristina tutti gli effetti: `VolumeGainBox` (volume e gain), `DistortionPanBox` (distortion, con la scelta tra `tanh` e `sin`, e pan) ed `EchoAutopanBox` (attenuazione e ritardo dell'eco e frequenza dell'autopan).
+![Classi di logica della view e loro dipendenze](doc/img/05-detailed-design/classi-logica-view.png){ width=70% }
 
-Il comportamento di ogni pannello è nella sua logica:
+## Avvio dell'applicazione
 
-- `TrackBoxLogic` collega i pulsanti e la timeline ai controller e aggiorna posizione ed etichette in base allo stato;
-- `EffectsLogic` collega i cursori ai controller, attraverso `EffectsControllerWrapper`, e invia l'effetto corrispondente;
-- `LoadSaveLogic` collega i pulsanti Import ed Export di `TitlePane` ai controller, con i selettori di file, e si iscrive agli stati di importazione ed esportazione: aggiorna l'etichetta e i pulsanti di `TitlePane` e mostra un avviso di riuscita o di errore, con i messaggi definiti in un unico punto (`ErrorMessages`); dopo l'avviso conferma l'esito al controller con `acknowledgeImport` o `acknowledgeExport`.
+L'applicazione è assemblata nella radice dei package da due classi con compiti distinti.
 
-Scelte di design:
+`AppSetup.make` costruisce il grafo degli oggetti in una `Resource` e svolge i seguenti compiti:
 
-- `EffectsControllerWrapper` nasconde l'esecuzione dell'`IO` dei controller degli effetti (`unsafeRunAndForget`), così `EffectsLogic` chiama semplici metodi;
-- `LoadSaveLogic` riceve per iniezione le funzioni che eseguono gli aggiornamenti sul thread JavaFX (`runOnGUIThread`) e mostrano gli avvisi (`showAlert`): così la sua logica si può verificare senza avviare l'interfaccia;
-- i widget non conoscono i controller né lo store: tutto il collegamento è nelle classi di logica.
+- crea un unico `AppStateStore`;
+- sceglie le implementazioni concrete (`WavAudioReader` e `WavAudioWriter` per i file, `AudioProcessorWithRules` per l'elaborazione e `SpeakerAudioOutput` per l'uscita audio) e le collega con i costruttori;
+- costruisce i controller e le logiche della view;
+- avvia in background lo `StreamingAudioPlayer` e gli osservatori della view, che partono solo quando la finestra è pronta;
+- restituisce alla View le sole logiche, raccolte in `AppDependencies`.
 
-Casi limite:
-
-- `Echo` e `Autopan` sono creati dalla view senza la frequenza di campionamento della traccia, quindi usano il valore predefinito delle factory (44100 Hz);
-- se l'utente annulla un selettore di file non viene inviata nessuna richiesta.
-
-## Concorrenza e thread
-
-L'applicazione usa tre contesti di esecuzione, che comunicano soltanto attraverso `AppStateStore`:
-
-- il **thread JavaFX** esegue la view: i gestori dei controlli (`TrackBoxLogic`, `EffectsLogic`, `LoadSaveLogic`) partono da qui, e gli aggiornamenti dei widget vi devono tornare con `Platform.runLater`;
-- le **fibre di Cats Effect**, sul pool di calcolo, eseguono i metodi in `PlaybackController`, `EffectsController` e `LoadSaveController`, il ciclo di `StreamingAudioPlayer` e gli osservatori della view (`TrackBoxLogic.observe`, `LoadSaveLogic.observe`), che si iscrivono ai flussi dello store;
-- il **pool dei compiti bloccanti** esegue le operazioni che attendono il sistema, con `IO.blocking`: `WavAudioReader` e `WavAudioWriter` per i file e `SpeakerAudioOutput` per la scrittura sulla linea audio.
-
-![Contesti di esecuzione e passaggi tra di essi](doc/img/05-detailed-design/contesti-esecuzione.png){ width=80% }
-
-Ne derivano tre regole:
-
-- la view avvia i controller con `unsafeRunAndForget` (direttamente nelle classi di logica, oppure attraverso `EffectsControllerWrapper`), senza attenderne il risultato, così l'interfaccia non si blocca durante le operazioni lunghe;
-- le operazioni bloccanti non occupano mai il pool di calcolo, quindi il player e gli altri flussi continuano a girare;
-- lo stato condiviso è uno solo, `AppStateStore`, che serializza le modifiche in modo atomico.
-
-## Composizione dell'applicazione
-
-`AppSetup.make` costruisce il grafo degli oggetti in una `Resource`: store, controller, logiche della view, avvio del player in background e osservatori. Al termine, la `Resource` rilascia tutto in ordine. `Main` è un `def main` ordinario: alloca le dipendenze, lancia l'applicazione ScalaFX e rilascia le risorse alla chiusura.
+`Main` è il punto di ingresso dell'applicazione. Alloca le dipendenze con `AppSetup.make`, poi lancia l'applicazione ScalaFX, che ha un proprio ciclo di vita: la finestra è costruita in `start` e il programma resta in esecuzione finché non viene chiusa. Alla chiusura rilascia la `Resource`, che interrompe le attività in background e libera le risorse.
 
 \newpage

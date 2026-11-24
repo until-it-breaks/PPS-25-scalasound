@@ -1,8 +1,8 @@
 package scalasound
 
-import cats.effect.{IO, Resource}
 import cats.effect.unsafe.IORuntime
-import scalasound.controller.{EffectsController, LoadSaveController, PlaybackControllerImpl}
+import cats.effect.{IO, Resource}
+import scalasound.controller.{EffectsController, LoadSaveController, PlaybackController}
 import scalasound.model.io.{AudioFormatRegistry, WavAudioFormat}
 import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.AudioProcessorWithRules
@@ -18,10 +18,9 @@ object AppSetup:
       store              <- Resource.eval(AppStateStore.make)
       formats            <- Resource.eval(supportedFormats)
       loadSaveController <- LoadSaveController.make(store, formats)
-      loadSaveLogic      = LoadSaveLogic(store, loadSaveController)
-      trackBoxLogic      = TrackBoxLogic(store, PlaybackControllerImpl(store))
-      effectsWrapper       = EffectsControllerWrapper(EffectsController(store))
-      effectsLogic       = EffectsLogic(effectsWrapper)
+      loadSaveLogic = LoadSaveLogic(store, loadSaveController)
+      trackBoxLogic = TrackBoxLogic(store, PlaybackController(store))
+      effectsLogic  = EffectsLogic(EffectsControllerWrapper(EffectsController(store)))
       _ <- startPlayer(store)
       _ <- (ready >> loadSaveLogic.observe).background
       _ <- (ready >> trackBoxLogic.observe).background

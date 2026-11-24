@@ -1,4 +1,4 @@
-## Implementazione - Simone Carpi
+## Simone Carpi
 
 ### Panoramica dei contributi
 
@@ -16,8 +16,8 @@ Il mio contributo al progetto si è focalizzato nelle seguenti aree:
   associata agli effetti.
 - **Testing**: definizione e implementazione di tutti i test relativi agli effetti, ai processori e al controller.
 
----
 
+\
 ### Effetti
 
 Gli effetti audio trasformazioni matematiche applicate alla traccia presa in carico (costituita da un insieme
@@ -149,8 +149,8 @@ dei casi noti, mentre restituirà un `None` per tutti gli effetti non specificat
         case _: AutopanEffect    => AudioEffectType.Autopan
         case _: VolumeEffect     => AudioEffectType.Volume
 ```
----
 
+\
 ### Processori Audio
 Il processore audio è il componente responsabile dell'applicazione sequenziale degli effetti sui singoli *chunk* e
 viene modellato tramite il `trait` `AudioProcessor`. Il contratto contiene due implementazioni disitinte del metodo `apply`, 
@@ -225,8 +225,8 @@ object AudioProcessorWithRules extends AudioProcessor:
     ...
 ```
 
----
 
+\
 ### Logica degli effetti
 `EffectsLogic` si occupa di gestire i widget, nello specifico sliders e bottoni, degli effetti che l'utente può applicare in tempo reale all'interno dell'applicazione.
 Il compito di questa componente è di inviare al relativo controller le azioni dell'utente e adattare i cambiamenti di stato nelle *label* dei widget.

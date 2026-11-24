@@ -12,7 +12,7 @@ Per il testing sono stati usati due framework e uno strumento per misurare la co
 
 Il team **non ha adottato il TDD** poichè si trattava del primo progetto in Scala per i membri del gruppo, e la scarsa dimestichezza sia con il linguaggio sia con lo stack di librerie (`cats-effect`, `fs2`) rendeva poco praticabile scrivere i test prima del codice. Si è quindi scelto di scrivere i test dopo l'implementazione, una volta stabilizzate le interfacce dei componenti.
 
-L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 199 test e una copertura del *91.28%* a livello di statement e dell'*87.50%* a livello di branch.
+L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 199 test e una copertura del *93.02%* a livello di statement e dell'*90.40%* a livello di branch.
 
 Le suite in `src/test` sono di tipologie diverse, riassunte nella tabella seguente.
 
@@ -56,21 +56,23 @@ La coverage è misurata con sbt-scoverage, escludendo il package `view` e i punt
 
 | Metrica                  | Valore                                 |
 |--------------------------|----------------------------------------|
-| Numero di test           | 199 (139 ScalaTest + 60 MUnit)         |
-| Statement coverage       | 91.28 % (973 / 1067)                   |
-| Branch coverage          | 87.50 % (140 / 160)                    |
-| Righe di codice misurate | 1945 in 25 file, 37 classi, 189 metodi |
+| Numero di test           | 294 (224 ScalaTest + 70 MUnit)         |
+| Statement coverage       | 93.02 % (1146 / 1232)                  |
+| Branch coverage          | 90.40 % (160 / 177)                    |
+| Righe di codice misurate | 2468 in 32 file, 45 classi, 229 metodi |
 
-| Package                       | Statement coverage |
-|-------------------------------|--------------------|
-| `scalasound.controller`       | 96.88 %            |
-| `scalasound.model.domain`     | 89.74 %            |
-| `scalasound.model.io`         | 89.83 %            |
-| `scalasound.model.player`     | 65.62 %            |
-| `scalasound.model.processing` | 95.86 %            |
-| `scalasound.model.state`      | 100.00 %           |
+| Package                                   | Statement coverage |
+|-------------------------------------------|--------------------|
+| `scalasound.controller`                   | 90.32 %            |
+| `scalasound.model.domain`                 | 98.86 %            |
+| `scalasound.model.io`                     | 94.21 %            |
+| `scalasound.model.player`                 | 66.91 %            |
+| `scalasound.model.processing`             | 97.20 %            |
+| `scalasound.model.processing.effects`     | 100.00 %           |
+| `scalasound.model.processing.processors`  | 100.00 %           |
+| `scalasound.model.state`                  | 100.00 %           |
 
-Il package `scalasound.model.player` è coperto al 65.62% poichè la parte non testata si concentra in `SpeakerAudioOutput`, in particolare per quanto riguarda la gestione della `SourceDataLine` di Java Sound API (apertura, uso e riapertura al cambio di formato), che si interfaccia con la scheda audio del sistema fisico. È stata invece testata la codifica degli `AudioChunk` in byte da inviare alla libreria suddetta. La fedeltà acustica dell'audio in output è stata verificata manualmente con la demo di riproduzione (`AudioPlaybackDemo`).
+Il package `scalasound.model.player` è coperto al 66.91% poichè la parte non testata si concentra in `SpeakerAudioOutput`, in particolare per quanto riguarda la gestione della `SourceDataLine` di Java Sound API (apertura, uso e riapertura al cambio di formato), che si interfaccia con la scheda audio del sistema fisico. È stata invece testata la codifica degli `AudioChunk` in byte da inviare alla libreria suddetta. La fedeltà acustica dell'audio in output è stata verificata manualmente con la demo di riproduzione (`AudioPlaybackDemo`).
 
 ## Esempi rilevanti
 

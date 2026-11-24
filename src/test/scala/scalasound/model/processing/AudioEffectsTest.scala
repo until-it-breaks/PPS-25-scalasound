@@ -104,7 +104,14 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val resultChunk = AudioEffect.pan(pan)(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
-  "PanEffect" should "disable right channel when the min pan value is inserted" in :
+    val stereoChunk = StereoChunk(
+      Vector.fill(sizeChunk)(defaultValueChunk),
+      Vector.fill(sizeChunk)(defaultValueChunk)
+    )
+    val resultStereoChunk = AudioEffect.pan(pan)(stereoChunk)
+    resultStereoChunk.value shouldBe a [StereoChunk]
+
+  it should "disable right channel when the min pan value is inserted" in :
     val pan = Config.PanConfig.min
     val resultChunk = AudioEffect.pan(pan)(chunk)
     resultChunk.value.channels(1) shouldBe Vector.fill(sizeChunk)(0.0f)
@@ -211,6 +218,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     // Since the size of the defaultChunk is 10, to guarantee a correct verification
     // of the IIR approach it used a sample rate of 1000Hz and a delay of 10ms.
     // So, for 10 samples is necessary a 10ms delay.
+    // Nsamples delayed = (delay / 1000ms) * sampleRate
     val sampleRate = 1000.0f //Hz
     val delay = 10 //ms
     val alpha = (Config.AlphaConfig.min + Config.AlphaConfig.max) / 2
@@ -229,3 +237,27 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     // because it was instantiated in the same way as the default chunk.
     val expectedSampleValue = defaultValueChunk + (alpha * defaultValueChunk)
     secondChunk.value.channels.head shouldBe Vector.fill(sizeChunk)(expectedSampleValue)
+
+  it should "apply the Infinite Impulse Response (IIR) to a StereoChunk" in:
+    val sampleRate = 100.0f //Hz
+    val delay = 20 //ms
+    val alpha = (Config.AlphaConfig.min + Config.AlphaConfig.max) / 2
+    val nSamples = ((delay / 1000.0f) * sampleRate).toInt
+    val leftValue = defaultValueChunk
+    val rightValue = defaultValueChunk / 2
+    val stereoChunk = StereoChunk(
+      Vector.fill(nSamples)(leftValue),
+      Vector.fill(nSamples)(rightValue)
+    )
+
+    val echoEffect = EchoEffect(alpha, delay, sampleRate)
+    val firstChunk = echoEffect(stereoChunk, chunkIndex = 0)
+    firstChunk.value.channels shouldBe stereoChunk.channels
+
+    val secondChunk = echoEffect(stereoChunk, chunkIndex = 1)
+    val expectedLeftValue = leftValue + (alpha * leftValue)
+    val expectedRightValue = rightValue + (alpha * rightValue)
+    secondChunk.value.channels shouldBe Vector(
+      Vector.fill(nSamples)(expectedLeftValue),
+      Vector.fill(nSamples)(expectedRightValue)
+    )

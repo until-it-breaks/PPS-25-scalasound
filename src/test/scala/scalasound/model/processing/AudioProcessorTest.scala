@@ -95,6 +95,10 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     val resultTrack = SimpleAudioProcessor(track, emptyEffects)
     resultTrack.value shouldBe track
 
+  it should "return the correct type of AudioProcessor by factory" in:
+    AudioProcessor.simple shouldBe a [SimpleAudioProcessor.type]
+    AudioProcessor.withRules shouldBe a [AudioProcessorWithRules.type]
+
   "SimpleAudioProcessor" should "apply the effects in the same order " +
     "in which they were added to the list" in:
     val resultChunk = SimpleAudioProcessor(chunk, simpleEffectsList, StartingIndex)

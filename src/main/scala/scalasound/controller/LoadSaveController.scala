@@ -3,7 +3,6 @@ package scalasound.controller
 import cats.effect.std.Supervisor
 import cats.effect.{IO, Ref, Resource}
 import scalasound.model.domain.AudioTrack
-import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.io.{AudioFormatRegistry, AudioLoadError, AudioSaveError}
 import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.state.{AppStateStore, Command, ExportState, ImportState}

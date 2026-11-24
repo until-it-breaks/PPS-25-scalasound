@@ -37,3 +37,11 @@ enum AudioSaveError:
 
   /** There is no track to export. */
   case NoTrackLoaded
+
+  /** No writer could be selected for the destination, so nothing was written.
+    *
+    * @param cause
+    *   a description of why no writer was selected: the extension is missing, unknown or has no
+    *   writer
+    */
+  case UnresolvedFormat(cause: FormatResolutionError)

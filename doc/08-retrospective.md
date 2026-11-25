@@ -88,12 +88,29 @@ completare il modello MVC.
 ## Sprint 4
 
 ### Descrizione dell'andamento dello sviluppo
+L'ultimo sprint è stato necessario per rifinire il codice (pulizia e refactoring), migliorare i test, finalizzare il report
+e generare gli eseguibili. 
 
 ### Backlog
+- Collegamento della logica di riproduzione alla GUI e refactoring dell'entry point (completato in 2 ore da JS)
+- Refactoring di `AudioOutput`, `AudioPlayer` e `SpeakerAudioOutput` con aggiunta dei relativi test (completato in 2 ore da JS)
+- Refactoring di `PlaybackController` e relativa suite di test (completato in 2 ore da JS)
+- Configurazione della build: *scalafmt*, *scalacOptions*, *sbt-coverage* e correzione dei warning (completato in 2 ore da JS)
+- Rifinitura della GUI (completato in 1 ora da JS)
+- Stesura del report - Proseguimento - (completato in 6 ore da JS)
+- Refactoring di `AudioProcessor` (completato in 2 ore da SC)
+- Implementazione di `EffectsController` e modifiche in `AppState` (completato in 1 ora da SC)
+- Gestione della logica dei widget degli effetti nella GUI (completato in 1 ora da SC)
+- Refactoring della GUI e rimozione di warning (completato in 1 ora da SC)
+- Miglioramento dei test per `AudioEffects` e `AudioProcessors`, e aggiunta suite di test per `EffectsController` (completato in 2 ora da SC)
+- Refactoring dei singoli effetti e del package `processing` (completato in 3 ore da SC)
+- Stesura del report (completato in 5 ore da SC)
 
 ### Iterazioni
 
 ### Commenti sullo sprint
+Le funzionalità di dominio sono state completate con qualche giorno di anticipo rispetto alla data di consegna, lasciandoci
+il tempo necessario a migliorare il codice e la documentazione presente, sia per quanto riguarda il report sia per la *scaladoc*.
 
 # Conclusioni
 Il gruppo si ritiene soddisfatto del risultato raggiunto nella realizzazione di un sistema di *importazione*, *modifica* ed

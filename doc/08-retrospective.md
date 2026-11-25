@@ -61,6 +61,30 @@ meeting nel corso dello sprint per chiarire le idee tra i vari componenti del gr
 
 ## Sprint 3
 
+### Descrizione dell'andamento dello sviluppo
+In questo sprint ci siamo dedicati alla gestione dei controller (`EffectsController`, `LoadSaveController`, `PlaybackController`)
+e la loro interazione con la GUI, al fine di reagire ai cambiamenti in modo reattivo alle azione che l'utente esegue
+nell'applicazione. Al termine dello sprint abbiamo ottenuto una GUI funzionante e quasi completa, che interagisce con i 
+controller, anch'essi funzionanti. Inoltre, alla traccia importata, a cui si può interagire tramite i pulsanti messi a 
+disposizione, possono essere applicati correttamente tutti gli effetti descritti. 
+
+### Backlog
+- Aggiunta spostamento del seek in secondi al `PlaybackController` e adeguamento dei test(completato in 4 ore da JS)
+- Definizione di una GUI demo con i soli comandi di riproduzione (completato in 4 ore da JS)
+- Stesura iniziale del report: introduzione processo (completato in 5 ore da JS)
+- Correzioni minori alla configurazione di progetto (completato in 2 ore da JS)
+- Completamento della GUI e di tutti i suoi pannelli (completato in 8 ore da SC)
+- Aggiunta di `ParameterConfiguration` negli effetti e successivo refactoring di `AudioEffect` (completato in 3 ore da SC)
+- Miglioramento delle formule presenti negli effetti e correzione di errori (completato in 3 ore da SC)
+- Puliza del codice e miglioramento della documentazione (completato in 1 ora da SC)
+
+### Iterazioni
+
+### Commenti sullo sprint
+Tutte le funzionalità richieste sono state completate con successo nei tempi previsti. In particolare in questa tappa
+ci si è concentrati sul perfezionamento della codebase esistente e all'introduzione della componente Controller per 
+completare il modello MVC.
+
 ## Sprint 4
 
 # Conclusioni

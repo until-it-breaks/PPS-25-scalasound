@@ -5,16 +5,16 @@
 Il mio contributo al progetto si è focalizzato nelle seguenti aree:
 
 - **Stato**: definizione e implementazione di `AppState` e `AppStateStore`, principalmente per quanto concerne il controllo di riproduzione.
+- **AudioADT**: definizione della conversione tra istante temporale e chunkIndex in `AudioTrack`.
 - **Motore di riproduzione**: definizione di `AudioPlayer` e l'implementazione `StreamingAudioPlayer`.
 - **Output audio**: definizione di `AudioOutput` e l'implementazione `SpeakerAudioOutput`.
 - **Controller**: implementazione di `PlaybackController`.
-- **AudioADT**: definizione della conversione tra istante temporale e chunkIndex in `AudioTrack`.
-- **Interfaccia grafica**: raffinamento del riquadro della traccia (`TrackBox`) e la logica associata (`TrackBoxLogic`).
+- **Interfaccia grafica**: raffinamento del riquadro della traccia (`TrackBox`) e implementazione della logica associata (`TrackBoxLogic`).
 - **Testing**: definizione e implementazione dei test di questi componenti e della demo di riproduzione senza GUI (`AudioPlaybackDemo`).
 
 ### Stato
 
-`AppState` è una `case class` immutabile che raccoglie lo stato dell'applicazione. Per il controllo di riproduzione sono rilevanti la traccia caricata (`track`), lo stato di riproduzione (`playbackState`) e l'indice del chunk corrente (`chunkIndex`). Il punto di riproduzione corrente è un indice di chunk e non un valore temporale, che se necessario è possibile ricavare dalla traccia stessa.
+`AppState` è una `case class` immutabile che rappresenta lo stato dell'applicazione. Per il controllo di riproduzione sono rilevanti la traccia caricata (`track`), lo stato di riproduzione (`playbackState`) e l'indice del chunk corrente (`chunkIndex`).
 
 ```scala
 final case class AppState(
@@ -27,10 +27,12 @@ final case class AppState(
 )
 
 enum PlaybackState:
-  case Stopped, Playing, Paused
+  case Stopped
+  case Playing
+  case Paused
 ```
 
-L'`AppState` non si modifica direttamente. I comandi disponibili sono rappresentati dall'enumerazione Scala 3 `Command`, un tipo algebrico chiuso come le altre componenti dello stato (`PlaybackState`, `ImportState`, `ExportState`). `AppState.handle` accetta in input un comando e, in base a questo, decide la transizione e restituisce il nuovo stato. È un pattern matching esaustivo su `Command` e per qualsiasi `case` caso delega a un metodo privato che restituisce una copia dello stato oppure lo stesso stato quando il comando non è applicabile.
+L'`AppState` non si modifica direttamente. I comandi disponibili sono rappresentati dall'`enum` `Command`, un tipo algebrico chiuso come le altre componenti dello stato (`PlaybackState`, `ImportState`, `ExportState`). `AppState.handle` accetta in input un comando e, in base a questo, decide la transizione e restituisce il nuovo stato. È un pattern matching esaustivo su `Command` e ogni caso delega a un metodo privato che restituisce una copia dello stato oppure lo stesso stato quando il comando non è applicabile.
 
 ```scala
 def handle(command: Command): AppState =
@@ -65,9 +67,9 @@ object AppState:
   )
 ```
 
-### Store
+### Store dello stato
 
-`AppStateStore` è un trait con due operazioni primitive, `current` e `dispatch`, e un flusso `changes`; i flussi derivati sono metodi con implementazione di default costruiti sopra `changes`.
+`AppStateStore` è un `trait` con due operazioni primitive, `current` e `dispatch`, e un flusso `changes`; i flussi derivati sono metodi con implementazione di default costruiti sopra `changes`.
 
 ```scala
 trait AppStateStore:
@@ -77,11 +79,10 @@ trait AppStateStore:
 
   def playbackStateChanges: Stream[IO, PlaybackState] =
     changes.map(_.playbackState).changes
-
   ...
 ```
 
-L'implementazione non è nel trait ma nel companion object, dentro `make`, e si appoggia a un `SignallingRef` di FS2, un riferimento mutabile che, oltre a supportare la lettura e la scrittura atomica rende possibile esporre i cambiamenti come flusso.
+L'implementazione non è nel `trait` ma nel companion object, dentro `make`, e si appoggia a un `SignallingRef` di FS2, un riferimento mutabile che, oltre a supportare la lettura e la scrittura atomica, rende possibile esporre i cambiamenti come flusso:
 
 ```scala
 object AppStateStore:
@@ -97,13 +98,31 @@ object AppStateStore:
     }
 ```
 
-Il `SignallingRef` è inizializzato con `AppState.initial`. `current` ne legge il valore attuale, in modo atomico. `dispatch` usa `updateAndGet`, che applica `handle` in modo atomico e restituisce il nuovo stato. `changes` usa `discrete`, che emette lo stato attuale e poi ogni cambiamento successivo. Può tuttavia saltare valori intermedi se il consumatore è lento.
+Il `SignallingRef` è inizializzato con `AppState.initial`. `current` ne legge il valore attuale, in modo atomico. `dispatch` usa `updateAndGet`, che applica `handle` in modo atomico e restituisce il nuovo stato. `changes` usa `discrete`, che emette lo stato attuale e poi ogni cambiamento successivo. Quest'ultimo può tuttavia saltare valori intermedi se il consumatore è lento.
 
-I flussi derivati si basano su `changes`, già definito nel trait dello store: ne estraggono la parte che interessa e, con l'operatore omonimo `.changes`, emettono solo quando quella parte cambia. `playbackStateChanges`, per esempio, emette solo quando cambia il `PlaybackState`, anche se l'`AppState` nel suo complesso è cambiato per altri motivi, come la modifica del `chunkIndex`. L'operatore confronta ogni valore con il precedente e richiede un'istanza di `Eq`. Per `PlaybackState`, che è un'enumerazione, basta l'uguaglianza standard `==`. L'istanza è quindi dichiarata come `given`, in modo tale che `.changes` la trovi in modo implicito:
+I flussi derivati si basano su `changes`, già definito nel ``trait` dello store: ne estraggono la parte che interessa e, con l'operatore omonimo `.changes`, emettono solo quando quella porzione cambia. `playbackStateChanges`, per esempio, emette solo quando cambia il `PlaybackState`, anche se l'`AppState` nel suo complesso è cambiato per altri motivi, come la modifica del `chunkIndex`. L'operatore confronta ogni valore con il precedente e richiede un'istanza di `Eq`. Per `PlaybackState`, che è un'`enum`, basta l'uguaglianza standard `==`. L'istanza è quindi dichiarata come `given`, in modo che `.changes` la trovi in modo implicito:
 
 ```scala
 given Eq[PlaybackState] = Eq.fromUniversalEquals
 ```
+
+### AudioADT
+
+La conversione tra tempo e chunk sta in `AudioTrack`, che conosce i chunk e la frequenza di campionamento. `chunkIndexAt` trova il chunk corrispondente a un dato valore temporale con una funzione ricorsiva in coda:
+
+```scala
+def chunkIndexAt(position: FiniteDuration): Int =
+  val targetFrame = (position.toNanos * sampleRate.value / 1_000_000_000L).max(0L)
+  @tailrec
+  def loop(index: Int, framesBefore: Long): Int =
+    chunks.lift(index) match
+      case None => (chunks.length - 1).max(0)
+      case Some(chunk) if targetFrame < framesBefore + chunk.frameCount => index
+      case Some(chunk) => loop(index + 1, framesBefore + chunk.frameCount)
+  loop(0, 0L)
+```
+
+L'operazione inversa, da indice a tempo, è `positionAt`. Essa somma i frame dei chunk che precedono l'indice e li divide per la frequenza di campionamento della traccia, ottenendo un valore temporale.
 
 ### Motore di riproduzione
 
@@ -133,9 +152,11 @@ def run(store: AppStateStore): Stream[IO, Unit] =
     }
 ```
 
-`playbackProgressChanges` è il flusso derivato dello store costruito con `changesBy`. Lascia passare l'intero `AppState`, poiché al player serve uno snapshot della traccia, gli effetti correnti e il chunkIndex, ma lo fa solo quando cambia la chiave, cioè la coppia (`playbackState`, `chunkIndex`). Inoltre, `switchMap` associa a ogni stato un flusso interno: con `Playing` è quello creato da `Stream.eval`, che esegue l'`IO` di elaborazione e riproduzione del chunk. Se `playbackState` diventa `Stopped` o `Paused`, il nuovo flusso interno è vuoto e la riproduzione non procede più; se invece cambia il `chunkIndex` mantenendo `Playing`, si continua a suonare a partire dal nuovo chunk indicato. La riproduzione prosegue in modo reattivo: quando il chunk è stato processato e suonato, il player invia `NextChunk` allo store, che incrementa il `chunkIndex`; la chiave (`playbackState`, `chunkIndex`) cambia e `playbackProgressChanges` emette il nuovo stato, che fa riprendere la riproduzione dal chunk successivo. Il player non regola il ritmo della riproduzione poichè tale aspetto dipende da `AudioOutput`.
+`playbackProgressChanges` è il flusso derivato dello store costruito con `changesBy`. Lascia passare l'intero `AppState`, poiché al player serve uno snapshot della traccia, gli effetti correnti e il `chunkIndex`, ma lo fa solo quando cambia la chiave, cioè la coppia (`playbackState`, `chunkIndex`).
 
-Il metodo `playChunk` cerca il chunk da suonare con una for-comprehension su `Option`, che si interrompe da sola se manca la traccia o se l'indice è fuori dai limiti, e il risultato è poi trattato con un pattern matching:
+`switchMap` associa a ogni stato un flusso interno: con `Playing` è quello creato da `Stream.eval`, che esegue l'`IO` di elaborazione e riproduzione del chunk. Se `playbackState` diventa `Stopped` o `Paused`, il nuovo flusso interno è vuoto e la riproduzione non procede più; se invece cambia il `chunkIndex` mantenendo `Playing`, si continua a suonare a partire dal nuovo chunk indicato. La riproduzione prosegue in modo reattivo: quando il chunk è stato processato e suonato, il player invia `NextChunk` allo store, che incrementa il `chunkIndex`; la chiave (`playbackState`, `chunkIndex`) cambia e `playbackProgressChanges` emette il nuovo stato, che fa riprendere la riproduzione dal chunk successivo. Il player non regola il ritmo della riproduzione poiché tale aspetto dipende da `AudioOutput`.
+
+Il metodo `playChunk` cerca il chunk da riprodurre con una for-comprehension su `Option`. Se manca la traccia o l'indice è fuori dai limiti il risultato è `None` e il player invia `Stop`; altrimenti elabora e suona il chunk e poi invia `NextChunk`:
 
 ```scala
 private def playChunk(state: AppState, store: AppStateStore): IO[Unit] =
@@ -150,11 +171,22 @@ private def playChunk(state: AppState, store: AppStateStore): IO[Unit] =
     case None                 => store.dispatch(Command.Stop).void
 ```
 
-Gli errori sono gestiti in due modi. Se l'`AudioProcessor` restituisce un `AudioError`, il player stampa un messaggio in console e riproduce il chunk originale. Per qualunque altro errore, come un fallimento dell'`AudioOutput`, `handleErrorWith` stampa l'errore in console e invia il comando `Stop` allo store. Il player resta comunque in ascolto dello store e può ripartire qualora il playbackState diventa di nuovo `Playing`.
+Gli errori sono gestiti in due modi. Se l'`AudioProcessor` restituisce un `AudioError`, il player stampa un messaggio in console e riproduce il chunk originale. Per qualunque altro errore, come un fallimento dell'`AudioOutput`, `handleErrorWith` stampa l'errore in console e invia il comando `Stop` allo store. Il player resta comunque in ascolto sullo store e può ripartire qualora `playbackState` diventi di nuovo `Playing`.
 
-### Uscita audio
+### Output audio
 
-`AudioOutput` ha un solo metodo astratto (`write`), quindi `AudioOutput.console` è definito come una semplice lambda. `paced` è un extension method che decora un qualunque output con un'attesa pari alla durata del chunk, calcolata in nanosecondi per non perdere precisione:
+`AudioOutput` è un `trait` con un solo metodo, `write`, che restituisce un `IO[Unit]` completato quando l'uscita ha accettato il chunk. Le implementazioni si ottengono dal companion object: `AudioOutput.console` stampa in console le informazioni del chunk e `AudioOutput.speakers` lo riproduce sugli altoparlanti.
+
+```scala
+trait AudioOutput:
+  def write(chunk: AudioChunk, sampleRate: Int): IO[Unit]
+
+object AudioOutput:
+  val console: AudioOutput = (chunk, sampleRate) => IO.println(...)
+  def speakers: Resource[IO, AudioOutput] = SpeakerAudioOutput.make
+```
+
+Trattandosi di un `trait` con un solo metodo, `console` è definito come una semplice lambda. Poiché la scrittura in console termina subito, è stato aggiunto l'extension method `paced` che decora un qualunque `AudioOutput` con un'attesa pari alla durata del chunk, in modo tale che la riproduzione avanzi in tempo reale:
 
 ```scala
 extension (out: AudioOutput)
@@ -165,38 +197,64 @@ extension (out: AudioOutput)
     yield ()
 ```
 
-In `SpeakerAudioOutput` gli extension method servono a tenere vicino al tipo le operazioni che lo riguardano senza modificarlo: `AudioChunk` ottiene `channels` e `toPcmBytes`, e `Float` ottiene `toPcm16`, che satura il campione in [-1, 1] e lo scala a 16 bit. `toPcmBytes` scrive in un `ByteBuffer` little-endian, alternando campione sinistro e destro per lo stereo, con un pattern matching su `MonoChunk` e `StereoChunk`:
+`SpeakerAudioOutput` usa la Java Sound API. La scrittura sulla linea è racchiusa in `IO.blocking`, perché può fermarsi se il buffer non ha spazio. Per questo il ritmo è quello dell'audio, senza bisogno di `paced`. La linea attiva è un `var` privato, aperta alla prima scrittura e riaperta solo se cambiano frequenza di campionamento o numero di canali:
 
 ```scala
-extension (sample: Float)
-  private def toPcm16: Short =
-    (sample.max(-1f).min(1f) * MaxAmplitude).toShort
+private var active: Option[ActiveLine] = None
+
+override def write(chunk: AudioChunk, sampleRate: Int): IO[Unit] =
+  for
+    bytes <- IO(chunk.toPcmBytes)
+    _     <- IO.blocking {
+      val line = lineFor(Format(sampleRate, chunk.channelCount))
+      line.write(bytes, 0, bytes.length)
+    }
+  yield ()
 ```
 
-La scrittura sulla linea è bloccante, quindi è racchiusa in `IO.blocking`, che la sposta sul pool dei compiti bloccanti e lascia libero quello di calcolo. La linea è aperta una sola volta e riusata finché formato e numero di canali restano uguali, perché riaprirla a ogni chunk produrrebbe interruzioni udibili; il formato è un `case class` privato usato come chiave di confronto. Il buffer è di 200 ms, un valore che assorbe le piccole irregolarità dei tempi di elaborazione senza ritardare troppo la risposta ai comandi. Il riferimento alla linea attiva è un `var` privato, l'unico stato mutabile del mio codice: è sicuro perché `write` è chiamata solo dalla fibra del player, una alla volta, ma non lo sarebbe con più fibre sullo stesso output.
-
-Anche per l'uscita il nome della factory descrive la variante (`AudioOutput.console` e `AudioOutput.speakers`). L'uscita sugli altoparlanti è una `Resource`: `AudioOutput.speakers` la crea con `Resource.make` (con `make` si indicano le creazioni con effetto, e il tipo restituito dice se c'è anche da rilasciare qualcosa), che alla chiusura dell'applicazione chiama `close`, il quale riproduce l'audio rimasto nel buffer (`drain`) e chiude la linea. In `AppSetup` l'uscita è acquisita prima del player e quindi rilasciata dopo, così la linea non viene chiusa mentre il player sta ancora scrivendo.
+Per codificare un chunk in byte PCM richiesti dalla libreria si usa un extension method su `AudioChunk`:
 
 ```scala
-def speakers: Resource[IO, AudioOutput] = SpeakerAudioOutput.make
+extension (chunk: AudioChunk)
+  private def toPcmBytes: Array[Byte] =
+    val buffer = ByteBuffer
+      .allocate(chunk.frameCount * chunk.channelCount * BytesPerSample)
+      .order(ByteOrder.LITTLE_ENDIAN)
+    chunk match
+      case AudioChunk.MonoChunk(samples) =>
+        samples.foreach(sample => buffer.putShort(sample.toPcm16))
+      case AudioChunk.StereoChunk(left, right) =>
+        left
+          .zip(right)
+          .foreach: (l, r) =>
+            buffer.putShort(l.toPcm16)
+            buffer.putShort(r.toPcm16)
+    buffer.array()
+```
 
+`SpeakerAudioOutput` è creato come `Resource`, poiché la linea audio deve essere chiusa alla terminazione dell'applicazione. La `Resource` è costruita con `Resource.make` e, come rilascio, chiama `close`, che riproduce l'audio rimasto nel buffer e chiude la linea.
+
+```scala
 def make: Resource[IO, AudioOutput] =
   Resource.make[IO, SpeakerAudioOutput](IO(SpeakerAudioOutput()))(_.close)
 ```
 
 ### Controller
 
-`PlaybackController` è un `trait` con un'implementazione privata, creata da un `apply` nel companion object: la creazione non ha effetti, quindi `apply` è il nome adatto. I metodi sono implementati con `override`, così il compilatore segnala un'implementazione che non corrisponde più al trait.
+`PlaybackController` è un `trait` con le operazioni `play`, `pause`, `stop` e `seek`, e un'implementazione privata creata da un `apply` nel companion object.
 
 ```scala
 object PlaybackController:
-  def apply(store: AppStateStore): PlaybackController = PlaybackControllerImpl(store)
+  def apply(store: AppStateStore): PlaybackController =
+    PlaybackControllerImpl(store)
 
-private final class PlaybackControllerImpl(store: AppStateStore) extends PlaybackController:
+private final class PlaybackControllerImpl(store: AppStateStore)
+    extends PlaybackController:
   override def play: IO[Unit] = store.dispatch(Play).void
+  ...
 ```
 
-I metodi restituiscono `IO[Unit]` e non eseguono nulla da soli: quando eseguire spetta a chi lo chiama, che nella view usa `unsafeRunAndForget`. Ogni metodo invia un comando allo store. `seek` riceve la posizione come `FiniteDuration`, la converte nell'indice del chunk con `AudioTrack.chunkIndexAt` e invia `SeekToIndex`; senza una traccia caricata non fa nulla:
+`play`, `pause` e `stop` si limitano a inviare il comando corrispondente allo store. `seek` è l'operazione più complessa, perché riceve un valore temporale come `FiniteDuration` e deve convertirlo nel `chunkIndex` corrispondente, usando la traccia corrente e `AudioTrack.chunkIndexAt`, prima di impartire il comando `SeekToIndex`.
 
 ```scala
 override def seek(position: FiniteDuration): IO[Unit] =
@@ -204,44 +262,25 @@ override def seek(position: FiniteDuration): IO[Unit] =
     state <- store.current
     _     <- state.track match
       case None        => IO.unit
-      case Some(track) => store.dispatch(SeekToIndex(track.chunkIndexAt(position))).void
+      case Some(track) =>
+        store.dispatch(SeekToIndex(track.chunkIndexAt(position))).void
   yield ()
 ```
 
-### Traccia audio
+### Interfaccia grafica
 
-La conversione tra tempo e chunk sta in `AudioTrack`, che conosce i chunk e la frequenza di campionamento. `chunkIndexAt` trova il chunk che contiene una posizione con una funzione ricorsiva in coda:
+`TrackBoxLogic` connette il riquadro della traccia (`TrackBox`) ai cambiamenti di stato e al `PlaybackController`. Segue lo stesso schema di quest'ultimo: un `trait` con due metodi, creato da un `apply`, con un'implementazione privata. `attach` collega i pulsanti e la timeline al `PlaybackController`, mentre `observe` riflette lo stato nella timeline e nelle due etichette che mostrano il tempo trascorso e la durata della traccia.
 
-```scala
-def chunkIndexAt(position: FiniteDuration): Int =
-  val targetFrame = (position.toNanos * sampleRate.value / 1_000_000_000L).max(0L)
-  @tailrec
-  def loop(index: Int, framesBefore: Long): Int =
-    chunks.lift(index) match
-      case None => (chunks.length - 1).max(0)
-      case Some(chunk) if targetFrame < framesBefore + chunk.frameCount => index
-      case Some(chunk) => loop(index + 1, framesBefore + chunk.frameCount)
-  loop(0, 0L)
-```
+Il punto delicato è che l'applicazione stessa muove la timeline durante la riproduzione, e un listener ingenuo scambierebbe ogni avanzamento per un seek dell'utente. Il flag `isProgrammaticUpdate` viene impostato a `true` mentre l'applicazione aggiorna la timeline e permette ai listener di ignorare gli eventi generati da tali aggiornamenti. Il seek viene impartito solo con un click sulla timeline o al rilascio dopo un trascinamento, non durante.
 
-L'annotazione `@tailrec` fa verificare al compilatore che la ricorsione sia in coda, quindi non consuma stack nemmeno su tracce con migliaia di chunk. Una posizione oltre la fine dà l'ultimo chunk e una negativa il primo. La guardia `if` nel pattern distingue il chunk che contiene il frame da quelli precedenti.
-
-L'operazione inversa, da indice a tempo, è `positionAt`: somma i frame dei chunk precedenti con una `view`, che evita di creare collezioni intermedie, e li converte in nanosecondi con aritmetica intera. `duration` è semplicemente `positionAt(chunks.length)`.
-
-### Logica della traccia
-
-`TrackBoxLogic` segue lo stesso schema del controller: un `trait` con `attach` e `observe`, creato da un `apply`, con un'implementazione privata. Collega i widget allo stato e ha due responsabilità: inviare ai controller le azioni dell'utente e riflettere lo stato nella timeline e nelle etichette. Il punto delicato è che il programma stesso muove lo slider durante la riproduzione, e un listener ingenuo scambierebbe ogni avanzamento per un seek dell'utente. Il flag `isProgrammaticUpdate` viene alzato mentre il programma aggiorna lo slider (e abbassato in un `finally`, anche se l'aggiornamento fallisce) e fa ignorare i listener; durante il trascinamento (`valueChanging`) l'aggiornamento automatico è sospeso e il seek parte solo al rilascio. Il controllo "il cambiamento è dell'utente" è espresso con `Option.when`, che rende il seek una catena di operazioni sul valore e non un blocco `if`:
+Le azioni dell'utente sono gestite sul thread JavaFX, che deve avviare le `IO` del controller con `unsafeRunAndForget`; per questo `TrackBoxLogic` riceve un `IORuntime` come parametro `using`:
 
 ```scala
-box.timeLine.value.onChange { (_, _, newValue) =>
-  val isUserChange = !isProgrammaticUpdate && !isDragging(box)
-  Option
-    .when(isUserChange)(newValue.doubleValue)
-    .map(toDuration)
-    .foreach(controller.seek(_).unsafeRunAndForget())
-}
+box.playButton.onAction = _ => controller.play.unsafeRunAndForget()
+box.pauseButton.onAction = _ => controller.pause.unsafeRunAndForget()
+box.stopButton.onAction = _ => controller.stop.unsafeRunAndForget()
 ```
 
-`observe` è uno `Stream` che, a ogni cambiamento della traccia o della posizione (`playheadChanges`), pianifica l'aggiornamento della finestra con `Platform.runLater`, perché i widget possono essere modificati solo dal thread JavaFX.
+`observe`, invece, è un'`IO` eseguita da una fibra di Cats Effect, non dal thread JavaFX. Le modifiche agli elementi grafici in base ai cambiamenti dello stato devono quindi essere effettuate con `Platform.runLater`.
 
 \newpage

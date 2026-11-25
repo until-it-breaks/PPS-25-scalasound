@@ -87,4 +87,17 @@ completare il modello MVC.
 
 ## Sprint 4
 
+### Descrizione dell'andamento dello sviluppo
+
+### Backlog
+
+### Iterazioni
+
+### Commenti sullo sprint
+
 # Conclusioni
+Il gruppo si ritiene soddisfatto del risultato raggiunto nella realizzazione di un sistema di *importazione*, *modifica* ed
+*esportazione* di un file audio. Nonostante le complessità tecniche derivanti da un dominio del *Digital Signal Processing* (DSP), 
+poco familiare a tutti i membri del team, il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a 
+ciascuno Sprint, assieme ad una corretta pianificazione delle attività e una forte collaborazione tra i componenti del team,
+ha permesso la riuscita del progetto nei tempi stabiliti.

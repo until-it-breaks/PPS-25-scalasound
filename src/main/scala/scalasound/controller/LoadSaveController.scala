@@ -100,7 +100,7 @@ private[controller] final class LoadSaveControllerImpl(
   private def loadFrom(path: Path): IO[Either[AudioLoadError, AudioTrack]] =
     formats.readerFor(path) match
       case Left(error)   => IO.pure(Left(AudioLoadError.UnresolvedFormat(error)))
-      case Right(reader) => IO.defer(reader.load(path.toString))
+      case Right(reader) => IO.defer(reader.load(path))
 
   private def toImportState(
       result: Either[Throwable, Either[AudioLoadError, AudioTrack]]
@@ -150,9 +150,12 @@ private[controller] final class LoadSaveControllerImpl(
       effects: List[AudioEffect],
       path: Path
   ): IO[Either[AudioSaveError, Unit]] =
-    IO.delay(resolveAndProcess(track, effects, path)).flatMap:
-      case Left(error)                => IO.pure(Left(error))
-      case Right((target, processed)) => IO.defer(target.writer.save(processed, target.path))
+    for
+      resolved <- IO.delay(resolveAndProcess(track, effects, path))
+      result <- resolved match
+        case Left(error) => IO.pure(Left(error))
+        case Right((target, processed)) => IO.defer(target.writer.save(processed, target.path))
+    yield result
 
   private def resolveAndProcess(
       track: AudioTrack,

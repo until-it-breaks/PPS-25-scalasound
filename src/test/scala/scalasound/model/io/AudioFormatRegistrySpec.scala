@@ -28,7 +28,7 @@ class AudioFormatRegistrySpec extends AnyFlatSpec with Matchers with EitherValue
 
   private final class FakeReader extends AudioReader:
     val calls                                                                   = AtomicInteger(0)
-    override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
+    override def load(path: Path): IO[Either[AudioLoadError, AudioTrack]] =
       IO:
         calls.incrementAndGet()
         Left(AudioLoadError.ReadFailure("fake"))

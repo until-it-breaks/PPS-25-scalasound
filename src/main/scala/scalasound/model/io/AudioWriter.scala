@@ -3,7 +3,6 @@ package scalasound.model.io
 import cats.effect.IO
 import scalasound.model.domain.AudioTrack
 import scalasound.model.io.error.AudioSaveError
-
 import java.nio.file.Path
 
 /** Exports an [[AudioTrack]] to a file. */

@@ -11,7 +11,7 @@ import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.state.{AppStateStore, ExportState, ImportState}
 import scalasound.view.panels.loadsave.LoadSaveLogic
 
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.*
 
@@ -68,7 +68,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
     tempDir.use: dir =>
       val input = dir.resolve("input.wav")
       val track = WavAudioReader
-        .load("src/test/resources/file_example_WAV_2MG.wav")
+        .load(Paths.get("src/test/resources/file_example_WAV_2MG.wav"))
         .unsafeRunSync()
         .getOrElse(fail("Failed to load the test WAV file."))
       val recorder = AlertRecorder()
@@ -89,7 +89,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
               .map(_ && recorder.alerts.get.exists(_.title == "Export completed"))
           )
           exported <- WavAudioReader
-            .load(dir.resolve("output.wav").toString)
+            .load(dir.resolve("output.wav"))
             .flatMap(orFail(_))
         yield
           assertEquals(
@@ -115,7 +115,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
     tempDir.use: dir =>
       val input = dir.resolve("input.wav")
       val track = WavAudioReader
-        .load("src/test/resources/file_example_WAV_2MG.wav")
+        .load(Paths.get("src/test/resources/file_example_WAV_2MG.wav"))
         .unsafeRunSync()
         .getOrElse(fail("Failed to load the test WAV file."))
       val recorder = AlertRecorder()
@@ -142,7 +142,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
               .map(_ && recorder.alerts.get.exists(_.title == "Export completed"))
           )
           exported <- WavAudioReader
-            .load(dir.resolve("processed_output.wav").toString)
+            .load(dir.resolve("processed_output.wav"))
             .flatMap(orFail(_))
           current <- store.current
         yield

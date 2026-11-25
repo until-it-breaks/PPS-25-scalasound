@@ -24,7 +24,7 @@ class WavAudioExportImportSpec extends AnyFlatSpec with Matchers with EitherValu
     withTempDir: dir =>
       val path = dir.resolve(name)
       WavAudioWriter.save(track, path).unsafeRunSync() shouldBe Right(())
-      WavAudioReader.load(path.toString).unsafeRunSync() match
+      WavAudioReader.load(path).unsafeRunSync() match
         case Right(loaded) => loaded
         case Left(error)   => fail(s"the exported file could not be imported: $error")
 
@@ -136,7 +136,7 @@ class WavAudioExportImportSpec extends AnyFlatSpec with Matchers with EitherValu
         Files.copy(in, source, StandardCopyOption.REPLACE_EXISTING)
       )
       val rawImported = WavAudioReader
-        .load(source.toString)
+        .load(source)
         .unsafeRunSync()
         .getOrElse(fail("the test resource could not be imported"))
       val before = expectTrack[StereoTrack](rawImported)

@@ -25,9 +25,9 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
   // Interleaved as (L0,R0,L1,R1,...) so that swapped channels or a wrong interleaving change the result.
   private final val StereoFrames = Vector((16384, -16384), (0, 32767), (-32768, 256), (1, -1))
 
-  private def withTempFile[A](name: String, bytes: Array[Byte])(test: String => A): A =
+  private def withTempFile[A](name: String, bytes: Array[Byte])(test: Path => A): A =
     withTempDir: dir =>
-      val path = Files.write(dir.resolve(name), bytes).toString
+      val path = Files.write(dir.resolve(name), bytes)
       test(path)
 
   private def withTempDir[A](test: Path => A): A =
@@ -37,14 +37,14 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       Option(dir.toFile.listFiles()).foreach(_.foreach(_.delete()))
       Files.deleteIfExists(dir)
 
-  private def loadTrack[T <: AudioTrack: ClassTag](path: String): T =
+  private def loadTrack[T <: AudioTrack: ClassTag](path: Path): T =
     runLoad(path) match
       case Right(track: T) =>
         track
       case other =>
         fail(s"expected a ${summon[ClassTag[T]].runtimeClass.getSimpleName} but got $other")
 
-  private def runLoad(path: String): Either[AudioLoadError, AudioTrack] =
+  private def runLoad(path: Path): Either[AudioLoadError, AudioTrack] =
     WavAudioReader.load(path).unsafeRunSync()
 
   "A mono PCM 16 bit WAV" should "be decoded with sample rate, signed values and byte order preserved" in
@@ -108,14 +108,12 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       track.duration shouldBe Duration.Zero
 
   "Loading a file" should "return FileNotFound when the path does not exist" in withTempDir: dir =>
-    val path = dir.resolve("missing.wav").toString
-
-    runLoad(path) shouldBe Left(AudioLoadError.FileNotFound(path))
+    val path = dir.resolve("missing.wav")
+    runLoad(path) shouldBe Left(AudioLoadError.FileNotFound(path.toString))
 
   it should "return FileNotFound when the path is a directory" in withTempDir: dir =>
-    val path = dir.toString
-
-    runLoad(path) shouldBe Left(AudioLoadError.FileNotFound(path))
+    val path = dir
+    runLoad(path) shouldBe Left(AudioLoadError.FileNotFound(path.toString))
 
   private def isUnsupported(result: Either[AudioLoadError, ?]): Boolean = result match
     case Left(_: AudioLoadError.UnsupportedFormat) => true
@@ -190,11 +188,11 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       valid.indices.foreach: length =>
         Files.write(path, valid.take(length))
         withClue(s"truncated at $length bytes: ")(
-          runLoad(path.toString).isLeft shouldBe true
+          runLoad(path).isLeft shouldBe true
         )
 
       Files.write(path, valid)
-      runLoad(path.toString).isRight shouldBe true
+      runLoad(path).isRight shouldBe true
 
   it should "never throw when a byte of the header is replaced by an arbitrary value" in withTempDir:
     dir =>
@@ -206,7 +204,7 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
         value <- Seq(0x00, 0x01, 0x7f, 0x80, 0xff)
       do
         Files.write(path, valid.updated(index, value.toByte))
-        runLoad(path.toString) should matchPattern { case Left(_) | Right(_) => }
+        runLoad(path) should matchPattern { case Left(_) | Right(_) => }
 
   it should "reject random bytes as an error" in withTempDir: dir =>
     val random = Random(42L)
@@ -214,4 +212,4 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
 
     (1 to 50).foreach: _ =>
       Files.write(path, random.nextBytes(random.nextInt(300)))
-      runLoad(path.toString).isLeft shouldBe true
+      runLoad(path).isLeft shouldBe true

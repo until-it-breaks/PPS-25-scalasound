@@ -99,43 +99,58 @@ object AppStateStore:
 
 Il `SignallingRef` è inizializzato con `AppState.initial`. `current` ne legge il valore attuale, in modo atomico. `dispatch` usa `updateAndGet`, che applica `handle` in modo atomico e restituisce il nuovo stato. `changes` usa `discrete`, che emette lo stato attuale e poi ogni cambiamento successivo. Può tuttavia saltare valori intermedi se il consumatore è lento.
 
-I flussi derivati si basano su `changes`, già definito nel trait dello store: ne estraggono la parte che interessa e, con l'operatore omonimo `.changes`, emettono solo quando quella parte cambia. `playbackStateChanges`, per esempio, emette solo quando cambia il `PlaybackState`, anche se l'`AppState` nel suo complesso è cambiato per altri motivi, come la modifica del `chunkIndex`. L'operatore confronta ogni valore con il precedente e richiede un'istanza di `Eq`. Per `PlaybackState`, che è un'enumerazione, basta l'uguaglianza standard `==`. L'istanza è quindi dichiarata come `given` con `Eq.fromUniversalEquals`, così che `.changes` la trovi in modo implicito:
+I flussi derivati si basano su `changes`, già definito nel trait dello store: ne estraggono la parte che interessa e, con l'operatore omonimo `.changes`, emettono solo quando quella parte cambia. `playbackStateChanges`, per esempio, emette solo quando cambia il `PlaybackState`, anche se l'`AppState` nel suo complesso è cambiato per altri motivi, come la modifica del `chunkIndex`. L'operatore confronta ogni valore con il precedente e richiede un'istanza di `Eq`. Per `PlaybackState`, che è un'enumerazione, basta l'uguaglianza standard `==`. L'istanza è quindi dichiarata come `given`, in modo tale che `.changes` la trovi in modo implicito:
 
 ```scala
 given Eq[PlaybackState] = Eq.fromUniversalEquals
 ```
 
-### Player
+### Motore di riproduzione
 
-`AudioPlayer` è un `trait` con il solo metodo `run(store)` e si crea con `AudioPlayer.streaming`: il nome descrive la variante, perché un'altra strategia di riproduzione, per esempio con un buffer, ne avrebbe uno diverso. L'implementazione `StreamingAudioPlayer` è privata e trasforma lo stream degli stati in uno stream di azioni sull'audio:
-
-```scala
-store.playbackProgressChanges
-  .switchMap { state =>
-    state.playbackState match
-      case PlaybackState.Playing =>
-        Stream.eval(playChunk(state, store).handleErrorWith(stopAfterFailure(store)))
-      case _ => Stream.empty
-  }
-```
-
-`playbackProgressChanges` è il flusso derivato dello store costruito con `changesBy`: lascia passare lo stato solo quando cambia la coppia (stato di riproduzione, indice), quindi la modifica degli effetti non fa ripartire la riproduzione. `switchMap` annulla il flusso interno all'arrivo di un nuovo stato: se l'utente mette in pausa o sposta la timeline mentre un chunk è in scrittura, l'operazione in corso viene cancellata. Il ciclo non ha un `while`: ogni chunk scritto invia `NextChunk`, il che cambia l'indice e produce lo stato successivo.
-
-Il chunk da suonare è cercato con una for-comprehension su `Option`, che si interrompe da sola se manca la traccia o se l'indice è fuori dai limiti, e il risultato è poi trattato con un pattern matching:
+`AudioPlayer` è un `trait` con il solo metodo `run(store)`, che restituisce uno `Stream[IO, Unit]`: il flusso descrive il lavoro del player, cioè osservare lo store e agire di conseguenza. I side effect, cioè l'elaborazione e la riproduzione dell'audio, avvengono solo quando il flusso viene eseguito. Tale flusso va lanciato in background e rimane aperto per l'intero ciclo di vita dell'applicazione.
 
 ```scala
-val current =
-  for
-    track <- state.track
-    chunk <- track.chunks.lift(state.chunkIndex)
-  yield (track, chunk)
+trait AudioPlayer:
+  def run(store: AppStateStore): Stream[IO, Unit]
 
-current match
-  case Some((track, chunk)) => ...   // elabora, scrive e invia NextChunk
-  case None                 => store.dispatch(Command.Stop).void
+object AudioPlayer:
+  def streaming(processor: AudioProcessor, out: AudioOutput): AudioPlayer =
+    StreamingAudioPlayer(processor, out)
 ```
 
-Gli errori sono gestiti in due punti. L'elaborazione è eseguita dentro `IO(...)`, così un'eccezione imprevista del processore diventa un errore dell'`IO`, mentre un `AudioError` restituito dal processore è un normale valore `Left`: si stampa un messaggio e si riproduce il chunk originale. Un fallimento dell'uscita audio è intercettato da `handleErrorWith`, che stampa l'errore e invia `Stop`; il player resta in ascolto dello store e può ripartire.
+Il player si crea con `AudioPlayer.streaming`, definito nel companion object, e richiede in input un `AudioProcessor` e un `AudioOutput`. Poiché sono astrazioni, il player può lavorare con implementazioni diverse del processore e dell'uscita audio senza essere modificato. Il nome `streaming` descrive la variante, trattandosi di un'implementazione che processa i chunk appena prima della loro riproduzione. Un'altra strategia di riproduzione, per esempio che processa in anticipo una serie di chunk, avrebbe un nome diverso.
+
+L'implementazione `StreamingAudioPlayer` è privata e trasforma lo stream degli stati in uno stream di azioni da effettuare:
+
+```scala
+def run(store: AppStateStore): Stream[IO, Unit] =
+  store.playbackProgressChanges
+    .switchMap { state =>
+      state.playbackState match
+        case PlaybackState.Playing =>
+          Stream.eval(playChunk(state, store).handleErrorWith(stopAfterFailure(store)))
+        case _ => Stream.empty
+    }
+```
+
+`playbackProgressChanges` è il flusso derivato dello store costruito con `changesBy`. Lascia passare l'intero `AppState`, poiché al player serve uno snapshot della traccia, gli effetti correnti e il chunkIndex, ma lo fa solo quando cambia la chiave, cioè la coppia (`playbackState`, `chunkIndex`). Inoltre, `switchMap` associa a ogni stato un flusso interno: con `Playing` è quello creato da `Stream.eval`, che esegue l'`IO` di elaborazione e riproduzione del chunk. Se `playbackState` diventa `Stopped` o `Paused`, il nuovo flusso interno è vuoto e la riproduzione non procede più; se invece cambia il `chunkIndex` mantenendo `Playing`, si continua a suonare a partire dal nuovo chunk indicato. La riproduzione prosegue in modo reattivo: quando il chunk è stato processato e suonato, il player invia `NextChunk` allo store, che incrementa il `chunkIndex`; la chiave (`playbackState`, `chunkIndex`) cambia e `playbackProgressChanges` emette il nuovo stato, che fa riprendere la riproduzione dal chunk successivo. Il player non regola il ritmo della riproduzione poichè tale aspetto dipende da `AudioOutput`.
+
+Il metodo `playChunk` cerca il chunk da suonare con una for-comprehension su `Option`, che si interrompe da sola se manca la traccia o se l'indice è fuori dai limiti, e il risultato è poi trattato con un pattern matching:
+
+```scala
+private def playChunk(state: AppState, store: AppStateStore): IO[Unit] =
+  val playable =
+    for
+      track <- state.track
+      chunk <- track.chunks.lift(state.chunkIndex)
+    yield (track, chunk)
+
+  playable match
+    case Some((track, chunk)) => ... // elabora, suona e invia NextChunk
+    case None                 => store.dispatch(Command.Stop).void
+```
+
+Gli errori sono gestiti in due modi. Se l'`AudioProcessor` restituisce un `AudioError`, il player stampa un messaggio in console e riproduce il chunk originale. Per qualunque altro errore, come un fallimento dell'`AudioOutput`, `handleErrorWith` stampa l'errore in console e invia il comando `Stop` allo store. Il player resta comunque in ascolto dello store e può ripartire qualora il playbackState diventa di nuovo `Playing`.
 
 ### Uscita audio
 

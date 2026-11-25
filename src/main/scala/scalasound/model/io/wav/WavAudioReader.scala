@@ -7,6 +7,7 @@ import scalasound.model.io.error.AudioLoadError
 import scalasound.model.io.error.AudioLoadError.*
 
 import java.io.{EOFException, File, IOException}
+import java.nio.file.{Files, Path}
 import javax.sound.sampled.{AudioInputStream, AudioSystem, UnsupportedAudioFileException}
 
 /** Loads WAV files from the file system, using Java Sound API.
@@ -24,14 +25,16 @@ object WavAudioReader extends AudioReader:
 
   private final val FramesPerChunk: Int = 1024
 
-  override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
-    val file = File(filePath)
+  override def load(path: Path): IO[Either[AudioLoadError, AudioTrack]] =
     for
-      exists <- IO.blocking(file.isFile)
-      raw <- exists match
-        case true  => readRawAudioFile(file)
-        case false => IO.pure(Left(FileNotFound(filePath)))
-    yield raw.flatMap(decode)
+      exists    <- IO.blocking(Files.isRegularFile(path))
+      rawResult <- exists match
+        case true => readRawAudioFile(path.toFile)
+        case false => IO.pure(Left(FileNotFound(path.toString)))
+    yield for
+      rawAudio <- rawResult
+      track    <- decode(rawAudio)
+    yield track
 
   private def openStream(file: File): Resource[IO, AudioInputStream] =
     Resource.fromAutoCloseable(IO.blocking(AudioSystem.getAudioInputStream(file)))

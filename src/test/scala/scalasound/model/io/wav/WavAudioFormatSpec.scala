@@ -44,7 +44,7 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
       Files.write(dir.resolve("song.wav"), "this is text, not an audio file".getBytes("UTF-8"))
     val reader = registry.readerFor(notAudio).value
 
-    reader.load(notAudio.toString).unsafeRunSync() should matchPattern {
+    reader.load(notAudio).unsafeRunSync() should matchPattern {
       case Left(AudioLoadError.UnsupportedFormat(_)) =>
     }
 
@@ -52,7 +52,7 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
     dir =>
       val calls = AtomicInteger(0)
       val other = new AudioReader:
-        override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
+        override def load(path: Path): IO[Either[AudioLoadError, AudioTrack]] =
           IO:
             calls.incrementAndGet()
             Left(AudioLoadError.ReadFailure("must not be called"))
@@ -62,7 +62,7 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
       val notAudio =
         Files.write(dir.resolve("song.wav"), "this is text, not an audio file".getBytes("UTF-8"))
 
-      both.readerFor(notAudio).value.load(notAudio.toString).unsafeRunSync().isLeft shouldBe true
+      both.readerFor(notAudio).value.load(notAudio).unsafeRunSync().isLeft shouldBe true
       calls.get shouldBe 0
 
   it should "not be read when the extension is not registered, even if the content is valid" in withTempDir:
@@ -81,5 +81,5 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
       Files.exists(dir.resolve("export.wav")) shouldBe true
 
       val loaded =
-        registry.readerFor(resolved.path).value.load(resolved.path.toString).unsafeRunSync()
+        registry.readerFor(resolved.path).value.load(resolved.path).unsafeRunSync()
       loaded shouldBe Right(original)

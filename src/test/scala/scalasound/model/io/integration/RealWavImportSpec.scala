@@ -123,7 +123,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
       track.frameCount shouldBe fixture.frames.toLong
       track.chunks.map(_.left.length.toLong).sum shouldBe fixture.frames.toLong
       track.chunks.map(_.right.length.toLong).sum shouldBe fixture.frames.toLong
-      Math.abs(track.durationInSeconds - fixture.frames.toDouble / sampleRate) < 1e-9 shouldBe true
+      Math.abs(track.duration.toNanos - fixture.frames.toDouble * 1e9 / sampleRate) < 1.0 shouldBe true
 
     name should "have well formed chunks: aligned channels, only the last one shorter" in:
       val chunks = loadStereo(fixture.resource).chunks

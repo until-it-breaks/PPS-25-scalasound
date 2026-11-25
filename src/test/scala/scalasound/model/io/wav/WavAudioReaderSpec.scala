@@ -9,6 +9,7 @@ import scalasound.model.io.fixtures.WavFixtures.*
 import scalasound.model.io.wav.WavAudioReader
 
 import java.nio.file.{Files, Path}
+import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 import scala.util.Random
 
@@ -59,7 +60,7 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       val track = loadTrack[MonoTrack](path)
 
       track.sampleRate.value shouldBe 8000
-      track.durationInSeconds shouldBe 1.0
+      track.duration shouldBe 1.second
 
   it should "be split in chunks of 1024 frames with a shorter final chunk and no padding" in:
     val samples = pcmSampleSequence(2500)
@@ -74,7 +75,7 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       val track = loadTrack[MonoTrack](path)
 
       track.chunks shouldBe Vector.empty
-      track.durationInSeconds shouldBe 0.0
+      track.duration shouldBe Duration.Zero
 
   private def pcmSampleSequence(frames: Int): Vector[Int] =
     Vector.tabulate(frames)(i => ((i * 13) % 20000) - 10000)
@@ -97,14 +98,14 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       val track = loadTrack[StereoTrack](path)
 
       track.frameCount shouldBe 4800L
-      track.durationInSeconds shouldBe 0.1
+      track.duration shouldBe 100.millis
 
   it should "be accepted when it contains no frames, with duration zero" in
     withTempFile("stereo-empty.wav", pcm16Wav(44100, 2, Vector.empty)): path =>
       val track = loadTrack[StereoTrack](path)
 
       track.chunks shouldBe Vector.empty
-      track.durationInSeconds shouldBe 0.0
+      track.duration shouldBe Duration.Zero
 
   "Loading a file" should "return FileNotFound when the path does not exist" in withTempDir: dir =>
     val path = dir.resolve("missing.wav").toString

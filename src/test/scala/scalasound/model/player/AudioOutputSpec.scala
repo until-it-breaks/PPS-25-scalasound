@@ -41,9 +41,9 @@ class AudioOutputSpec extends CatsEffectSuite:
   }
 
   test("console does not wait") {
-    // a 100 ms chunk is being played here
-    elapsed(AudioOutput.console.write(mono(4410), sampleRate)).map: e =>
-      assert(e < 50.millis, s"Expected no pacing, but took ${e.toMillis}ms")
+    // a 10 s chunk: a paced output would take about 10 s here
+    elapsed(AudioOutput.console.write(mono(441000), sampleRate)).map: e =>
+      assert(e < 1.second, s"Expected no pacing, but took ${e.toMillis}ms")
   }
 
   List(8000 -> 120.millis, 16000 -> 60.millis, 48000 -> 20.millis, 96000 -> 10.millis)

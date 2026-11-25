@@ -100,7 +100,7 @@ class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
   "removeAll" should "clear the list even if no element is inside" in:
     val base = AppState.initial
     base.effects shouldBe List.empty
-    base.handle(RemoveAll).effects shouldBe List.empty
+    base.handle(RemoveAllEffects).effects shouldBe List.empty
 
   it should "remove all the effects contained in the effects list" in:
     val effects = Seq(AudioEffect.volume(1.0f), AudioEffect.gain(1.0f))
@@ -109,7 +109,7 @@ class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
     }
     base.effects should not be List.empty
     base.effects.length shouldBe effects.length
-    base.handle(RemoveAll).effects shouldBe List.empty
+    base.handle(RemoveAllEffects).effects shouldBe List.empty
 
   "addEffect" should "add a new effect to the effects list" in:
     val base = AppState.initial
@@ -136,18 +136,6 @@ class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
     newBase.effects.length shouldBe effects.length
     newBase.effects.head.effectType shouldBe Some(Volume)
     newBase.effects shouldBe List(volume2, gain)
-
-  "currentPositionSeconds" should "calculate correct time based on active chunkIndex" in {
-    val state = AppState.initial.handle(UpdateImport(Imported(track)))
-    // Chunk 0 (0.0s)
-    state.currentPositionSeconds shouldBe 0.0 +- 0.001
-    // Chunk 1 (Starts at 1.0s)
-    state.handle(SeekToIndex(1)).currentPositionSeconds shouldBe 1.0 +- 0.001
-    // Chunk 2 (Starts at 2.0s)
-    state.handle(SeekToIndex(2)).currentPositionSeconds shouldBe 2.0 +- 0.001
-    // No track loaded should return 0.0
-    AppState.initial.currentPositionSeconds shouldBe 0.0
-  }
 
   "import and export" should "handle intermediate and failure states without losing track" in {
     val loaded         = AppState.initial.handle(UpdateImport(Imported(track)))

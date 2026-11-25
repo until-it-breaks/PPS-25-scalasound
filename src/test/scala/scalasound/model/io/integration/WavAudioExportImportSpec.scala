@@ -60,7 +60,7 @@ class WavAudioExportImportSpec extends AnyFlatSpec with Matchers with EitherValu
 
     loaded.sampleRate.value shouldBe 44100
     loaded.frameCount shouldBe original.frameCount
-    loaded.durationInSeconds shouldBe original.durationInSeconds
+    loaded.duration shouldBe original.duration
     assertClose(loaded.chunks.flatMap(_.samples), samples)
 
   it should "re-chunk samples into standard 1024-frame blocks upon import regardless of original chunk layout" in:
@@ -110,7 +110,7 @@ class WavAudioExportImportSpec extends AnyFlatSpec with Matchers with EitherValu
 
     loaded.sampleRate.value shouldBe 48000
     loaded.frameCount shouldBe original.frameCount
-    loaded.durationInSeconds shouldBe original.durationInSeconds
+    loaded.duration shouldBe original.duration
     assertClose(loaded.chunks.flatMap(_.left), left)
     assertClose(loaded.chunks.flatMap(_.right), right)
 

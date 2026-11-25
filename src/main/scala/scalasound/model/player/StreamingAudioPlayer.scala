@@ -1,16 +1,15 @@
 package scalasound.model.player
 
 import cats.effect.IO
-import cats.kernel.Eq
 import fs2.Stream
 import scalasound.model.domain.AudioChunk
 import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.{AppState, AppStateStore, Command, PlaybackState}
 
 /** An [[AudioPlayer]] that processes and plays audio in real time, one chunk at a time.
- *
- * Each chunk is processed with the current effects just before it is played, so effect changes are
- * heard on the next chunk and nothing is processed in advance.
+  *
+  * Each chunk is processed with the current effects just before it is played. A change made while a
+  * chunk is playing takes effect from the next one
   *
   * @param processor
   *   the processor used to apply effects to each [[AudioChunk]]
@@ -20,11 +19,8 @@ import scalasound.model.state.{AppState, AppStateStore, Command, PlaybackState}
 private final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOutput)
     extends AudioPlayer:
 
-  private given Eq[(PlaybackState, Int)] = Eq.fromUniversalEquals
-
   def run(store: AppStateStore): Stream[IO, Unit] =
-    store.changes
-      .changesBy(state => (state.playbackState, state.chunkIndex))
+    store.playbackProgressChanges
       .switchMap { state =>
         state.playbackState match
           case PlaybackState.Playing =>
@@ -50,12 +46,12 @@ private final class StreamingAudioPlayer(processor: AudioProcessor, out: AudioOu
     *   the store to dispatch `NextChunk` or `Stop` to
     */
   private def playChunk(state: AppState, store: AppStateStore): IO[Unit] =
-    val current =
+    val playable =
       for
         track <- state.track
         chunk <- track.chunks.lift(state.chunkIndex)
       yield (track, chunk)
-    current match
+    playable match
       case Some((track, chunk)) =>
         for
           processed <- process(chunk, state)

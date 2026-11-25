@@ -1,3 +1,5 @@
+\newpage
+
 # Testing
 
 ## Tecnologie utilizzate
@@ -12,17 +14,22 @@ Per il testing sono stati usati due framework e uno strumento per misurare la co
 
 Il team **non ha adottato il TDD** poichè si trattava del primo progetto in Scala per i membri del gruppo, e la scarsa dimestichezza sia con il linguaggio sia con lo stack di librerie (`cats-effect`, `fs2`) rendeva poco praticabile scrivere i test prima del codice. Si è quindi scelto di scrivere i test dopo l'implementazione, una volta stabilizzate le interfacce dei componenti.
 
-L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 199 test e una copertura del *91.28%* a livello di statement e dell'*87.50%* a livello di branch.
+L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 199 test e una copertura del *93.02%* a livello di statement e dell'*90.40%* a livello di branch.
 
 Le suite in `src/test` sono di tipologie diverse, riassunte nella tabella seguente.
 
 +----------------------+----------------------------------------------+----------------------------------------+
 | Tipologia            | Suite                                        | Cosa verificano                        |
 +======================+==============================================+========================================+
-| Unit sulla logica    | `AudioTrackSpec`\                            | dominio, stato, effetti, processore e  |
-| pura                 | `AppStateSpec`\                              | codifica PCM                           |
-|                      | `AudioEffectsTest`\                          |                                        |
-|                      | `AudioProcessorTest`\                        |                                        |
+| Unit sulla logica    | `AudioTrackSpec`\                            | dominio, stato, effetti,               |
+| pura                 | `AppStateSpec`\                              | processore, formati WAV,               |
+|                      | `AudioEffectsTest`\                          | registro dei formati e                 |
+|                      | `AudioProcessorTest`\                        | codifica PCM                           |
+|                      | `AudioFormatRegistrySpec`\                   |                                        |
+|                      | `FileExtensionsSpec`\                        |                                        |
+|                      | `WavFormatSpec`\                             |                                        |
+|                      | `Pcm16Spec`\                                 |                                        |
+|                      | `PcmChunksSpec`\                             |                                        |
 |                      | `SpeakerAudioOutputSpec`                     |                                        |
 +----------------------+----------------------------------------------+----------------------------------------+
 | Unit su componenti   | `PlaybackControllerSpec`\                    | comportamento osservabile di           |
@@ -32,7 +39,8 @@ Le suite in `src/test` sono di tipologie diverse, riassunte nella tabella seguen
 |                      | `AudioOutputSpec`                            |                                        |
 +----------------------+----------------------------------------------+----------------------------------------+
 | I/O su file          | `WavAudioReaderSpec`\                        | lettura e scrittura WAV su file        |
-|                      | `WavAudioWriterSpec`                         | temporanei                             |
+|                      | `WavAudioWriterSpec`\                        | temporanei                             |
+|                      | `WavAudioFormatSpec`                         |                                        |
 +----------------------+----------------------------------------------+----------------------------------------+
 | Integrazione         | `StreamingAudioPlayerSpec`\                  | più componenti usati insieme e         |
 |                      | `LoadSaveIntegrationSpec`\                   | round-trip di esportazione e           |
@@ -56,21 +64,23 @@ La coverage è misurata con sbt-scoverage, escludendo il package `view` e i punt
 
 | Metrica                  | Valore                                 |
 |--------------------------|----------------------------------------|
-| Numero di test           | 199 (139 ScalaTest + 60 MUnit)         |
-| Statement coverage       | 91.28 % (973 / 1067)                   |
-| Branch coverage          | 87.50 % (140 / 160)                    |
-| Righe di codice misurate | 1945 in 25 file, 37 classi, 189 metodi |
+| Numero di test           | 294 (224 ScalaTest + 70 MUnit)         |
+| Statement coverage       | 93.02 % (1146 / 1232)                  |
+| Branch coverage          | 90.40 % (160 / 177)                    |
+| Righe di codice misurate | 2468 in 32 file, 45 classi, 229 metodi |
 
-| Package                       | Statement coverage |
-|-------------------------------|--------------------|
-| `scalasound.controller`       | 96.88 %            |
-| `scalasound.model.domain`     | 89.74 %            |
-| `scalasound.model.io`         | 89.83 %            |
-| `scalasound.model.player`     | 65.62 %            |
-| `scalasound.model.processing` | 95.86 %            |
-| `scalasound.model.state`      | 100.00 %           |
+| Package                                   | Statement coverage |
+|-------------------------------------------|--------------------|
+| `scalasound.controller`                   | 90.32 %            |
+| `scalasound.model.domain`                 | 98.86 %            |
+| `scalasound.model.io`                     | 94.21 %            |
+| `scalasound.model.player`                 | 66.91 %            |
+| `scalasound.model.processing`             | 97.20 %            |
+| `scalasound.model.processing.effects`     | 100.00 %           |
+| `scalasound.model.processing.processors`  | 100.00 %           |
+| `scalasound.model.state`                  | 100.00 %           |
 
-Il package `scalasound.model.player` è coperto al 65.62% poichè la parte non testata si concentra in `SpeakerAudioOutput`, in particolare per quanto riguarda la gestione della `SourceDataLine` di Java Sound API (apertura, uso e riapertura al cambio di formato), che si interfaccia con la scheda audio del sistema fisico. È stata invece testata la codifica degli `AudioChunk` in byte da inviare alla libreria suddetta. La fedeltà acustica dell'audio in output è stata verificata manualmente con la demo di riproduzione (`AudioPlaybackDemo`).
+Il package `scalasound.model.player` è coperto al 66.91% poichè la parte non testata si concentra in `SpeakerAudioOutput`, in particolare per quanto riguarda la gestione della `SourceDataLine` di Java Sound API (apertura, uso e riapertura al cambio di formato), che si interfaccia con la scheda audio del sistema fisico. È stata invece testata la codifica degli `AudioChunk` in byte da inviare alla libreria suddetta. La fedeltà acustica dell'audio in output è stata verificata manualmente con la demo di riproduzione (`AudioPlaybackDemo`).
 
 ## Esempi rilevanti
 
@@ -100,10 +110,10 @@ L'helper `playToEnd` incapsula lo scenario: crea l'`AppStateStore`, avvia il pla
 
 ### AppState e AppStateStore: flussi di stati senza duplicati
 
-`AppState` è immutabile e `AppStateStore` lo espone come uno stream di cambiamenti. I flussi derivati (`playbackChanges`, `trackChanges`, `importStateChanges`, `exportStateChanges`) devono emettere un valore solo quando cambia la parte di stato a cui sono interessati. Per verificarli in isolamento, i test usano un'implementazione dello store che emette una lista fissa di stati, ottenuti con `copy` a partire dallo stato iniziale: il risultato atteso si legge direttamente nel test. Le transizioni dello stato (`Play` senza traccia ignorato, `Pause` solo da `Playing`, `Stop` che azzera il play head, clamp del `seek`, un solo effetto per tipo) sono funzioni pure e sono testate in `AppStateSpec` senza alcuna infrastruttura.
+`AppState` è immutabile e `AppStateStore` lo espone come uno stream di cambiamenti. I flussi derivati (`playbackStateChanges`, `playheadChanges`, `playbackProgressChanges`, `importStateChanges`, `exportStateChanges`) devono emettere un valore solo quando cambia la parte di stato a cui sono interessati. Per verificarli in isolamento, i test usano un'implementazione dello store che emette una lista fissa di stati, ottenuti con `copy` a partire dallo stato iniziale: il risultato atteso si legge direttamente nel test. Le transizioni dello stato (`Play` senza traccia ignorato, `Pause` solo da `Playing`, `Stop` che azzera il play head, clamp del `seek`, un solo effetto per tipo) sono funzioni pure e sono testate in `AppStateSpec` senza alcuna infrastruttura.
 
 ```scala
-test("playbackChanges should drop repeated playback states") {
+test("playbackStateChanges should drop repeated playback states") {
   val store = storeEmitting(
     base,
     base.copy(playbackState = PlaybackState.Playing),
@@ -111,7 +121,7 @@ test("playbackChanges should drop repeated playback states") {
     base.copy(playbackState = PlaybackState.Playing, chunkIndex = 1),
     base.copy(playbackState = PlaybackState.Paused)
   )
-  store.playbackChanges.compile.toList.map { result =>
+  store.playbackStateChanges.compile.toList.map { result =>
     assertEquals(
       result,
       List(PlaybackState.Stopped, PlaybackState.Playing, PlaybackState.Paused)
@@ -122,7 +132,7 @@ test("playbackChanges should drop repeated playback states") {
 
 ### Flusso completo di importazione ed esportazione
 
-`LoadSaveIntegrationSpec` verifica il percorso intero con componenti reali: store, `LoadSaveController`, `WavAudioReader`, `WavAudioWriter` e l'osservatore che aggiorna la view. La view è sostituita da una versione che registra gli eventi ricevuti. Un file WAV reale viene scritto in una cartella temporanea, importato tramite il controller ed esportato di nuovo, quindi riletto: la traccia esportata deve essere uguale a quella originale e la view deve aver ricevuto la traccia importata e l'esito dell'esportazione. Un secondo test verifica che gli errori (file inesistente, salvataggio senza traccia) arrivino alla view e vengano azzerati dopo la conferma dell'utente. La cartella temporanea è gestita da una `Resource` e viene eliminata anche se il test fallisce.
+`LoadSaveIntegrationSpec` verifica il percorso intero con componenti reali: store, `LoadSaveController`, `AudioFormatRegistry` con il formato WAV (`WavAudioReader` e `WavAudioWriter`) e l'osservatore che aggiorna la view. La view è sostituita da una versione che registra gli eventi ricevuti. Un file WAV reale viene scritto in una cartella temporanea, importato tramite il controller ed esportato di nuovo, quindi riletto: la traccia esportata deve essere uguale a quella originale e la view deve aver ricevuto la traccia importata e l'esito dell'esportazione. Un secondo test verifica che gli effetti attivi siano applicati alla traccia esportata senza modificare quella caricata. Un terzo verifica che gli errori (file inesistente, salvataggio senza traccia) arrivino alla view e vengano azzerati dopo la conferma dell'utente, e un quarto che un file con estensione non supportata sia segnalato come errore di importazione senza essere aperto. La cartella temporanea è gestita da una `Resource` e viene eliminata anche se il test fallisce.
 
 ### Importazione di file WAV reali
 
@@ -138,7 +148,7 @@ L'hash verifica ogni campione del file senza doverli elencare uno per uno nel te
 
 ### Esportazione WAV: byte esatti e casi limite
 
-`WavAudioWriterSpec` confronta il file prodotto, byte per byte, con un WAV PCM a 16 bit costruito a parte da `WavFixtures`, e legge l'header campo per campo (dimensioni RIFF, byte rate, block align) per mono e stereo. Verifica poi le regole di conversione dei campioni (arrotondamento, saturazione di +1.0 a 32767, ordine little-endian) e i casi limite:
+`WavAudioWriterSpec` confronta il file prodotto, byte per byte, con un WAV PCM a 16 bit costruito a parte da `WavFixtures`, e legge l'header campo per campo (dimensioni RIFF, byte rate, block align) per mono e stereo. Verifica poi che i dati siano la concatenazione dei chunk codificati da `PcmChunks` e i casi limite. Le regole di conversione dei campioni (arrotondamento, saturazione di +1.0 a 32767, ordine little-endian) sono invece verificate a parte, in `Pcm16Spec` e `PcmChunksSpec`:
 
 - `NaN` e infiniti sono rifiutati con `InvalidSample` e non viene creato alcun file;
 - una cartella inesistente o un percorso che è una directory producono `WriteFailure`;
@@ -153,11 +163,11 @@ I test degli effetti (`AudioEffectsTest`) ricavano i limiti dei parametri dalla 
 val echoEffect = EchoEffect(alpha, delay = 10, sampleRate = 1000.0f)
 val firstChunk = echoEffect(chunk, chunkIndex = 0)
 // niente da ripetere: il primo chunk è uguale all'ingresso
-firstChunk.value.getVectors shouldBe chunk.getVectors
+firstChunk.value.channels shouldBe chunk.channels
 
 val secondChunk = echoEffect(chunk, chunkIndex = 1)
 val expectedSampleValue = defaultValueChunk + (alpha * defaultValueChunk)
-secondChunk.value.getVectors.head shouldBe
+secondChunk.value.channels.head shouldBe
   Vector.fill(sizeChunk)(expectedSampleValue)
 ```
 

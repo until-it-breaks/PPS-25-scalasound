@@ -1,15 +1,17 @@
 package scalasound
 
-import cats.effect.{IO, Resource}
 import cats.effect.unsafe.IORuntime
 import scalasound.controller.{EffectsController, LoadSaveController, PlaybackControllerImpl}
 import scalasound.model.io.AudioFormatRegistry
 import scalasound.model.io.wav.WavAudioFormat
+import cats.effect.{IO, Resource}
+import scalasound.controller.{EffectsController, LoadSaveController, PlaybackController}
+import scalasound.model.io.AudioFormatRegistry
 import scalasound.model.player.{AudioOutput, AudioPlayer}
-import scalasound.model.processing.AudioProcessorWithRules
+import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.AppStateStore
 import scalasound.view.AppDependencies
-import scalasound.view.panels.effects.{EffectsControllerProxy, EffectsLogic}
+import scalasound.view.panels.effects.{EffectsControllerWrapper, EffectsLogic}
 import scalasound.view.panels.loadsave.LoadSaveLogic
 import scalasound.view.panels.playback.TrackBoxLogic
 
@@ -19,10 +21,9 @@ object AppSetup:
       store              <- Resource.eval(AppStateStore.make)
       formats            <- Resource.eval(supportedFormats)
       loadSaveController <- LoadSaveController.make(store, formats)
-      loadSaveLogic      = LoadSaveLogic(store, loadSaveController)
-      trackBoxLogic      = TrackBoxLogic(store, PlaybackControllerImpl(store))
-      effectsProxy       = EffectsControllerProxy(EffectsController(store))
-      effectsLogic       = EffectsLogic(effectsProxy)
+      loadSaveLogic = LoadSaveLogic(store, loadSaveController)
+      trackBoxLogic = TrackBoxLogic(store, PlaybackController(store))
+      effectsLogic  = EffectsLogic(EffectsControllerWrapper(EffectsController(store)))
       _ <- startPlayer(store)
       _ <- (ready >> loadSaveLogic.observe).background
       _ <- (ready >> trackBoxLogic.observe).background
@@ -37,10 +38,12 @@ object AppSetup:
     )
 
   private def startPlayer(store: AppStateStore): Resource[IO, Unit] =
-    AudioPlayer
-      .streaming(AudioProcessorWithRules, AudioOutput.speakers)
-      .run(store)
-      .compile
-      .drain
-      .background
-      .map(_ => ())
+    for
+      out <- AudioOutput.speakers
+      _   <- AudioPlayer
+        .streaming(AudioProcessor.withRules, out)
+        .run(store)
+        .compile
+        .drain
+        .background
+    yield ()

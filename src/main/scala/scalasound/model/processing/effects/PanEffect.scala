@@ -1,7 +1,8 @@
-package scalasound.model.processing
+package scalasound.model.processing.effects
 
-import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
+import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.model.processing.*
 
 /* *** PAN EFFECT *** */
 private[processing] object PanEffect extends AudioConfiguration:
@@ -76,10 +77,8 @@ private[processing] final case class PanEffect(pan: Float) extends StatelessAudi
      */
 
     checkPan.toLeft:
-      val (lch, rch) = chunk match
-        case MonoChunk(samples) => (samples, samples)
-        case StereoChunk(left, right) => (left, right)
-
-      StereoChunk(
-        lch.map(x => x * leftPan),
-        rch.map(x => x * rightPan))
+      chunk match
+        case MonoChunk(samples) =>
+          StereoChunk(samples.map(_ * leftPan), samples.map(_ * rightPan))
+        case StereoChunk(left, right) =>
+          StereoChunk(left.map(_ * leftPan), right.map(_ * rightPan))

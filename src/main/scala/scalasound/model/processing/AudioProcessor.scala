@@ -2,7 +2,8 @@ package scalasound.model.processing
 
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import AudioError.AudioProcessorError
-import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
+import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, SampleRate, StereoTrack}
+import scalasound.model.processing.processors.{AudioProcessorWithRules, SimpleAudioProcessor}
 
 /**
  * Defines the entity capable of managing the various effects
@@ -38,21 +39,22 @@ trait AudioProcessor:
     else if track.isEmpty then Left(AudioProcessorError(this, "Track is empty!"))
     else processTrack(track, effects)
 
+  /* Applies the effects on the given chunk. */
+  protected def processChunk(chunk: AudioChunk,
+                             effects: List[AudioEffect],
+                             chunkIndex: Int): Either[AudioError, AudioChunk] =
+    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)):
+      (currentChunk, effect) =>
+        currentChunk.flatMap:
+          chunky =>
+            effect match
+              case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
+              case standardEffect: StatelessAudioEffect => standardEffect(chunky)
+
   /* Applies the effects on the given track. */
   protected def processTrack(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
-    val processedTrack = track.chunksAsList.
-      // It starts with an empty list and index 0.
-      foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))) { (accumulator, currentChunk) =>
-        for
-          /* Extracts the accumulator as a list (initially is Nil) and the first index. */
-          (acc, idx) <- accumulator
-          chunk <- processChunk(currentChunk, effects, idx) /* Extracts the chunk if is Right. */
-        yield
-          (chunk :: acc, idx + 1) /* Adds the chunk in front of the list, and it updates the index. */
-      }
-
     for
-      (reversedChunks, _) <- processedTrack
+      (reversedChunks, _) <- processedAudioTrack(track, effects)
       /*
        * If the track is [C1, C2, C3], the foldLeft returns [C3, C2, C1].
        * FoldLeft chosen for performance because it starts at the beginning
@@ -65,78 +67,53 @@ trait AudioProcessor:
        * If the outcome is positive then the result track is an StereoTrack
        * otherwise a MonoTrack.
        */
-      isStereo = chunks.exists(_.isInstanceOf[StereoChunk])
+      isStereo = chunks.exists {
+        case _ :MonoChunk => false
+        case _ :StereoChunk => true
+      }
 
-      resultTrack <- if isStereo then
-        val stereoChunks: Vector[StereoChunk] = chunks.map[StereoChunk] {
-          case stereoChunk: StereoChunk => stereoChunk
-          case MonoChunk(samples) => StereoChunk(samples, samples)
-        }.toVector
-        StereoTrack
-          .fromValidated(track.sampleRate, stereoChunks)
-          .left
-          .map(err => AudioProcessorError(this, err.toString))
-      else
-        val monoChunks: Vector[MonoChunk] = chunks.collect {
-          case monoChunk: MonoChunk => monoChunk
-        }.toVector
-        Right(MonoTrack.fromValidated(track.sampleRate, monoChunks))
+      resultTrack <- trackMonoOrStereo(chunks, isStereo, track.sampleRate)
     yield resultTrack
 
-  /* Applies the effects on the given chunk. */
-  protected def processChunk(chunk: AudioChunk,
-                             effects: List[AudioEffect],
-                             chunkIndex: Int): Either[AudioError, AudioChunk] =
-    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)) {
-      (currentChunk, effect) =>
-        currentChunk.flatMap:
-          chunky =>
-            effect match
-              // Checks if the effect is type TimeAudioEffect since this type
-              // of effects need the chunk index to compute the final result.
-              case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
-              case standardEffect: StatelessAudioEffect => standardEffect(chunky)
-    }
+  /* Applies the effects on all the chunks in the track. */
+  private def processedAudioTrack(track: AudioTrack, effects: List[AudioEffect]): Either[AudioError, (List[AudioChunk], Int)] =
+    track.chunksAsList.
+      // It starts with an empty list and index 0.
+      foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))):
+        (accumulator, currentChunk) =>
+          for
+            (acc, idx) <- accumulator
+            chunk <- processChunk(currentChunk, effects, idx)
+          yield
+            (chunk :: acc, idx + 1)
 
-/**
- * AudioProcessor with no rules on how to apply effects.
- */
-object SimpleAudioProcessor extends AudioProcessor
+  /* Builds a new track Mono or Stereo by checking a flag that indicates how will be the result track. */
+  private def trackMonoOrStereo(chunks: List[AudioChunk], isStereo: Boolean, sampleRate: SampleRate): Either[AudioError, AudioTrack] =
+    if isStereo then
+      val stereoChunks: Vector[StereoChunk] = chunks.map[StereoChunk] {
+        case stereoChunk: StereoChunk => stereoChunk
+        case MonoChunk(samples) => StereoChunk(samples, samples)
+      }.toVector
+      StereoTrack
+        .fromValidated(sampleRate, stereoChunks)
+        .left
+        .map(err => AudioProcessorError(this, err.toString))
+    else
+      val monoChunks: Vector[MonoChunk] = chunks.collect {
+        case monoChunk: MonoChunk => monoChunk
+      }.toVector
+      Right(MonoTrack.fromValidated(sampleRate, monoChunks))
 
-/**
- * AudioProcessor with rules that define the order on how to apply effects.
- */
-object AudioProcessorWithRules extends AudioProcessor:
+object AudioProcessor:
 
-  /* Implicit ordering by using priority on the effects. */
-  given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
+  /**
+   * @return a new AudioProcessor with no internal ordering
+   *         for the effects.
+   */
+  def simple: AudioProcessor = SimpleAudioProcessor
 
-  /* It defines the mechanism for ordering the various effects based on priority. */
-  private def orderingByPriority(effect: AudioEffect): Int = effect match
-    case IdentityEffect => EffectPriority.IdentityEffect.ordinal
-    case _: GainEffect => EffectPriority.GainEffect.ordinal
-    case _: DistortionEffect => EffectPriority.DistortionEffect.ordinal
-    case _: EchoEffect => EffectPriority.EchoEffect.ordinal
-    case _: PanEffect => EffectPriority.PanEffect.ordinal
-    case _: AutopanEffect => EffectPriority.AutopanEffect.ordinal
-    case _: VolumeEffect => EffectPriority.VolumeEffect.ordinal
-    case _ => EffectPriority.values.length
-
-  override protected def processChunk(chunk: AudioChunk,
-                                      effects: List[AudioEffect],
-                                      chunkIndex: Int): Either[AudioError, AudioChunk] =
-    super.processChunk(chunk, effects.sorted, chunkIndex)
-
-  override protected def processTrack(track: AudioTrack,
-                                      effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
-    super.processTrack(track, effects.sorted)
-
-  /* Specifies the different effects and the corresponding order. */
-  private enum EffectPriority:
-    case IdentityEffect
-    case GainEffect
-    case DistortionEffect
-    case EchoEffect
-    case PanEffect
-    case AutopanEffect
-    case VolumeEffect
+  /**
+   * @return a new AudioProcessor with a defined ordering logic
+   *         for the effects.
+   */
+  def withRules: AudioProcessor = AudioProcessorWithRules

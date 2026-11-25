@@ -6,6 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
 import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Pan, Volume}
+import scalasound.model.processing.effects.{AutopanEffect, EchoEffect}
 
 /**
  * Test class containing all the checks for the effects applied on an audio chunk.
@@ -60,8 +61,8 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     newStatelessEffect.effectType shouldBe Option.empty
     newTimeEffect.effectType shouldBe Option.empty
 
-  it should "return true for effects of the same type even if they have different parameters" +
-    "otherwise it should return false because the two effects doesn't have the same type" in:
+  it should "return true for effects of the same type even if they have different parameters " +
+    "otherwise it should return false because the two effects don't have the same type" in:
     val gain1 = AudioEffect.gain(Config.GainConfig.default)
     val gain2 = AudioEffect.gain(Config.GainConfig.max)
     gain1.hasSameEffectTypeOf(gain2) shouldBe true
@@ -103,7 +104,14 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val resultChunk = AudioEffect.pan(pan)(chunk)
     resultChunk.value shouldBe a [StereoChunk]
 
-  "PanEffect" should "disable right channel when the min pan value is inserted" in :
+    val stereoChunk = StereoChunk(
+      Vector.fill(sizeChunk)(defaultValueChunk),
+      Vector.fill(sizeChunk)(defaultValueChunk)
+    )
+    val resultStereoChunk = AudioEffect.pan(pan)(stereoChunk)
+    resultStereoChunk.value shouldBe a [StereoChunk]
+
+  it should "disable right channel when the min pan value is inserted" in :
     val pan = Config.PanConfig.min
     val resultChunk = AudioEffect.pan(pan)(chunk)
     resultChunk.value.channels(1) shouldBe Vector.fill(sizeChunk)(0.0f)
@@ -155,7 +163,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val resultValueSin = math.sin(distortion * defaultValueChunk).toFloat
     resultChunkSin.value shouldBe MonoChunk(Vector.fill(sizeChunk)(resultValueSin))
 
-  it should "apply the distortion in both channel on a StereoChunk" in :
+  it should "apply the distortion in both channel of a StereoChunk" in:
     val distortion = (Config.DistortionConfig.min + Config.DistortionConfig.max) / 2
     val channel = Vector.fill(sizeChunk)(defaultValueChunk)
     val stereoChunk = StereoChunk(channel, channel)
@@ -173,7 +181,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
 
     val invalidDistortionMin = Config.DistortionConfig.min - 3.0f
     val resultChunkMin = AudioEffect.distortion(invalidDistortionMin)(chunk)
-    resultChunkMin.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkMin.left.value shouldBe a [AudioError.AudioEffectsError]
 
   "AutopanEffect" should "return a new StereoChunk where " +
     "for each sample is multiplied by a different factor" in:
@@ -194,22 +202,23 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val resultChunkAlpha = EchoEffect(alphaOut,
       delayStandard,
       sampleRateStandard)(chunk, chunkIndex = 0)
-    resultChunkAlpha.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkAlpha.left.value shouldBe a [AudioError.AudioEffectsError]
 
     val delayOut = Config.DelayConfig.max.toInt * 100
     val resultChunkDelay = EchoEffect(alphaStandard,
       delayOut,
       sampleRateStandard)(chunk, chunkIndex = 0)
-    resultChunkDelay.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkDelay.left.value shouldBe a [AudioError.AudioEffectsError]
 
     val invalidSampleRate = 0.0f
     val resultChunkSampleRate = EchoEffect(alphaStandard, delayStandard, invalidSampleRate)(chunk, chunkIndex = 0)
-    resultChunkSampleRate.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkSampleRate.left.value shouldBe a [AudioError.AudioEffectsError]
     
   it should "apply the Infinite Impulse Response (IIR) in the correct way" in:
     // Since the size of the defaultChunk is 10, to guarantee a correct verification
     // of the IIR approach it used a sample rate of 1000Hz and a delay of 10ms.
     // So, for 10 samples is necessary a 10ms delay.
+    // Nsamples delayed = (delay / 1000ms) * sampleRate
     val sampleRate = 1000.0f //Hz
     val delay = 10 //ms
     val alpha = (Config.AlphaConfig.min + Config.AlphaConfig.max) / 2
@@ -228,3 +237,27 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     // because it was instantiated in the same way as the default chunk.
     val expectedSampleValue = defaultValueChunk + (alpha * defaultValueChunk)
     secondChunk.value.channels.head shouldBe Vector.fill(sizeChunk)(expectedSampleValue)
+
+  it should "apply the Infinite Impulse Response (IIR) to a StereoChunk" in:
+    val sampleRate = 100.0f //Hz
+    val delay = 20 //ms
+    val alpha = (Config.AlphaConfig.min + Config.AlphaConfig.max) / 2
+    val nSamples = ((delay / 1000.0f) * sampleRate).toInt
+    val leftValue = defaultValueChunk
+    val rightValue = defaultValueChunk / 2
+    val stereoChunk = StereoChunk(
+      Vector.fill(nSamples)(leftValue),
+      Vector.fill(nSamples)(rightValue)
+    )
+
+    val echoEffect = EchoEffect(alpha, delay, sampleRate)
+    val firstChunk = echoEffect(stereoChunk, chunkIndex = 0)
+    firstChunk.value.channels shouldBe stereoChunk.channels
+
+    val secondChunk = echoEffect(stereoChunk, chunkIndex = 1)
+    val expectedLeftValue = leftValue + (alpha * leftValue)
+    val expectedRightValue = rightValue + (alpha * rightValue)
+    secondChunk.value.channels shouldBe Vector(
+      Vector.fill(nSamples)(expectedLeftValue),
+      Vector.fill(nSamples)(expectedRightValue)
+    )

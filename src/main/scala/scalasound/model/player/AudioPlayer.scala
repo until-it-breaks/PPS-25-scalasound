@@ -5,7 +5,7 @@ import fs2.Stream
 import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.AppStateStore
 
-/** Plays the track in the [[AppState]] through an [[AudioOutput]].
+/** Plays the track in the [[AppState]].
   *
   * An [[AudioPlayer]] only watches the [[AppStateStore]] and reacts to it: while `Playing` it plays
   * from `chunkIndex`, advances the play head with `NextChunk`, and dispatches `Stop` at the end of
@@ -19,8 +19,7 @@ trait AudioPlayer:
     * can be started again.
     *
     * @param store
-    *   the [[AppStateStore]] to watch for [[AppState]] changes and to dispatch play head updates
-    *   to.
+    *   the [[AppStateStore]] to watch for changes and to dispatch the play head updates to
     * @return
     *   a stream that never completes on its own; cancel it to stop the player
     */
@@ -28,7 +27,7 @@ trait AudioPlayer:
 
 object AudioPlayer:
 
-  /** An [[AudioPlayer]] that plays one chunk at a time, processing each chunk just before playing
+  /** Creates an [[AudioPlayer]] that plays one chunk at a time, processing each chunk just before playing
     * it.
     *
     * @param processor

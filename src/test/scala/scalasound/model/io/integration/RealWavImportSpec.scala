@@ -8,7 +8,7 @@ import scalasound.model.io.wav.WavAudioReader
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN
-import java.nio.file.{Files, Paths, StandardCopyOption}
+import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import java.security.MessageDigest
 import scala.util.Using
 
@@ -21,11 +21,11 @@ import scala.util.Using
   */
 class RealWavImportSpec extends AnyFlatSpec with Matchers:
 
-  private lazy val resolvedResourcePaths: Map[String, String] =
+  private lazy val resolvedResourcePaths: Map[Path, Path] =
     fixtures.map(fixture => fixture.resource -> resolveResource(fixture.resource)).toMap
   private val fixtures = Vector(
     Fixture(
-      "/file_example_WAV_2MG.wav",
+      Paths.get("/file_example_WAV_2MG.wav"),
       526_073,
       "0c2c795c9898b37e401abf638b452fa55f245f3dee833d3e7ecfacf65154f4f4",
       "3994479633ab6436f734a0c7b4d40eaff60944e0863a2c706b513ed01e9ba7b3",
@@ -39,7 +39,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
       )
     ),
     Fixture(
-      "/file_example_WAV_5MG.wav",
+      Paths.get("/file_example_WAV_5MG.wav"),
       1_322_253,
       "d1e7060f734ccfb364a4902c3b6671317196b757b8ae2fc886f62749a7b7260a",
       "5c799583eb56c163c52b9c7d8054dfcbca4bba23d48ddb6e0eb8c1a34416be49",
@@ -55,7 +55,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
   )
   private val sampleRate = 44100
 
-  private def loadStereo(resource: String): StereoTrack =
+  private def loadStereo(resource: Path): StereoTrack =
     WavAudioReader.load(resourcePath(resource)).unsafeRunSync() match
       case Right(track: StereoTrack) =>
         track
@@ -64,15 +64,16 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
           s"expected a StereoTrack for $resource but got ${other.getClass.getSimpleName}: $other"
         )
 
-  private def resourcePath(resource: String): String =
+  private def resourcePath(resource: Path): Path =
     resolvedResourcePaths.getOrElse(resource, resolveResource(resource))
 
-  private def resolveResource(resource: String): String =
-    val url = Option(getClass.getResource(resource)).getOrElse(
-      fail(s"test resource not found on the classpath: $resource")
+  private def resolveResource(resource: Path): Path =
+    val resourceName = resource.toString.replace('\\', '/')
+    val url = Option(getClass.getResource(resourceName)).getOrElse(
+      fail(s"test resource not found on the classpath: $resourceName")
     )
 
-    if url.getProtocol == "file" then Paths.get(url.toURI).toString
+    if url.getProtocol == "file" then Paths.get(url.toURI)
     else
       val tempFile = Files.createTempFile("scalasound-wav-", ".wav")
 
@@ -81,7 +82,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
           Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING)
 
         tempFile.toFile.deleteOnExit()
-        tempFile.toAbsolutePath.toString
+        tempFile.toAbsolutePath
       catch
         case e: Exception =>
           Files.deleteIfExists(tempFile)
@@ -96,7 +97,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
     MessageDigest.getInstance("SHA-256").digest(buffer.array()).map("%02x".format(_)).mkString
 
   private case class Fixture(
-      resource: String,
+      resource: Path,
       frames: Int,
       leftSha256: String,
       rightSha256: String,
@@ -110,7 +111,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
   )
 
   for fixture <- fixtures do
-    val name = s"The WAV file ${fixture.resource.drop(1)}"
+    val name = s"The WAV file ${fixture.resource.getFileName}"
 
     name should "be imported as a stereo track with the sample rate of the source" in:
       val track = loadStereo(fixture.resource)

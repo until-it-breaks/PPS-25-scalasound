@@ -27,22 +27,22 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   private def succeedingWriter = FakeWriter((_, _) => IO.pure(Right(())))
 
   private def withController(reader: AudioReader, writer: AudioWriter)(
-      test: (AppStateStore, LoadSaveController) => IO[Unit]
+    test: (AppStateStore, LoadSaveController) => IO[Unit]
   ): IO[Unit] = withFormats(wavFormat(reader, writer))(test)
 
   private def wavFormat(reader: AudioReader, writer: AudioWriter): AudioFileType =
     AudioFileType("WAV", "wav", reader = Some(reader), writer = Some(writer))
 
   private def withFormats(fileTypes: AudioFileType*)(
-      test: (AppStateStore, LoadSaveController) => IO[Unit]
+    test: (AppStateStore, LoadSaveController) => IO[Unit]
   ): IO[Unit] =
     val formats = AudioFormatRegistry.of(fileTypes*).fold(error => fail(error.toString), identity)
     AppStateStore.make.flatMap: store =>
       LoadSaveController.make(store, formats).use(controller => test(store, controller))
 
   private def awaitImport(
-      store: AppStateStore
-  )(predicate: ImportState => Boolean): IO[ImportState] =
+                           store: AppStateStore
+                         )(predicate: ImportState => Boolean): IO[ImportState] =
     store.changes
       .map(_.importState)
       .filter(predicate)
@@ -52,8 +52,8 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       .timeout(5.seconds)
 
   private def awaitExport(
-      store: AppStateStore
-  )(predicate: ExportState => Boolean): IO[ExportState] =
+                           store: AppStateStore
+                         )(predicate: ExportState => Boolean): IO[ExportState] =
     store.changes
       .map(_.exportState)
       .filter(predicate)
@@ -76,18 +76,18 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       case false => IO.cede >> retryUntilSuccess(attempt)
 
   private final class FakeReader(
-      behaviour: String => IO[Either[AudioLoadError, AudioTrack]]
-  ) extends AudioReader:
-    val loaded = AtomicReference(Vector.empty[String])
+                                  behaviour: Path => IO[Either[AudioLoadError, AudioTrack]]
+                                ) extends AudioReader:
+    val loaded = AtomicReference(Vector.empty[Path])
 
-    override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
+    override def load(path: Path): IO[Either[AudioLoadError, AudioTrack]] =
       IO.defer:
-        loaded.updateAndGet(_ :+ filePath)
-        behaviour(filePath)
+        loaded.updateAndGet(_ :+ path)
+        behaviour(path)
 
   private final class FakeWriter(
-      behaviour: (AudioTrack, Path) => IO[Either[AudioSaveError, Unit]]
-  ) extends AudioWriter:
+                                  behaviour: (AudioTrack, Path) => IO[Either[AudioSaveError, Unit]]
+                                ) extends AudioWriter:
     val saved = AtomicReference(Vector.empty[(AudioTrack, Path)])
 
     override def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]] =
@@ -106,7 +106,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       yield
         assertEquals(state, ImportState.Imported(trackA))
         assertEquals(current.track, Some(trackA))
-        assertEquals(reader.loaded.get, Vector("in.wav"))
+        assertEquals(reader.loaded.get, Vector(inputPath))
 
   test("load ends in state Failed with the error returned by the reader"):
     val error = AudioLoadError.UnsupportedFormat("not a wav")
@@ -186,7 +186,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
           _              <- controller.load(Paths.get("other.wav"))
           _              <- importGate.complete(()).void
           _              <- doneFiber.joinWithNever
-        yield assertEquals(reader.loaded.get, Vector("in.wav"))
+        yield assertEquals(reader.loaded.get, Vector(inputPath))
     yield ()
 
   test("a new load is accepted once the previous one has completed"):
@@ -367,7 +367,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
         state <- fiber.joinWithNever
       yield
         assertEquals(state, ImportState.Imported(trackB))
-        assertEquals(fakeReader.loaded.get, Vector("song.FAKE"))
+        assertEquals(fakeReader.loaded.get, Vector(Paths.get("song.FAKE")))
         assertEquals(wavReader.loaded.get, Vector.empty)
         assertEquals(wavWriter.saved.get, Vector.empty)
         assertEquals(fakeWriter.saved.get, Vector.empty)
@@ -490,7 +490,8 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
 
   test("the controller accepts a new import after a failed one with an effect error"):
     val reader = FakeReader(path =>
-      if path == "bad.wav" then IO.raiseError(RuntimeException("error")) else IO.pure(Right(trackA))
+      if path == Paths.get("bad.wav") then IO.raiseError(RuntimeException("error"))
+      else IO.pure(Right(trackA))
     )
     withController(reader, succeedingWriter): (store, controller) =>
       for
@@ -499,7 +500,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
         first  <- failed.joinWithNever
         _      <- controller.acknowledgeImport
         ok     <- awaitImport(store)(isFinalImport).start
-        _      <- retryUntilSuccess(controller.load(inputPath) >> IO(reader.loaded.get.contains("in.wav")))
+        _      <- retryUntilSuccess(controller.load(inputPath) >> IO(reader.loaded.get.contains(inputPath)))
         second <- ok.joinWithNever
       yield
         assertEquals(first, ImportState.Failed(AudioLoadError.ReadFailure("error")))

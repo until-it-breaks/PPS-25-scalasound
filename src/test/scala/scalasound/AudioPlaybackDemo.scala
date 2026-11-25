@@ -6,6 +6,7 @@ import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
 
+import java.nio.file.Paths
 import scala.concurrent.duration.{Duration, DurationInt, SECONDS}
 
 object AudioPlaybackDemo extends IOApp.Simple:
@@ -16,7 +17,7 @@ object AudioPlaybackDemo extends IOApp.Simple:
       store <- AppStateStore.make
 
       _ <- IO.println("[DEMO] Loading sample WAV file from resources...")
-      path = "src/test/resources/file_example_WAV_5MG.wav"
+      path = Paths.get("src/test/resources/file_example_WAV_5MG.wav")
       track <- WavAudioReader
         .load(path)
         .map(_.left.map(e => new RuntimeException(e.toString)))

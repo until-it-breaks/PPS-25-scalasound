@@ -61,8 +61,8 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     newStatelessEffect.effectType shouldBe Option.empty
     newTimeEffect.effectType shouldBe Option.empty
 
-  it should "return true for effects of the same type even if they have different parameters" +
-    "otherwise it should return false because the two effects doesn't have the same type" in:
+  it should "return true for effects of the same type even if they have different parameters " +
+    "otherwise it should return false because the two effects don't have the same type" in:
     val gain1 = AudioEffect.gain(Config.GainConfig.default)
     val gain2 = AudioEffect.gain(Config.GainConfig.max)
     gain1.hasSameEffectTypeOf(gain2) shouldBe true
@@ -163,7 +163,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val resultValueSin = math.sin(distortion * defaultValueChunk).toFloat
     resultChunkSin.value shouldBe MonoChunk(Vector.fill(sizeChunk)(resultValueSin))
 
-  it should "apply the distortion in both channel on a StereoChunk" in :
+  it should "apply the distortion in both channel of a StereoChunk" in:
     val distortion = (Config.DistortionConfig.min + Config.DistortionConfig.max) / 2
     val channel = Vector.fill(sizeChunk)(defaultValueChunk)
     val stereoChunk = StereoChunk(channel, channel)
@@ -181,7 +181,7 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
 
     val invalidDistortionMin = Config.DistortionConfig.min - 3.0f
     val resultChunkMin = AudioEffect.distortion(invalidDistortionMin)(chunk)
-    resultChunkMin.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkMin.left.value shouldBe a [AudioError.AudioEffectsError]
 
   "AutopanEffect" should "return a new StereoChunk where " +
     "for each sample is multiplied by a different factor" in:
@@ -202,17 +202,17 @@ final class AudioEffectsTest extends AnyFlatSpec with Matchers with EitherValues
     val resultChunkAlpha = EchoEffect(alphaOut,
       delayStandard,
       sampleRateStandard)(chunk, chunkIndex = 0)
-    resultChunkAlpha.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkAlpha.left.value shouldBe a [AudioError.AudioEffectsError]
 
     val delayOut = Config.DelayConfig.max.toInt * 100
     val resultChunkDelay = EchoEffect(alphaStandard,
       delayOut,
       sampleRateStandard)(chunk, chunkIndex = 0)
-    resultChunkDelay.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkDelay.left.value shouldBe a [AudioError.AudioEffectsError]
 
     val invalidSampleRate = 0.0f
     val resultChunkSampleRate = EchoEffect(alphaStandard, delayStandard, invalidSampleRate)(chunk, chunkIndex = 0)
-    resultChunkSampleRate.left.value shouldBe a[AudioError.AudioEffectsError]
+    resultChunkSampleRate.left.value shouldBe a [AudioError.AudioEffectsError]
     
   it should "apply the Infinite Impulse Response (IIR) in the correct way" in:
     // Since the size of the defaultChunk is 10, to guarantee a correct verification

@@ -155,7 +155,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     resultChunk.value shouldBe pipeline(orderedList, chunk, StartingIndex).value
 
   it should "apply the effects in the correct order when all " +
-    "the type of effects are included in the effects list" in:
+    "the types of effects are included in the effects list" in:
     val completeList = List(gain, volume, pan, distortion, echo, autopan, identity)
     val newEcho = AudioEffect.echo(echoAlphaConfig.default, echoDelayConfig.default.toInt)
     val newAutopan = AudioEffect.autopan(autopanConfig.default)

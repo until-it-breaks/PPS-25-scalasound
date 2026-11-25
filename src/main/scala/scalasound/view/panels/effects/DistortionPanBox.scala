@@ -1,7 +1,7 @@
 package scalasound.view.panels.effects
 
 import scalafx.beans.property.{ObjectProperty, ReadOnlyObjectProperty}
-import scalafx.geometry.{Insets, Pos}
+import scalafx.geometry.Pos
 import scalafx.scene.Cursor
 import scalafx.scene.control.{Slider, ToggleButton, ToggleGroup}
 import scalafx.scene.layout.{HBox, VBox}
@@ -9,15 +9,14 @@ import scalasound.model.processing.AudioConfiguration
 import scalasound.model.processing.AudioEffectType.{Distortion, Pan}
 
 /* Simplifies the management of the switch. */
-private[effects] enum DistortionEnum(val text: String):
-  case Tanh extends DistortionEnum("Tanh")
-  case Sin extends DistortionEnum("Sin")
+private[effects] enum DistortionType(val text: String):
+  case Tanh extends DistortionType("Tanh")
+  case Sin extends DistortionType("Sin")
 
 /* Companion Object containing constants and utility methods. */
 private[effects] object DistortionPanBox:
 
   /* Constants for styling. */
-  private val BackgroundColor = Utility.BackgroundColor
   private val BorderLeft =
     """
         -fx-background-radius: 15px 0px 0px 15px;
@@ -31,33 +30,34 @@ private[effects] object DistortionPanBox:
       -fx-border-width: 1px 1px 1px 0px;
     """
 
-  private def switch(selectedDistortion: ObjectProperty[DistortionEnum]): HBox = new HBox:
-    private val group = new ToggleGroup()
-
-    private val buttons =
+  private def switch(selectedDistortion: ObjectProperty[DistortionType]): HBox =
+    val group = new ToggleGroup()
+    val buttons =
       for
-        dstEnum <- DistortionEnum.values
+        dstEnum <- DistortionType.values
       yield
         new ToggleButton(dstEnum.text):
           toggleGroup = group
           cursor = Cursor.Hand
-          selected = dstEnum == DistortionEnum.Tanh
+          selected = dstEnum == DistortionType.Tanh
           style <== selected.map(sel => styleButton(sel, dstEnum))
+          selectedDistortion.onChange((_, _, newVal) => selected = newVal == dstEnum)
           onAction = _ =>
             if selected.value then
               selectedDistortion.value = dstEnum
             else
               selected = true
 
-    alignment = Pos.Center
-    children = buttons.toSeq
+    new HBox:
+      alignment = Pos.Center
+      children = buttons.toSeq
 
-  private def styleButton(isSelected: Boolean, distType: DistortionEnum): String =
-    val bkg = if isSelected then BackgroundColor else "white"
+  private def styleButton(isSelected: Boolean, distType: DistortionType): String =
+    val bkg = if isSelected then EffectPane.BackgroundColor else "white"
     val frg = if isSelected then "white" else "black"
     val border = distType match
-      case DistortionEnum.Tanh => BorderLeft
-      case DistortionEnum.Sin => BorderRight
+      case DistortionType.Tanh => BorderLeft
+      case DistortionType.Sin => BorderRight
     s"""
         -fx-background-color: $bkg;
         -fx-text-fill: $frg;
@@ -71,7 +71,7 @@ private[effects] object DistortionPanBox:
 /* Box for the Distortion-Pan effects. */
 private[effects] final class DistortionPanBox extends VBox with EffectPane:
 
-  import DistortionEnum.*
+  import DistortionType.*
   import DistortionPanBox.*
 
   /* Importing of the Pan and Distortion parameter values. */
@@ -80,26 +80,25 @@ private[effects] final class DistortionPanBox extends VBox with EffectPane:
 
   /* Initialization of the switch for the distortion effect to be applied. */
   private val defaultSwitchValue = Tanh
-  private val _distortionFilter: ObjectProperty[DistortionEnum] = ObjectProperty(defaultSwitchValue)
+  private val _distortionFilter: ObjectProperty[DistortionType] = ObjectProperty(defaultSwitchValue)
   private val distortionSwitch = switch(_distortionFilter)
 
   private val panContainer = Utility.effectContainer(Pan.name,
     panConfig.panConfiguration,
     v => f"$v%.2f",
-    labels = Some("L", "R"))
+    labels = Some(("L", "R"))
+  )
 
   private val distortionContainer = Utility.effectContainer(Distortion.name,
     distortionConfig.distortionConfiguration,
-    v => f"$v%.2f")
+    v => f"$v%.2f"
+  )
 
   private val finalBoxDistortion = new VBox:
     alignment = Pos.Center
     spacing = 15
     children = Seq(distortionContainer.panel, distortionSwitch)
 
-  alignment = Pos.Center
-  padding = Insets(10, 20, 10, 20)
-  spacing = 50
   children = Seq(panContainer.panel, finalBoxDistortion)
 
   override def resetSlidersAndValues(): Unit =
@@ -120,4 +119,4 @@ private[effects] final class DistortionPanBox extends VBox with EffectPane:
   /**
    * @return value of the filter for Distortion effect.
    */
-  def distortionFilter: ReadOnlyObjectProperty[DistortionEnum] = _distortionFilter
+  def distortionFilter: ReadOnlyObjectProperty[DistortionType] = _distortionFilter

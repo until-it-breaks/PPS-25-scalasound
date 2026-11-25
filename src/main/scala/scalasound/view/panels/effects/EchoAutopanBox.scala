@@ -1,15 +1,20 @@
 package scalasound.view.panels.effects
 
-import scalafx.geometry.{Insets, Pos}
+import scalafx.geometry.Pos
 import scalafx.scene.control.Slider
 import scalafx.scene.layout.VBox
 import scalasound.model.processing.AudioConfiguration
 import scalasound.model.processing.AudioEffectType.{Autopan, Echo}
 
-/* Box fot the Echo-Autopan effects. */
-private[effects] final class EchoAutopanBox extends VBox with EffectPane:
+private[effects] object EchoAutopanBox:
 
   private val FontSizeParameter = 18
+  private val DefaultSpacingEchoBox = 20
+
+/* Box for the Echo-Autopan effects. */
+private[effects] final class EchoAutopanBox extends VBox with EffectPane:
+
+  import EchoAutopanBox.*
 
   /* Importing of the Echo and Autopan parameters values. */
   private val echoConfig    = AudioConfiguration.parameterConfiguration(Echo)
@@ -31,19 +36,19 @@ private[effects] final class EchoAutopanBox extends VBox with EffectPane:
 
   private val echo = new VBox:
     alignment = Pos.Center
-    spacing = 20
+    spacing = DefaultSpacingEchoBox
     children = Seq(
       Utility.label(Echo.name, true, Utility.TitleEffectSize),
       alphaContainer.panel,
       delayContainer.panel
     )
 
-  private val autopanContainer =
-    Utility.effectContainer(Autopan.name, autopanConfig.autopanConfiguration, v => f"$v%.2f Hz")
+  private val autopanContainer = Utility.effectContainer(
+    Autopan.name,
+    autopanConfig.autopanConfiguration,
+    v => f"$v%.2f Hz"
+  )
 
-  alignment = Pos.Center
-  padding = Insets(10, 20, 10, 20)
-  spacing = 50
   children = Seq(echo, autopanContainer.panel)
 
   override def resetSlidersAndValues(): Unit =

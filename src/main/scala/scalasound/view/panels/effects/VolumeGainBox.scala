@@ -1,6 +1,6 @@
 package scalasound.view.panels.effects
 
-import scalafx.geometry.{Insets, Pos}
+import scalafx.geometry.Orientation.Vertical
 import scalafx.scene.control.Slider
 import scalafx.scene.layout.HBox
 import scalasound.model.processing.AudioConfiguration
@@ -17,19 +17,16 @@ private[effects] final class VolumeGainBox extends HBox with EffectPane:
     Gain.name,
     gainConfig.gainConfiguration,
     v => f"$v%.2f",
-    isHorizontal = false
+    sliderOrientation = Vertical
   )
 
   private val volumeContainer = Utility.effectContainer(
     Volume.name,
     volumeConfig.volumeConfiguration,
     v => f"${v * 100}%.2f%%",
-    isHorizontal = false
+    sliderOrientation = Vertical
   )
 
-  alignment = Pos.Center
-  padding = Insets(10, 30, 10, 30)
-  spacing = 50
   children = Seq(gainContainer.panel, volumeContainer.panel)
 
   override def resetSlidersAndValues(): Unit =

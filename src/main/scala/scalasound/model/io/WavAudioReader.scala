@@ -24,18 +24,19 @@ object WavAudioReader extends AudioReader:
 
   override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
     val file = File(filePath)
-    IO.blocking(file.isFile).flatMap:
-      case true  => readRawAudioFile(file).map(_.flatMap(decode))
-      case false => IO.pure(Left(FileNotFound(filePath)))
+    for
+      exists <- IO.blocking(file.isFile)
+      raw <- exists match
+        case true  => readRawAudioFile(file)
+        case false => IO.pure(Left(FileNotFound(filePath)))
+    yield raw.flatMap(decode)
 
   private def openStream(file: File): Resource[IO, AudioInputStream] =
     Resource.fromAutoCloseable(IO.blocking(AudioSystem.getAudioInputStream(file)))
 
   private def readRawAudioFile(file: File): IO[Either[AudioLoadError, RawAudio]] =
-    openStream(file)
-      .use(stream => IO.blocking(readFromStream(stream)))
-      .attempt
-      .map:
+    for attempted <- openStream(file).use(stream => IO.blocking(readFromStream(stream))).attempt
+      yield attempted match
         case Right(result)   => result
         case Left(exception) => Left(fromThrowable(exception))
 

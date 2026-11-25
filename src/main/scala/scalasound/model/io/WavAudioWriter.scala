@@ -30,9 +30,12 @@ object WavAudioWriter extends AudioWriter:
   private final val MaxDataSizeHandledByPCM         = 0xffffffffL - 43 // (2^32 - 44) bytes
 
   override def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]] =
-    IO.delay(prepare(track)).flatMap:
-      case Right(format) => writeAudioToFile(path, format, track.frameCount, track.chunks)
-      case Left(error)   => IO.pure(Left(error))
+    for
+      prepared <- IO.delay(prepare(track))
+      result   <- prepared match
+        case Right(format) => writeAudioToFile(path, format, track.frameCount, track.chunks)
+        case Left(error)   => IO.pure(Left(error))
+    yield result
 
   private def prepare(track: AudioTrack): Either[AudioSaveError, AudioFormat] =
     for
@@ -94,15 +97,16 @@ object WavAudioWriter extends AudioWriter:
       frameCount: Long,
       chunks: Vector[AudioChunk]
   ): IO[Either[AudioSaveError, Unit]] =
-    IO.blocking(writeBlocking(path, format, frameCount, chunks)).attempt.map:
-      case Right(_)        => Right(())
-      case Left(exception) =>
-        Left(
-          WriteFailure(
-            path,
-            Option(exception.getMessage).getOrElse(exception.getClass.getSimpleName)
+    for attempted <- IO.blocking(writeBlocking(path, format, frameCount, chunks)).attempt
+      yield attempted match
+        case Right(_)        => Right(())
+        case Left(exception) =>
+          Left(
+            WriteFailure(
+              path,
+              Option(exception.getMessage).getOrElse(exception.getClass.getSimpleName)
+            )
           )
-        )
 
   private def writeBlocking(
       path: Path,

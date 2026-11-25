@@ -4,17 +4,33 @@
 
 Il mio contributo al progetto si è focalizzato nelle seguenti aree:
 
-- **Stato**: `AppState` e `AppStateStore`, principalmente per la parte di riproduzione (comandi `Play`, `Pause`, `Stop`, `NextChunk` e `SeekToIndex`, `SignallingRef` e flussi derivati).
-- **Motore di riproduzione**: `AudioPlayer` e la sua implementazione `StreamingAudioPlayer`.
-- **Uscita audio**: `AudioOutput` e `SpeakerAudioOutput`.
-- **Controller**: `PlaybackController`, che espone play, pause, stop e seek.
-- **AudioADT**: definizione della conversione tra tempo e chunk in `AudioTrack` (`duration`, `positionAt` e `chunkIndexAt`).
-- **Interfaccia grafica**: il riquadro della traccia (`TrackBox`) e la logica associata (`TrackBoxLogic`).
-- **Testing**: definizione e implementazione dei test di questi componenti e della demo di riproduzione (`AudioPlaybackDemo`).
+- **Stato**: definizione e implementazione di `AppState` e `AppStateStore`, principalmente per quanto concerne il controllo di riproduzione.
+- **Motore di riproduzione**: definizione di `AudioPlayer` e l'implementazione `StreamingAudioPlayer`.
+- **Output audio**: definizione di `AudioOutput` e l'implementazione `SpeakerAudioOutput`.
+- **Controller**: implementazione di `PlaybackController`.
+- **AudioADT**: definizione della conversione tra istante temporale e chunkIndex in `AudioTrack`.
+- **Interfaccia grafica**: raffinamento del riquadro della traccia (`TrackBox`) e la logica associata (`TrackBoxLogic`).
+- **Testing**: definizione e implementazione dei test di questi componenti e della demo di riproduzione senza GUI (`AudioPlaybackDemo`).
 
 ### Stato
 
-Lo stato è modellato con enumerazioni Scala 3 (`PlaybackState`, `Command`, `ImportState`, `ExportState`), che sono tipi algebrici chiusi. `AppState.handle` è un pattern matching esaustivo su `Command`: il compilatore segnala un comando non gestito, e ogni caso delega a un metodo privato che restituisce una copia dello stato (`copy`) oppure lo stesso stato quando il comando non è applicabile.
+`AppState` è una `case class` immutabile che raccoglie lo stato dell'applicazione. Per il controllo di riproduzione sono rilevanti la traccia caricata (`track`), lo stato di riproduzione (`playbackState`) e l'indice del chunk corrente (`chunkIndex`). Il punto di riproduzione corrente è un indice di chunk e non un valore temporale, che se necessario è possibile ricavare dalla traccia stessa.
+
+```scala
+final case class AppState(
+    playbackState: PlaybackState,
+    importState: ImportState,
+    track: Option[AudioTrack],
+    effects: List[AudioEffect],
+    chunkIndex: Int,
+    exportState: ExportState
+)
+
+enum PlaybackState:
+  case Stopped, Playing, Paused
+```
+
+L'`AppState` non si modifica direttamente. I comandi disponibili sono rappresentati dall'enumerazione Scala 3 `Command`, un tipo algebrico chiuso come le altre componenti dello stato (`PlaybackState`, `ImportState`, `ExportState`). `AppState.handle` accetta in input un comando e, in base a questo, decide la transizione e restituisce il nuovo stato. È un pattern matching esaustivo su `Command` e per qualsiasi `case` caso delega a un metodo privato che restituisce una copia dello stato oppure lo stesso stato quando il comando non è applicabile.
 
 ```scala
 def handle(command: Command): AppState =
@@ -23,9 +39,11 @@ def handle(command: Command): AppState =
     case Pause               => handlePause()
     case Stop                => handleStop()
     case NextChunk           => handleNextChunk()
-    case SeekToIndex(index)  => handleSeek(index)
+    case RemoveAllEffects    => handleRemoveAllEffects()
     case AddEffect(effect)   => handleAddEffect(effect)
-    ...
+    case SeekToIndex(index)  => handleSeek(index)
+    case UpdateImport(state) => handleImport(state)
+    case UpdateExport(state) => handleExport(state)
 
 private def handlePause(): AppState =
   playbackState match
@@ -33,27 +51,59 @@ private def handlePause(): AppState =
     case _       => this
 ```
 
+Lo stato iniziale è definito nel companion object `AppState`:
+
+```scala
+object AppState:
+  val initial: AppState = AppState(
+    playbackState = Stopped,
+    importState = ImportState.Idle,
+    track = None,
+    effects = List.empty,
+    chunkIndex = 0,
+    exportState = ExportState.Idle
+  )
+```
+
 ### Store
 
-`AppStateStore` è un trait con due operazioni primitive, `current` e `dispatch`, e un flusso `changes`; i flussi derivati sono metodi con implementazione di default costruiti sopra `changes`. L'implementazione usa un `SignallingRef` di fs2:
+`AppStateStore` è un trait con due operazioni primitive, `current` e `dispatch`, e un flusso `changes`; i flussi derivati sono metodi con implementazione di default costruiti sopra `changes`.
 
 ```scala
-def dispatch(command: Command): IO[AppState] =
-  sigRef.updateAndGet(_.handle(command))
+trait AppStateStore:
+  def current: IO[AppState]
+  def dispatch(command: Command): IO[AppState]
+  def changes: Stream[IO, AppState]
 
-def changes: Stream[IO, AppState] = sigRef.discrete
+  def playbackStateChanges: Stream[IO, PlaybackState] =
+    changes.map(_.playbackState).changes
+
+  ...
 ```
 
-`updateAndGet` applica `handle` in modo atomico, quindi comandi inviati da fibre diverse (view, controller, player) non si sovrascrivono. `discrete` emette il valore corrente e poi ogni cambiamento, ma può saltare valori intermedi se il consumatore è lento: per la view e per il player conta lo stato più recente, non la sequenza completa. I flussi derivati (`playbackStateChanges`, `playheadChanges`, `playbackProgressChanges`, `importStateChanges` e `exportStateChanges`) usano `.changes` di fs2, che emette solo quando il valore cambia e richiede un'istanza di `Eq`. Le istanze sono dichiarate come `given` basate sull'uguaglianza universale, perché stati e tracce si confrontano per valore:
+L'implementazione non è nel trait ma nel companion object, dentro `make`, e si appoggia a un `SignallingRef` di FS2, un riferimento mutabile che, oltre a supportare la lettura e la scrittura atomica rende possibile esporre i cambiamenti come flusso.
 
 ```scala
-given Eq[PlaybackState]      = Eq.fromUniversalEquals
+object AppStateStore:
+  def make: IO[AppStateStore] =
+    SignallingRef[IO, AppState](AppState.initial).map { sigRef =>
+      new AppStateStore:
+        def current: IO[AppState] = sigRef.get
 
-def playbackStateChanges: Stream[IO, PlaybackState] =
-  changes.map(_.playbackState).changes
+        def dispatch(command: Command): IO[AppState] =
+          sigRef.updateAndGet(_.handle(command))
+
+        def changes: Stream[IO, AppState] = sigRef.discrete
+    }
 ```
 
-Lo store si crea con `AppStateStore.make`, che restituisce un `IO[AppStateStore]`: allocare il `SignallingRef` è un'operazione con effetto, e per questo il nome è `make` e non `apply`. Non serve una `Resource`, perché non c'è niente da rilasciare.
+Il `SignallingRef` è inizializzato con `AppState.initial`. `current` ne legge il valore attuale, in modo atomico. `dispatch` usa `updateAndGet`, che applica `handle` in modo atomico e restituisce il nuovo stato. `changes` usa `discrete`, che emette lo stato attuale e poi ogni cambiamento successivo. Può tuttavia saltare valori intermedi se il consumatore è lento.
+
+I flussi derivati si basano su `changes`, già definito nel trait dello store: ne estraggono la parte che interessa e, con l'operatore omonimo `.changes`, emettono solo quando quella parte cambia. `playbackStateChanges`, per esempio, emette solo quando cambia il `PlaybackState`, anche se l'`AppState` nel suo complesso è cambiato per altri motivi, come la modifica del `chunkIndex`. L'operatore confronta ogni valore con il precedente e richiede un'istanza di `Eq`. Per `PlaybackState`, che è un'enumerazione, basta l'uguaglianza standard `==`. L'istanza è quindi dichiarata come `given` con `Eq.fromUniversalEquals`, così che `.changes` la trovi in modo implicito:
+
+```scala
+given Eq[PlaybackState] = Eq.fromUniversalEquals
+```
 
 ### Player
 

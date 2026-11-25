@@ -1,5 +1,6 @@
 package scalasound.model.io
 
+import cats.effect.unsafe.implicits.global
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.StereoTrack
@@ -55,7 +56,7 @@ class RealWavImportSpec extends AnyFlatSpec with Matchers:
   private val sampleRate = 44100
 
   private def loadStereo(resource: String): StereoTrack =
-    WavAudioReader.load(resourcePath(resource)) match
+    WavAudioReader.load(resourcePath(resource)).unsafeRunSync() match
       case Right(track: StereoTrack) =>
         track
       case other =>

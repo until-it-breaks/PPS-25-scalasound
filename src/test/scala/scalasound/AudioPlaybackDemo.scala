@@ -17,8 +17,8 @@ object AudioPlaybackDemo extends IOApp.Simple:
 
       _ <- IO.println("[DEMO] Loading sample WAV file from resources...")
       path = "src/test/resources/file_example_WAV_5MG.wav"
-      track <- IO
-        .blocking(WavAudioReader.load(path))
+      track <- WavAudioReader
+        .load(path)
         .map(_.left.map(e => new RuntimeException(e.toString)))
         .rethrow
 

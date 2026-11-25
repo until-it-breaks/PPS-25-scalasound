@@ -1,6 +1,5 @@
 package scalasound.controller
 
-import cats.effect.std.Dispatcher
 import cats.effect.{Deferred, IO}
 import munit.CatsEffectSuite
 import scalasound.model.domain.AudioChunk.MonoChunk
@@ -22,9 +21,9 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   private val inputPath  = Paths.get("in.wav")
   private val outputPath = Paths.get("out.wav")
 
-  private def succeedingReader = FakeReader(_ => Right(trackA))
+  private def succeedingReader = FakeReader(_ => IO.pure(Right(trackA)))
 
-  private def succeedingWriter = FakeWriter((_, _) => Right(()))
+  private def succeedingWriter = FakeWriter((_, _) => IO.pure(Right(())))
 
   private def withController(reader: AudioReader, writer: AudioWriter)(
       test: (AppStateStore, LoadSaveController) => IO[Unit]
@@ -75,21 +74,25 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
       case true  => IO.unit
       case false => IO.cede >> retryUntilSuccess(attempt)
 
-  private final class FakeReader(behaviour: String => Either[AudioLoadError, AudioTrack])
-      extends AudioReader:
+  private final class FakeReader(
+      behaviour: String => IO[Either[AudioLoadError, AudioTrack]]
+  ) extends AudioReader:
     val loaded = AtomicReference(Vector.empty[String])
 
-    override def load(filePath: String): Either[AudioLoadError, AudioTrack] =
-      loaded.updateAndGet(_ :+ filePath)
-      behaviour(filePath)
+    override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
+      IO.defer:
+        loaded.updateAndGet(_ :+ filePath)
+        behaviour(filePath)
 
-  private final class FakeWriter(behaviour: (AudioTrack, Path) => Either[AudioSaveError, Unit])
-      extends AudioWriter:
+  private final class FakeWriter(
+      behaviour: (AudioTrack, Path) => IO[Either[AudioSaveError, Unit]]
+  ) extends AudioWriter:
     val saved = AtomicReference(Vector.empty[(AudioTrack, Path)])
 
-    override def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
-      saved.updateAndGet(_ :+ (track -> path))
-      behaviour(track, path)
+    override def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]] =
+      IO.defer:
+        saved.updateAndGet(_ :+ (track -> path))
+        behaviour(track, path)
 
   test("load imports the track and ends in state Imported"):
     val reader = succeedingReader
@@ -106,7 +109,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
 
   test("load ends in state Failed with the error returned by the reader"):
     val error = AudioLoadError.UnsupportedFormat("not a wav")
-    withController(FakeReader(_ => Left(error)), succeedingWriter): (store, controller) =>
+    withController(FakeReader(_ => IO.pure(Left(error))), succeedingWriter): (store, controller) =>
       for
         fiber   <- awaitImport(store)(isFinalImport).start
         _       <- controller.load(inputPath)
@@ -125,71 +128,65 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
           state <- fiber.joinWithNever
         yield assertEquals(state, ImportState.Failed(AudioLoadError.ReadFailure("error")))
 
-  test("load reports the state Importing while the reader is working"):
-    Dispatcher
-      .parallel[IO]
-      .use: dispatcher =>
+  test("load ends in state Failed when the reader effect fails with an error"):
+    withController(FakeReader(_ => IO.raiseError(RuntimeException("error"))), succeedingWriter):
+      (store, controller) =>
         for
-          importGate <- Deferred[IO, Unit]
-          reader = FakeReader: _ =>
-            dispatcher.unsafeRunSync(importGate.get)
-            Right(trackA)
-          _ <- withController(reader, succeedingWriter): (store, controller) =>
-            for
-              importingFiber <- awaitImport(store)(_ == ImportState.Importing).start
-              doneFiber      <- awaitImport(store)(isFinalImport).start
-              _              <- controller.load(inputPath)
-              importing      <- importingFiber.joinWithNever
-              _              <- importGate.complete(()).void
-              done           <- doneFiber.joinWithNever
-            yield
-              assertEquals(importing, ImportState.Importing)
-              assertEquals(done, ImportState.Imported(trackA))
-        yield ()
+          fiber <- awaitImport(store)(isFinalImport).start
+          _     <- controller.load(inputPath)
+          state <- fiber.joinWithNever
+        yield assertEquals(state, ImportState.Failed(AudioLoadError.ReadFailure("error")))
+
+  test("load reports the state Importing while the reader is working"):
+    for
+      importGate <- Deferred[IO, Unit]
+      reader = FakeReader(_ => importGate.get.as(Right(trackA)))
+      _ <- withController(reader, succeedingWriter): (store, controller) =>
+        for
+          importingFiber <- awaitImport(store)(_ == ImportState.Importing).start
+          doneFiber      <- awaitImport(store)(isFinalImport).start
+          _              <- controller.load(inputPath)
+          importing      <- importingFiber.joinWithNever
+          _              <- importGate.complete(()).void
+          done           <- doneFiber.joinWithNever
+        yield
+          assertEquals(importing, ImportState.Importing)
+          assertEquals(done, ImportState.Imported(trackA))
+    yield ()
 
   test("load is accepted and runs while an export is currently in progress"):
-    Dispatcher
-      .parallel[IO]
-      .use: dispatcher =>
+    for
+      exportGate <- Deferred[IO, Unit]
+      writer = FakeWriter((_, _) => exportGate.get.as(Right(())))
+      reader = succeedingReader
+      _ <- withController(reader, writer): (store, controller) =>
         for
-          exportGate <- Deferred[IO, Unit]
-          writer = FakeWriter: (_, _) =>
-            dispatcher.unsafeRunSync(exportGate.get)
-            Right(())
-          reader = succeedingReader
-          _ <- withController(reader, writer): (store, controller) =>
-            for
-              _           <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-              exportFiber <- awaitExport(store)(_ == ExportState.Exporting).start
-              _           <- controller.save(outputPath)
-              _           <- exportFiber.joinWithNever
-              importFiber <- awaitImport(store)(isFinalImport).start
-              _           <- controller.load(inputPath)
-              importState <- importFiber.joinWithNever
-              _           <- exportGate.complete(()).void
-            yield assertEquals(importState, ImportState.Imported(trackA))
-        yield ()
+          _           <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+          exportFiber <- awaitExport(store)(_ == ExportState.Exporting).start
+          _           <- controller.save(outputPath)
+          _           <- exportFiber.joinWithNever
+          importFiber <- awaitImport(store)(isFinalImport).start
+          _           <- controller.load(inputPath)
+          importState <- importFiber.joinWithNever
+          _           <- exportGate.complete(()).void
+        yield assertEquals(importState, ImportState.Imported(trackA))
+    yield ()
 
   test("a second load is ignored while the first one is still running"):
-    Dispatcher
-      .parallel[IO]
-      .use: dispatcher =>
+    for
+      importGate <- Deferred[IO, Unit]
+      reader = FakeReader(_ => importGate.get.as(Right(trackA)))
+      _ <- withController(reader, succeedingWriter): (store, controller) =>
         for
-          importGate <- Deferred[IO, Unit]
-          reader = FakeReader: _ =>
-            dispatcher.unsafeRunSync(importGate.get)
-            Right(trackA)
-          _ <- withController(reader, succeedingWriter): (store, controller) =>
-            for
-              importingFiber <- awaitImport(store)(_ == ImportState.Importing).start
-              doneFiber      <- awaitImport(store)(isFinalImport).start
-              _              <- controller.load(inputPath)
-              _              <- importingFiber.joinWithNever
-              _              <- controller.load(Paths.get("other.wav"))
-              _              <- importGate.complete(()).void
-              _              <- doneFiber.joinWithNever
-            yield assertEquals(reader.loaded.get, Vector("in.wav"))
-        yield ()
+          importingFiber <- awaitImport(store)(_ == ImportState.Importing).start
+          doneFiber      <- awaitImport(store)(isFinalImport).start
+          _              <- controller.load(inputPath)
+          _              <- importingFiber.joinWithNever
+          _              <- controller.load(Paths.get("other.wav"))
+          _              <- importGate.complete(()).void
+          _              <- doneFiber.joinWithNever
+        yield assertEquals(reader.loaded.get, Vector("in.wav"))
+    yield ()
 
   test("a new load is accepted once the previous one has completed"):
     val reader = succeedingReader
@@ -227,7 +224,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
 
   test("save ends in state Failed with the error returned by the writer"):
     val error = AudioSaveError.WriteFailure(outputPath, "disk full")
-    withController(succeedingReader, FakeWriter((_, _) => Left(error))): (store, controller) =>
+    withController(succeedingReader, FakeWriter((_, _) => IO.pure(Left(error)))): (store, controller) =>
       for
         _     <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
         fiber <- awaitExport(store)(isFinalExport).start
@@ -262,33 +259,39 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   test(
     "save exports the track loaded when it was requested, even if another one is loaded meanwhile"
   ):
-    Dispatcher
-      .parallel[IO]
-      .use: dispatcher =>
+    for
+      exportGate <- Deferred[IO, Unit]
+      writer = FakeWriter((_, _) => exportGate.get.as(Right(())))
+      reader = FakeReader(_ => IO.pure(Right(trackB)))
+      _ <- withController(reader, writer): (store, controller) =>
         for
-          exportGate <- Deferred[IO, Unit]
-          writer = FakeWriter: (_, _) =>
-            dispatcher.unsafeRunSync(exportGate.get)
-            Right(())
+          _            <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+          exportingFib <- awaitExport(store)(_ == ExportState.Exporting).start
+          _            <- controller.save(outputPath)
+          _            <- exportingFib.joinWithNever
+          importedFib  <- awaitImport(store)(_ == ImportState.Imported(trackB)).start
+          _            <- controller.load(inputPath)
+          _            <- importedFib.joinWithNever
+          exportedFib  <- awaitExport(store)(isFinalExport).start
+          _            <- exportGate.complete(()).void
+          state        <- exportedFib.joinWithNever
+        yield
+          assertEquals(state, ExportState.Exported)
+          assertEquals(writer.saved.get.map(_._1), Vector[AudioTrack](trackA))
+    yield ()
 
-          reader = FakeReader(_ => Right(trackB))
-          _ <- withController(reader, writer): (store, controller) =>
-            for
-              _            <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
-              exportingFib <- awaitExport(store)(_ == ExportState.Exporting).start
-              _            <- controller.save(outputPath)
-              _            <- exportingFib.joinWithNever
-              importedFib  <- awaitImport(store)(_ == ImportState.Imported(trackB)).start
-              _            <- controller.load(inputPath)
-              _            <- importedFib.joinWithNever
-              exportedFib  <- awaitExport(store)(isFinalExport).start
-              _            <- exportGate.complete(()).void
-              state        <- exportedFib.joinWithNever
-            yield
-              assertEquals(state, ExportState.Exported)
-              assertEquals(writer.saved.get.map(_._1), Vector[AudioTrack](trackA))
-
-        yield ()
+  test("save ends in state Failed when the writer effect fails with an error"):
+    withController(succeedingReader, FakeWriter((_, _) => IO.raiseError(RuntimeException("error")))):
+      (store, controller) =>
+        for
+          _     <- store.dispatch(Command.UpdateImport(ImportState.Imported(trackA)))
+          fiber <- awaitExport(store)(isFinalExport).start
+          _     <- controller.save(outputPath)
+          state <- fiber.joinWithNever
+        yield assertEquals(
+          state,
+          ExportState.Failed(AudioSaveError.WriteFailure(outputPath, "error"))
+        )
 
   test("save is ignored while an import is running"):
     val writer = succeedingWriter
@@ -350,7 +353,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
 
   test("load uses only the reader of the format of the path"):
     val wavReader  = succeedingReader
-    val fakeReader = FakeReader(_ => Right(trackB))
+    val fakeReader = FakeReader(_ => IO.pure(Right(trackB)))
     val wavWriter  = succeedingWriter
     val fakeWriter = succeedingWriter
     withFormats(
@@ -483,3 +486,20 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
         _        <- controller.load(inputPath)
         state    <- imported.joinWithNever
       yield assertEquals(state, ImportState.Imported(trackA))
+
+  test("the controller accepts a new import after a failed one with an effect error"):
+    val reader = FakeReader(path =>
+      if path == "bad.wav" then IO.raiseError(RuntimeException("error")) else IO.pure(Right(trackA))
+    )
+    withController(reader, succeedingWriter): (store, controller) =>
+      for
+        failed <- awaitImport(store)(isFinalImport).start
+        _      <- controller.load(Paths.get("bad.wav"))
+        first  <- failed.joinWithNever
+        _      <- controller.acknowledgeImport
+        ok     <- awaitImport(store)(isFinalImport).start
+        _      <- retryUntilSuccess(controller.load(inputPath) >> IO(reader.loaded.get.contains("in.wav")))
+        second <- ok.joinWithNever
+      yield
+        assertEquals(first, ImportState.Failed(AudioLoadError.ReadFailure("error")))
+        assertEquals(second, ImportState.Imported(trackA))

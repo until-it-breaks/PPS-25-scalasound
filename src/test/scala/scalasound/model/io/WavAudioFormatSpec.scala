@@ -1,5 +1,7 @@
 package scalasound.model.io
 
+import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -39,7 +41,7 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
       Files.write(dir.resolve("song.wav"), "this is text, not an audio file".getBytes("UTF-8"))
     val reader = registry.readerFor(notAudio).value
 
-    reader.load(notAudio.toString) should matchPattern {
+    reader.load(notAudio.toString).unsafeRunSync() should matchPattern {
       case Left(AudioLoadError.UnsupportedFormat(_)) =>
     }
 
@@ -47,16 +49,17 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
     dir =>
       val calls = AtomicInteger(0)
       val other = new AudioReader:
-        override def load(filePath: String): Either[AudioLoadError, AudioTrack] =
-          calls.incrementAndGet()
-          Left(AudioLoadError.ReadFailure("must not be called"))
+        override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
+          IO:
+            calls.incrementAndGet()
+            Left(AudioLoadError.ReadFailure("must not be called"))
       val both = AudioFormatRegistry
         .of(WavAudioFormat.fileType, AudioFileType("Other", "other", reader = Some(other)))
         .value
       val notAudio =
         Files.write(dir.resolve("song.wav"), "this is text, not an audio file".getBytes("UTF-8"))
 
-      both.readerFor(notAudio).value.load(notAudio.toString).isLeft shouldBe true
+      both.readerFor(notAudio).value.load(notAudio.toString).unsafeRunSync().isLeft shouldBe true
       calls.get shouldBe 0
 
   it should "not be read when the extension is not registered, even if the content is valid" in withTempDir:
@@ -71,8 +74,9 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
       val resolved = registry.writerFor(dir.resolve("export")).value
 
       resolved.path shouldBe dir.resolve("export.wav")
-      resolved.writer.save(original, resolved.path) shouldBe Right(())
+      resolved.writer.save(original, resolved.path).unsafeRunSync() shouldBe Right(())
       Files.exists(dir.resolve("export.wav")) shouldBe true
 
-      val loaded = registry.readerFor(resolved.path).value.load(resolved.path.toString)
+      val loaded =
+        registry.readerFor(resolved.path).value.load(resolved.path.toString).unsafeRunSync()
       loaded shouldBe Right(original)

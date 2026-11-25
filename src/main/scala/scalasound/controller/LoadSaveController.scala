@@ -3,7 +3,7 @@ package scalasound.controller
 import cats.effect.std.Supervisor
 import cats.effect.{IO, Ref, Resource}
 import scalasound.model.domain.AudioTrack
-import scalasound.model.io.{AudioFormatRegistry, AudioLoadError, AudioSaveError}
+import scalasound.model.io.{AudioFormatRegistry, AudioLoadError, AudioSaveError, ResolvedWriter}
 import scalasound.model.processing.{AudioEffect, AudioProcessor, AudioProcessorWithRules}
 import scalasound.model.state.{AppStateStore, Command, ExportState, ImportState}
 
@@ -88,17 +88,18 @@ private[controller] final class LoadSaveControllerImpl(
     runInBackground(startIfIdle(importBusy)(runImport(path)))
 
   private def runImport(path: Path): IO[Unit] =
-    for
-      _      <- store.dispatch(Command.UpdateImport(ImportState.Importing))
-      result <- IO.blocking(loadFrom(path)).attempt
-      _      <- store.dispatch(Command.UpdateImport(toImportState(result)))
-    yield ()
+    val operation =
+      for
+        _      <- store.dispatch(Command.UpdateImport(ImportState.Importing))
+        result <- loadFrom(path).attempt
+        _      <- store.dispatch(Command.UpdateImport(toImportState(result)))
+      yield ()
+    operation.onCancel(store.dispatch(Command.UpdateImport(ImportState.Idle)).void)
 
-  private def loadFrom(path: Path): Either[AudioLoadError, AudioTrack] =
-    for
-      reader <- formats.readerFor(path).left.map(AudioLoadError.UnresolvedFormat.apply)
-      track <- reader.load(path.toString)
-    yield track
+  private def loadFrom(path: Path): IO[Either[AudioLoadError, AudioTrack]] =
+    formats.readerFor(path) match
+      case Left(error)   => IO.pure(Left(AudioLoadError.UnresolvedFormat(error)))
+      case Right(reader) => IO.defer(reader.load(path.toString))
 
   private def toImportState(
       result: Either[Throwable, Either[AudioLoadError, AudioTrack]]
@@ -135,25 +136,35 @@ private[controller] final class LoadSaveControllerImpl(
       case None =>
         store.dispatch(Command.UpdateExport(ExportState.Failed(AudioSaveError.NoTrackLoaded))).void
       case Some(track) =>
-        for
-          _      <- store.dispatch(Command.UpdateExport(ExportState.Exporting))
-          result <- IO.blocking(processAndSave(track, effects, path)).attempt
-          _      <- store.dispatch(Command.UpdateExport(toExportState(result, path)))
-        yield ()
+        val operation =
+          for
+            _      <- store.dispatch(Command.UpdateExport(ExportState.Exporting))
+            result <- processAndSave(track, effects, path).attempt
+            _      <- store.dispatch(Command.UpdateExport(toExportState(result, path)))
+          yield ()
+        operation.onCancel(store.dispatch(Command.UpdateExport(ExportState.Idle)).void)
 
   private def processAndSave(
       track: AudioTrack,
       effects: List[AudioEffect],
       path: Path
-  ): Either[AudioSaveError, Unit] =
+  ): IO[Either[AudioSaveError, Unit]] =
+    IO.delay(resolveAndProcess(track, effects, path)).flatMap:
+      case Left(error)                => IO.pure(Left(error))
+      case Right((target, processed)) => IO.defer(target.writer.save(processed, target.path))
+
+  private def resolveAndProcess(
+      track: AudioTrack,
+      effects: List[AudioEffect],
+      path: Path
+  ): Either[AudioSaveError, (ResolvedWriter, AudioTrack)] =
     for
       target <- formats.writerFor(path).left.map(AudioSaveError.UnresolvedFormat.apply)
       processed <- processor
         .apply(track, effects)
         .left
         .map(error => AudioSaveError.InvalidTrack(error.toString))
-      _ <- target.writer.save(processed, target.path)
-    yield ()
+    yield (target, processed)
 
   private def toExportState(
       result: Either[Throwable, Either[AudioSaveError, Unit]],

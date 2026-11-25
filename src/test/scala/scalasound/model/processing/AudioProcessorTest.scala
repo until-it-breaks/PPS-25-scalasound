@@ -6,6 +6,8 @@ import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Pan, Volume}
+import scalasound.model.processing.effects.{AutopanEffect, GainEffect}
+import scalasound.model.processing.processors.{AudioProcessorWithRules, SimpleAudioProcessor}
 
 /**
  * Test class containing all the checks for the different audio processors
@@ -93,6 +95,10 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     val resultTrack = SimpleAudioProcessor(track, emptyEffects)
     resultTrack.value shouldBe track
 
+  it should "return the correct type of AudioProcessor by factory" in:
+    AudioProcessor.simple shouldBe a [SimpleAudioProcessor.type]
+    AudioProcessor.withRules shouldBe a [AudioProcessorWithRules.type]
+
   "SimpleAudioProcessor" should "apply the effects in the same order " +
     "in which they were added to the list" in:
     val resultChunk = SimpleAudioProcessor(chunk, simpleEffectsList, StartingIndex)
@@ -149,7 +155,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     resultChunk.value shouldBe pipeline(orderedList, chunk, StartingIndex).value
 
   it should "apply the effects in the correct order when all " +
-    "the type of effects are included in the effects list" in:
+    "the types of effects are included in the effects list" in:
     val completeList = List(gain, volume, pan, distortion, echo, autopan, identity)
     val newEcho = AudioEffect.echo(echoAlphaConfig.default, echoDelayConfig.default.toInt)
     val newAutopan = AudioEffect.autopan(autopanConfig.default)

@@ -5,7 +5,7 @@ import cats.effect.{IO, Resource}
 import scalasound.controller.{EffectsController, LoadSaveController, PlaybackController}
 import scalasound.model.io.{AudioFormatRegistry, WavAudioFormat}
 import scalasound.model.player.{AudioOutput, AudioPlayer}
-import scalasound.model.processing.AudioProcessorWithRules
+import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.AppStateStore
 import scalasound.view.AppDependencies
 import scalasound.view.panels.effects.{EffectsControllerWrapper, EffectsLogic}
@@ -38,7 +38,7 @@ object AppSetup:
     for
       out <- AudioOutput.speakers
       _   <- AudioPlayer
-        .streaming(AudioProcessorWithRules, out)
+        .streaming(AudioProcessor.withRules, out)
         .run(store)
         .compile
         .drain

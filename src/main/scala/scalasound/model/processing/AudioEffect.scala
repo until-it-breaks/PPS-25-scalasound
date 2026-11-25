@@ -2,6 +2,7 @@ package scalasound.model.processing
 
 import scalasound.model.domain.AudioChunk
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.model.processing.effects.{AutopanEffect, DistortionEffect, EchoEffect, GainEffect, IdentityEffect, PanEffect, VolumeEffect}
 
 /*
  * It is used the covariance so if IdentityEffect <: AudioConfiguration then

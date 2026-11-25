@@ -1,4 +1,4 @@
-## Implementazione - Simone Carpi
+## Simone Carpi
 
 ### Panoramica dei contributi
 
@@ -16,8 +16,8 @@ Il mio contributo al progetto si è focalizzato nelle seguenti aree:
   associata agli effetti.
 - **Testing**: definizione e implementazione di tutti i test relativi agli effetti, ai processori e al controller.
 
----
 
+\
 ### Effetti
 
 Gli effetti audio trasformazioni matematiche applicate alla traccia presa in carico (costituita da un insieme
@@ -149,8 +149,8 @@ dei casi noti, mentre restituirà un `None` per tutti gli effetti non specificat
         case _: AutopanEffect    => AudioEffectType.Autopan
         case _: VolumeEffect     => AudioEffectType.Volume
 ```
----
 
+\
 ### Processori Audio
 Il processore audio è il componente responsabile dell'applicazione sequenziale degli effetti sui singoli *chunk* e
 viene modellato tramite il `trait` `AudioProcessor`. Il contratto contiene due implementazioni disitinte del metodo `apply`, 
@@ -205,28 +205,35 @@ numerico dell'effetto all'interno dell'enum), è stata creata una associazione e
 il meccanismo dei `given`, è stata fornita una istanza di `Ordering[AudioEffect]` che viene passata implicitamente dal compilatore al metodo `.sorted` delle liste per ordinare gli effetti ricevuti.
 
 ```scala
-object AudioProcessorWithRules extends AudioProcessor:
-  
+private enum EffectPriority:
+  case IdentityEffect
+  case GainEffect
+  ...
+
+private[processing] object AudioProcessorWithRules extends AudioProcessor:
+
   given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
 
   private def orderingByPriority(effect: AudioEffect): Int = effect match
     case IdentityEffect => EffectPriority.IdentityEffect.ordinal
     case _: GainEffect => EffectPriority.GainEffect.ordinal
     ...
-
+  
+  private def sortEffects(effects: List[AudioEffect]): List[AudioEffect] =
+    if effects.length <= 1 then effects else effects.sorted
+  
   override protected def processChunk(chunk: AudioChunk,
                                       effects: List[AudioEffect],
                                       chunkIndex: Int): Either[AudioError, AudioChunk] =
-    super.processChunk(chunk, effects.sorted, chunkIndex)
-
-  private enum EffectPriority:
-    case IdentityEffect
-    case GainEffect
-    ...
+    super.processChunk(chunk, sortEffects(effects), chunkIndex)
+  
+  override protected def processTrack(track: AudioTrack,
+                                      effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
+    super.processTrack(track, sortEffects(effects))
 ```
 
----
 
+\
 ### Logica degli effetti
 `EffectsLogic` si occupa di gestire i widget, nello specifico sliders e bottoni, degli effetti che l'utente può applicare in tempo reale all'interno dell'applicazione.
 Il compito di questa componente è di inviare al relativo controller le azioni dell'utente e adattare i cambiamenti di stato nelle *label* dei widget.

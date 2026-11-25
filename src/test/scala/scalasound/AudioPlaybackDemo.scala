@@ -3,7 +3,7 @@ package scalasound
 import cats.effect.{IO, IOApp}
 import scalasound.model.io.WavAudioReader
 import scalasound.model.player.{AudioOutput, AudioPlayer}
-import scalasound.model.processing.SimpleAudioProcessor
+import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
 
 import scala.concurrent.duration.{Duration, DurationInt, SECONDS}
@@ -37,7 +37,7 @@ object AudioPlaybackDemo extends IOApp.Simple:
       output = AudioOutput.speakers
       _ <- output
         .flatMap(out =>
-          AudioPlayer.streaming(SimpleAudioProcessor, out).run(store).compile.drain.background
+          AudioPlayer.streaming(AudioProcessor.simple, out).run(store).compile.drain.background
         )
         .use { _ =>
           for

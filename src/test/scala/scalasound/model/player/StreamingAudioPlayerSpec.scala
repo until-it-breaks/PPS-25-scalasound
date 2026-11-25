@@ -7,8 +7,7 @@ import scalasound.model.player.AudioOutput
 import scalasound.model.processing.{
   AudioEffect,
   AudioError,
-  AudioProcessor,
-  AudioProcessorWithRules
+  AudioProcessor
 }
 import scalasound.model.state.*
 
@@ -71,7 +70,7 @@ class StreamingAudioPlayerSpec extends CatsEffectSuite:
   private def playToEnd(
       track: AudioTrack,
       out: AudioOutput,
-      processor: AudioProcessor = AudioProcessorWithRules
+      processor: AudioProcessor = AudioProcessor.withRules
   ): IO[AppState] =
     for
       store <- AppStateStore.make

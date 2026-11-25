@@ -1,11 +1,13 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
+import cats.effect.{IO, Resource}
 import scalasound.model.domain.{AudioDomainError, AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.AudioLoadError.*
+import scalasound.model.io.AudioReader
+import scalasound.model.io.error.AudioLoadError
+import scalasound.model.io.error.AudioLoadError.*
 
 import java.io.{EOFException, File, IOException}
 import javax.sound.sampled.{AudioInputStream, AudioSystem, UnsupportedAudioFileException}
-import scala.util.{Failure, Success, Using}
 
 /** Loads WAV files from the file system, using Java Sound API.
   *
@@ -22,28 +24,23 @@ object WavAudioReader extends AudioReader:
 
   private final val FramesPerChunk: Int = 1024
 
-  /** Loads a WAV file from the given path.
-    *
-    * @param filePath
-    *   the path to the WAV file
-    * @return
-    *   an `Either` containing the loaded `AudioTrack` or an `AudioLoadError` if loading failed
-    */
-  override def load(filePath: String): Either[AudioLoadError, AudioTrack] =
-    for
-      file  <- ensureFileExists(filePath)
-      raw   <- readRawAudio(file)
-      track <- decode(raw)
-    yield track
-
-  private def ensureFileExists(filePath: String): Either[AudioLoadError, File] =
+  override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
     val file = File(filePath)
-    Either.cond(file.isFile, file, FileNotFound(filePath))
+    for
+      exists <- IO.blocking(file.isFile)
+      raw <- exists match
+        case true  => readRawAudioFile(file)
+        case false => IO.pure(Left(FileNotFound(filePath)))
+    yield raw.flatMap(decode)
 
-  private def readRawAudio(file: File): Either[AudioLoadError, RawAudio] =
-    Using(AudioSystem.getAudioInputStream(file))(readFromStream) match
-      case Success(result)    => result
-      case Failure(exception) => Left(fromThrowable(exception))
+  private def openStream(file: File): Resource[IO, AudioInputStream] =
+    Resource.fromAutoCloseable(IO.blocking(AudioSystem.getAudioInputStream(file)))
+
+  private def readRawAudioFile(file: File): IO[Either[AudioLoadError, RawAudio]] =
+    for attempted <- openStream(file).use(stream => IO.blocking(readFromStream(stream))).attempt
+      yield attempted match
+        case Right(result)   => result
+        case Left(exception) => Left(fromThrowable(exception))
 
   private def readFromStream(stream: AudioInputStream): Either[AudioLoadError, RawAudio] =
     for format <- WavFormat.from(stream.getFormat)

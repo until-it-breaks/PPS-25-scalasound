@@ -5,7 +5,8 @@ import cats.effect.{IO, Resource}
 import munit.CatsEffectSuite
 import scalafx.scene.control.Alert.AlertType
 import scalasound.controller.{EffectsController, LoadSaveController}
-import scalasound.model.io.{AudioFormatRegistry, WavAudioFormat, WavAudioReader, WavAudioWriter}
+import scalasound.model.io.AudioFormatRegistry
+import scalasound.model.io.wav.{WavAudioFormat, WavAudioReader, WavAudioWriter}
 import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.state.{AppStateStore, ExportState, ImportState}
 import scalasound.view.panels.loadsave.LoadSaveLogic
@@ -68,12 +69,13 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
       val input = dir.resolve("input.wav")
       val track = WavAudioReader
         .load("src/test/resources/file_example_WAV_2MG.wav")
+        .unsafeRunSync()
         .getOrElse(fail("Failed to load the test WAV file."))
       val recorder = AlertRecorder()
 
       application(recorder).use: (store, loadSaveController, _) =>
         for
-          _ <- IO.blocking(WavAudioWriter.save(track, input)).flatMap(orFail(_))
+          _ <- WavAudioWriter.save(track, input).flatMap(orFail(_))
           _ <- loadSaveController.load(input)
           _ <- waitUntil(
             store.current.map(state =>
@@ -86,8 +88,8 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
               .map(_.exportState == ExportState.Idle)
               .map(_ && recorder.alerts.get.exists(_.title == "Export completed"))
           )
-          exported <- IO
-            .blocking(WavAudioReader.load(dir.resolve("output.wav").toString))
+          exported <- WavAudioReader
+            .load(dir.resolve("output.wav").toString)
             .flatMap(orFail(_))
         yield
           assertEquals(
@@ -114,6 +116,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
       val input = dir.resolve("input.wav")
       val track = WavAudioReader
         .load("src/test/resources/file_example_WAV_2MG.wav")
+        .unsafeRunSync()
         .getOrElse(fail("Failed to load the test WAV file."))
       val recorder = AlertRecorder()
 
@@ -124,7 +127,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
 
       application(recorder).use: (store, loadSaveController, effectsController) =>
         for
-          _ <- IO.blocking(WavAudioWriter.save(track, input)).flatMap(orFail(_))
+          _ <- WavAudioWriter.save(track, input).flatMap(orFail(_))
           _ <- loadSaveController.load(input)
           _ <- waitUntil(
             store.current.map(state =>
@@ -138,8 +141,8 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
               .map(_.exportState == ExportState.Idle)
               .map(_ && recorder.alerts.get.exists(_.title == "Export completed"))
           )
-          exported <- IO
-            .blocking(WavAudioReader.load(dir.resolve("processed_output.wav").toString))
+          exported <- WavAudioReader
+            .load(dir.resolve("processed_output.wav").toString)
             .flatMap(orFail(_))
           current <- store.current
         yield

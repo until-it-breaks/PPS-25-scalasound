@@ -1,7 +1,7 @@
 package scalasound.model.player
 
-import cats.syntax.foldable.*
 import cats.effect.IO
+import cats.syntax.foldable.*
 import munit.CatsEffectSuite
 import scalasound.model.domain.AudioChunk
 import scalasound.model.player.AudioOutput

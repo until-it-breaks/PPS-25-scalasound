@@ -2,8 +2,13 @@ package scalasound
 
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
-import scalasound.controller.{EffectsController, LoadSaveController, PlaybackController}
-import scalasound.model.io.{AudioFormatRegistry, WavAudioFormat}
+import scalasound.controller.{
+  EffectsController,
+  LoadSaveController,
+  PlaybackController
+}
+import scalasound.model.io.AudioFormatRegistry
+import scalasound.model.io.wav.WavAudioFormat
 import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.AppStateStore

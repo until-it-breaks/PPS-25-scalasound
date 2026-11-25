@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 /** Conversions for 16-bit signed little-endian PCM, the sample format of the supported WAV subset.
   *
@@ -9,7 +9,7 @@ package scalasound.model.io
   * The opposite direction maps a PCM value `s` to the normalised sample `s / 32768f`, so that
   * -32768 becomes -1.0 and 32767 becomes 32767/32768.
   */
-private[io] object Pcm16:
+private[wav] object Pcm16:
 
   final val BitsPerSample         = 16
   final val BytesPerSample        = 2
@@ -23,7 +23,8 @@ private[io] object Pcm16:
     /** Whether the sample has a PCM representation, that is whether it is neither `NaN` nor
       * infinite. Finite samples outside [-1.0, 1.0) are representable too: they are clipped.
       */
-    def isRepresentable: Boolean = java.lang.Float.isFinite(sample)
+    def isRepresentable: Boolean =
+      !sample.isNaN && !sample.isInfinite
 
     /** Quantises a normalised sample to a signed 16-bit PCM value, clipping it to the representable
       * range.
@@ -45,6 +46,7 @@ private[io] object Pcm16:
     *   the index of the sample, not of its first byte
     */
   def fromLittleEndianBytes(bytes: Array[Byte], sampleIndex: Int): Short =
-    val low  = bytes(sampleIndex * BytesPerSample) & 0xff
-    val high = bytes(sampleIndex * BytesPerSample + 1) // keeps the sign
+    val offset = sampleIndex * BytesPerSample
+    val low    = bytes(offset) & 0xff
+    val high   = bytes(offset + 1)
     ((high << 8) | low).toShort

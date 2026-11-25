@@ -1,12 +1,14 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
+import cats.effect.unsafe.implicits.global
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.*
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.model.io.WavFixtures.*
-import scalasound.model.io.{AudioSaveError, WavAudioWriter}
+import scalasound.model.io.error.AudioSaveError
+import scalasound.model.io.fixtures.WavFixtures.*
+import scalasound.model.io.wav.{PcmChunks, WavAudioWriter}
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN
@@ -31,8 +33,11 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   private def exported(track: AudioTrack, name: String = "out.wav"): Array[Byte] =
     withTempDir: dir =>
       val path = dir.resolve(name)
-      WavAudioWriter.save(track, path) shouldBe Right(())
+      runSave(track, path) shouldBe Right(())
       Files.readAllBytes(path)
+
+  private def runSave(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
+    WavAudioWriter.save(track, path).unsafeRunSync()
 
   private def withTempDir[A](test: Path => A): A =
     val dir = Files.createTempDirectory("scalasound-wav-writer-test-")
@@ -45,31 +50,45 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     Vector.tabulate(frames)(i => ((i * 13) % 20000) - 10000)
 
   private def parseHeader(bytes: Array[Byte]): Header =
-    val buffer        = ByteBuffer.wrap(bytes).order(LITTLE_ENDIAN)
-    def tag(): String =
-      val raw = new Array[Byte](4)
-      buffer.get(raw)
-      new String(raw, US_ASCII)
-    def u32(): Long = Integer.toUnsignedLong(buffer.getInt)
-    def u16(): Int  = java.lang.Short.toUnsignedInt(buffer.getShort)
+    val buf                      = ByteBuffer.wrap(bytes).order(LITTLE_ENDIAN)
+    def tag(offset: Int): String = String(bytes, offset, 4, US_ASCII)
+    def u16(offset: Int): Int    = buf.getShort(offset) & 0xffff
+    def u32(offset: Int): Long   = buf.getInt(offset) & 0xffffffffL
+
     Header(
-      tag(),
-      u32(),
-      tag(),
-      tag(),
-      u32(),
-      u16(),
-      u16(),
-      u32(),
-      u32(),
-      u16(),
-      u16(),
-      tag(),
-      u32()
+      riff = tag(0),
+      riffSize = u32(4),
+      wave = tag(8),
+      fmt = tag(12),
+      fmtSize = u32(16),
+      audioFormat = u16(20),
+      channels = u16(22),
+      sampleRate = u32(24),
+      byteRate = u32(28),
+      blockAlign = u16(32),
+      bits = u16(34),
+      data = tag(36),
+      dataSize = u32(40)
     )
 
   private def invalidSampleTrack(bad: Float): MonoTrack =
     MonoTrack(44100, Vector(MonoChunk(Vector(0.1f, bad, 0.2f)))).value
+
+  private case class Header(
+      riff: String,
+      riffSize: Long,
+      wave: String,
+      fmt: String,
+      fmtSize: Long,
+      audioFormat: Int,
+      channels: Int,
+      sampleRate: Long,
+      byteRate: Long,
+      blockAlign: Int,
+      bits: Int,
+      data: String,
+      dataSize: Long
+  )
 
   "Exporting a mono track" should "produce exactly the bytes of the equivalent 16 bit PCM WAV" in:
     exported(monoTrack(44100, KnownSamples)) shouldBe pcm16Wav(44100, 1, KnownSamples)
@@ -168,7 +187,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
 
       val path = tempDir.resolve("late-nan.wav")
 
-      WavAudioWriter.save(MonoTrack(44100, chunks).value, path) should matchPattern {
+      runSave(MonoTrack(44100, chunks).value, path) should matchPattern {
         case Left(AudioSaveError.InvalidSample(_)) =>
       }
       Files.exists(path) shouldBe false
@@ -176,11 +195,11 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   it should "leave an existing file untouched when the track holds an invalid sample" in withTempDir:
     tempDir =>
       val path = tempDir.resolve("keep.wav")
-      WavAudioWriter.save(monoTrack(44100, Seq(1, 2, 3)), path) shouldBe Right(())
+      runSave(monoTrack(44100, Seq(1, 2, 3)), path) shouldBe Right(())
 
       val before = Files.readAllBytes(path)
 
-      WavAudioWriter.save(invalidSampleTrack(Float.PositiveInfinity), path) should matchPattern {
+      runSave(invalidSampleTrack(Float.PositiveInfinity), path) should matchPattern {
         case Left(AudioSaveError.InvalidSample(_)) =>
       }
       Files.readAllBytes(path) shouldBe before
@@ -208,27 +227,11 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
 
     bytes.drop(44).toSeq shouldBe chunks.flatMap(chunk => PcmChunks.encode(chunk).toSeq)
 
-  private case class Header(
-      riff: String,
-      riffSize: Long,
-      wave: String,
-      fmt: String,
-      fmtSize: Long,
-      audioFormat: Int,
-      channels: Int,
-      sampleRate: Long,
-      byteRate: Long,
-      blockAlign: Int,
-      bits: Int,
-      data: String,
-      dataSize: Long
-  )
-
   "Exporting invalid samples" should "reject NaN with InvalidSample and create no file" in withTempDir:
     tempDir =>
       val path = tempDir.resolve("nan.wav")
 
-      WavAudioWriter.save(invalidSampleTrack(Float.NaN), path) should matchPattern {
+      runSave(invalidSampleTrack(Float.NaN), path) should matchPattern {
         case Left(AudioSaveError.InvalidSample(_)) =>
       }
       Files.exists(path) shouldBe false
@@ -237,7 +240,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     Seq(Float.PositiveInfinity, Float.NegativeInfinity).foreach: bad =>
       val path = tempDir.resolve(s"inf-$bad.wav")
 
-      WavAudioWriter.save(invalidSampleTrack(bad), path) should matchPattern {
+      runSave(invalidSampleTrack(bad), path) should matchPattern {
         case Left(AudioSaveError.InvalidSample(_)) =>
       }
       Files.exists(path) shouldBe false
@@ -247,7 +250,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
       val track =
         StereoTrack(44100, Vector(StereoChunk(Vector(0f, 0f), Vector(0f, Float.NaN)))).value
 
-      WavAudioWriter.save(track, tempDir.resolve("stereo-nan.wav")) should matchPattern {
+      runSave(track, tempDir.resolve("stereo-nan.wav")) should matchPattern {
         case Left(AudioSaveError.InvalidSample(_)) =>
       }
 
@@ -255,21 +258,21 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     tempDir =>
       val path = tempDir.resolve("missing-dir").resolve("out.wav")
 
-      WavAudioWriter.save(monoTrack(44100, Seq(1, 2)), path) should matchPattern {
+      runSave(monoTrack(44100, Seq(1, 2)), path) should matchPattern {
         case Left(AudioSaveError.WriteFailure(`path`, _)) =>
       }
 
   it should "return WriteFailure when the path is a directory" in withTempDir: tempDir =>
     val directory = tempDir
 
-    WavAudioWriter.save(monoTrack(44100, Seq(1, 2)), directory) should matchPattern {
+    runSave(monoTrack(44100, Seq(1, 2)), directory) should matchPattern {
       case Left(AudioSaveError.WriteFailure(`directory`, _)) =>
     }
 
   it should "overwrite an existing file without leaving stale bytes" in withTempDir: tempDir =>
     val path = tempDir.resolve("overwrite.wav")
-    WavAudioWriter.save(monoTrack(44100, pcmSampleSequence(100)), path) shouldBe Right(())
-    WavAudioWriter.save(monoTrack(44100, Seq(5, 6)), path) shouldBe Right(())
+    runSave(monoTrack(44100, pcmSampleSequence(100)), path) shouldBe Right(())
+    runSave(monoTrack(44100, Seq(5, 6)), path) shouldBe Right(())
 
     Files.readAllBytes(path) shouldBe pcm16Wav(44100, 1, Seq(5, 6))
 
@@ -301,13 +304,13 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
       val veryFast = StereoTrack(Int.MaxValue, Vector.empty).value
       val tooFast  = StereoTrack((1 << 24) + 1, Vector.empty).value
 
-      WavAudioWriter.save(veryFast, tempDir.resolve("fast.wav")) should matchPattern {
+      runSave(veryFast, tempDir.resolve("fast.wav")) should matchPattern {
         case Left(AudioSaveError.InvalidTrack(_)) =>
       }
-      WavAudioWriter.save(tooFast, tempDir.resolve("fast2.wav")) should matchPattern {
+      runSave(tooFast, tempDir.resolve("fast2.wav")) should matchPattern {
         case Left(AudioSaveError.InvalidTrack(_)) =>
       }
-      WavAudioWriter.save(
+      runSave(
         StereoTrack(1 << 24, Vector.empty).value,
         tempDir.resolve("limit.wav")
       ) shouldBe Right(())
@@ -317,6 +320,6 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
       override def sampleRate: SampleRate     = SampleRate.from(44100).value
       override def chunks: Vector[AudioChunk] = Vector.empty
 
-    WavAudioWriter.save(custom, tempDir.resolve("custom.wav")) should matchPattern {
+    runSave(custom, tempDir.resolve("custom.wav")) should matchPattern {
       case Left(AudioSaveError.InvalidTrack(_)) =>
     }

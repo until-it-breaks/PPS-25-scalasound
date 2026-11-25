@@ -1,9 +1,11 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.SampleRate
+import scalasound.model.io.error.AudioLoadError
+import scalasound.model.io.wav.{ChannelLayout, WavFormat}
 
 import javax.sound.sampled.{AudioFormat, AudioSystem}
 

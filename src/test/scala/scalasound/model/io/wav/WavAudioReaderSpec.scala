@@ -1,14 +1,17 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
+import cats.effect.unsafe.implicits.global
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.{AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.WavFixtures.*
-import scalasound.model.io.{AudioLoadError, WavAudioReader}
+import scalasound.model.io.error.AudioLoadError
+import scalasound.model.io.fixtures.WavFixtures.*
+import scalasound.model.io.wav.WavAudioReader
 
 import java.nio.file.{Files, Path}
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
+import scala.util.Random
 
 class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
 
@@ -35,11 +38,14 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       Files.deleteIfExists(dir)
 
   private def loadTrack[T <: AudioTrack: ClassTag](path: String): T =
-    WavAudioReader.load(path) match
+    runLoad(path) match
       case Right(track: T) =>
         track
       case other =>
         fail(s"expected a ${summon[ClassTag[T]].runtimeClass.getSimpleName} but got $other")
+
+  private def runLoad(path: String): Either[AudioLoadError, AudioTrack] =
+    WavAudioReader.load(path).unsafeRunSync()
 
   "A mono PCM 16 bit WAV" should "be decoded with sample rate, signed values and byte order preserved" in
     withTempFile("mono.wav", pcm16Wav(44100, 1, KnownSamples)): path =>
@@ -104,12 +110,12 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
   "Loading a file" should "return FileNotFound when the path does not exist" in withTempDir: dir =>
     val path = dir.resolve("missing.wav").toString
 
-    WavAudioReader.load(path) shouldBe Left(AudioLoadError.FileNotFound(path))
+    runLoad(path) shouldBe Left(AudioLoadError.FileNotFound(path))
 
   it should "return FileNotFound when the path is a directory" in withTempDir: dir =>
     val path = dir.toString
 
-    WavAudioReader.load(path) shouldBe Left(AudioLoadError.FileNotFound(path))
+    runLoad(path) shouldBe Left(AudioLoadError.FileNotFound(path))
 
   private def isUnsupported(result: Either[AudioLoadError, ?]): Boolean = result match
     case Left(_: AudioLoadError.UnsupportedFormat) => true
@@ -123,35 +129,35 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
     val bytes = wav(PcmFormatTag, 44100, 1, 8, Array.fill[Byte](16)(120))
 
     withTempFile("pcm8.wav", bytes): path =>
-      isUnsupported(WavAudioReader.load(path)) shouldBe true
+      isUnsupported(runLoad(path)) shouldBe true
 
   it should "reject 24 bit PCM as an unsupported format" in:
     val bytes = wav(PcmFormatTag, 44100, 1, 24, Array.fill[Byte](24)(1))
 
     withTempFile("pcm24.wav", bytes): path =>
-      isUnsupported(WavAudioReader.load(path)) shouldBe true
+      isUnsupported(runLoad(path)) shouldBe true
 
   it should "reject 32 bit float WAV as an unsupported format" in:
     val bytes = wav(FloatFormatTag, 44100, 1, 32, Array.fill[Byte](16)(0))
 
     withTempFile("float32.wav", bytes): path =>
-      isUnsupported(WavAudioReader.load(path)) shouldBe true
+      isUnsupported(runLoad(path)) shouldBe true
 
   it should "reject WAV files with more than two channels" in:
     val bytes = pcm16Wav(44100, 3, Vector.fill(30)(100))
 
     withTempFile("three-channels.wav", bytes): path =>
-      isUnsupported(WavAudioReader.load(path)) shouldBe true
+      isUnsupported(runLoad(path)) shouldBe true
 
   it should "reject a file that is not a WAV at all" in:
     val bytes = "this is plain text, not audio".getBytes("UTF-8")
 
     withTempFile("notes.wav", bytes): path =>
-      isUnsupported(WavAudioReader.load(path)) shouldBe true
+      isUnsupported(runLoad(path)) shouldBe true
 
   it should "reject an empty file without throwing" in
     withTempFile("zero-bytes.wav", Array.emptyByteArray): path =>
-      WavAudioReader.load(path).isLeft shouldBe true
+      runLoad(path).isLeft shouldBe true
 
   it should "report CorruptedData when the data is shorter than the header declares" in:
     val data      = pcm16Data(Vector.tabulate(100)(_ * 10))
@@ -159,7 +165,7 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       wav(PcmFormatTag, 44100, 1, 16, data.take(100), declaredDataSize = Some(data.length))
 
     withTempFile("truncated.wav", truncated): path =>
-      isCorrupted(WavAudioReader.load(path)) shouldBe true
+      isCorrupted(runLoad(path)) shouldBe true
 
   it should "discard an incomplete trailing frame, as Java Sound does, keeping all whole frames" in:
     val data = pcm16Data(Vector(100, -100, 200, -200, 300, -300)).dropRight(3)
@@ -174,7 +180,7 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
     val bytes = wav(PcmFormatTag, 0, 1, 16, pcm16Data(Vector(1, 2, 3)))
 
     withTempFile("zero-rate.wav", bytes): path =>
-      isCorrupted(WavAudioReader.load(path)) shouldBe true
+      isCorrupted(runLoad(path)) shouldBe true
 
   "Loading corrupted files" should "return an error, never throw, for a WAV truncated at any length" in withTempDir:
     dir =>
@@ -184,11 +190,11 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
       valid.indices.foreach: length =>
         Files.write(path, valid.take(length))
         withClue(s"truncated at $length bytes: ")(
-          WavAudioReader.load(path.toString).isLeft shouldBe true
+          runLoad(path.toString).isLeft shouldBe true
         )
 
       Files.write(path, valid)
-      WavAudioReader.load(path.toString).isRight shouldBe true
+      runLoad(path.toString).isRight shouldBe true
 
   it should "never throw when a byte of the header is replaced by an arbitrary value" in withTempDir:
     dir =>
@@ -200,12 +206,12 @@ class WavAudioReaderSpec extends AnyFlatSpec with Matchers:
         value <- Seq(0x00, 0x01, 0x7f, 0x80, 0xff)
       do
         Files.write(path, valid.updated(index, value.toByte))
-        WavAudioReader.load(path.toString) should matchPattern { case Left(_) | Right(_) => }
+        runLoad(path.toString) should matchPattern { case Left(_) | Right(_) => }
 
   it should "reject random bytes as an error" in withTempDir: dir =>
-    val random = scala.util.Random(42L)
+    val random = Random(42L)
     val path   = dir.resolve("random.wav")
 
     (1 to 50).foreach: _ =>
       Files.write(path, random.nextBytes(random.nextInt(300)))
-      WavAudioReader.load(path.toString).isLeft shouldBe true
+      runLoad(path.toString).isLeft shouldBe true

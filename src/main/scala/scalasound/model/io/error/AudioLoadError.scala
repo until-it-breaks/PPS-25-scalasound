@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.error
 
 /** Represents errors that can occur while importing an audio file. */
 enum AudioLoadError:

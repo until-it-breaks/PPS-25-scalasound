@@ -1,6 +1,7 @@
 package scalasound.model.io
 
-import FormatResolutionError.*
+import scalasound.model.io.error.FormatResolutionError
+import scalasound.model.io.error.FormatResolutionError.*
 
 import java.nio.file.Path
 

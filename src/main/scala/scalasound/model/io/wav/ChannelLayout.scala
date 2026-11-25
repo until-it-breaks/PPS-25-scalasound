@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 /** The channel layouts of the supported WAV subset, shared by [[WavAudioReader]] and
   * [[WavAudioWriter]].
@@ -6,14 +6,14 @@ package scalasound.model.io
   * @param channels
   *   the number of channels of the layout
   */
-private[io] enum ChannelLayout(val channels: Int):
+private[wav] enum ChannelLayout(val channels: Int):
   case Mono   extends ChannelLayout(1)
   case Stereo extends ChannelLayout(2)
 
   /** The size in bytes of one frame: one 16 bit sample for each channel. */
   def frameSize: Int = channels * Pcm16.BytesPerSample
 
-private[io] object ChannelLayout:
+private[wav] object ChannelLayout:
 
   /** The layout with the given number of channels, if it is supported. */
   def fromChannelCount(channels: Int): Option[ChannelLayout] =

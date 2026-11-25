@@ -1,6 +1,8 @@
 package scalasound.model.io
 
+import cats.effect.IO
 import scalasound.model.domain.AudioTrack
+import scalasound.model.io.error.AudioSaveError
 
 import java.nio.file.Path
 
@@ -14,7 +16,7 @@ trait AudioWriter:
     * @param path
     *   the destination file path
     * @return
-    *   `Right(())` if the file was written, or a `Left` containing an [[AudioSaveError]] describing
-    *   why the export failed
+    *   an effect producing a `Right`, if the file was successfully exported
+    *   or a `Left` with an [[AudioSaveError]], if exporting fails
     */
-  def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit]
+  def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]]

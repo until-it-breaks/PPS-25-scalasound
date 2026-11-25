@@ -1,9 +1,10 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.model.io.Pcm16.toNormalised
+import scalasound.model.io.wav.Pcm16.toNormalised
+import scalasound.model.io.wav.PcmChunks
 
 class PcmChunksSpec extends AnyFlatSpec with Matchers:
 

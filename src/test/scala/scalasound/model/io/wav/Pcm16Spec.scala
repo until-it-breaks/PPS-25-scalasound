@@ -1,8 +1,8 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scalasound.model.io.Pcm16.{fromLittleEndianBytes, isRepresentable, toNormalised, toPcm16}
+import scalasound.model.io.wav.Pcm16.{fromLittleEndianBytes, isRepresentable, toNormalised, toPcm16}
 
 import scala.util.Random
 

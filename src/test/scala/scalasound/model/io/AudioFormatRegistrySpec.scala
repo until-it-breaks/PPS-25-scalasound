@@ -1,10 +1,12 @@
 package scalasound.model.io
 
-import FormatResolutionError.*
+import cats.effect.IO
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioTrack
+import scalasound.model.io.error.FormatResolutionError.*
+import scalasound.model.io.error.{AudioLoadError, AudioSaveError}
 
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.atomic.AtomicInteger
@@ -25,16 +27,18 @@ class AudioFormatRegistrySpec extends AnyFlatSpec with Matchers with EitherValue
   private def path(text: String): Path = Paths.get(text)
 
   private final class FakeReader extends AudioReader:
-    val calls                                                               = AtomicInteger(0)
-    override def load(filePath: String): Either[AudioLoadError, AudioTrack] =
-      calls.incrementAndGet()
-      Left(AudioLoadError.ReadFailure("fake"))
+    val calls                                                                   = AtomicInteger(0)
+    override def load(filePath: String): IO[Either[AudioLoadError, AudioTrack]] =
+      IO:
+        calls.incrementAndGet()
+        Left(AudioLoadError.ReadFailure("fake"))
 
   private final class FakeWriter extends AudioWriter:
     val calls = AtomicInteger(0)
-    override def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
-      calls.incrementAndGet()
-      Right(())
+    override def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]] =
+      IO:
+        calls.incrementAndGet()
+        Right(())
 
   "Selecting a reader" should "return the reader of the format of the extension" in:
     registry(wav).readerFor(path("song.wav")).value shouldBe wavReader

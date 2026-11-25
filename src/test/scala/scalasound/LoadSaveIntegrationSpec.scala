@@ -5,10 +5,8 @@ import cats.effect.{IO, Resource}
 import munit.CatsEffectSuite
 import scalafx.scene.control.Alert.AlertType
 import scalasound.controller.{EffectsController, LoadSaveController}
+import scalasound.model.io.AudioFormatRegistry
 import scalasound.model.io.wav.{WavAudioFormat, WavAudioReader, WavAudioWriter}
-import scalasound.model.io.{AudioFormatRegistry}
-import scalasound.model.processing.{AudioEffect, AudioProcessorWithRules}
-import scalasound.model.io.{AudioFormatRegistry, WavAudioFormat, WavAudioReader, WavAudioWriter}
 import scalasound.model.processing.{AudioEffect, AudioProcessor}
 import scalasound.model.state.{AppStateStore, ExportState, ImportState}
 import scalasound.view.panels.loadsave.LoadSaveLogic

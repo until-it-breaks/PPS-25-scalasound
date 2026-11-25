@@ -9,9 +9,9 @@ import scalasound.model.io.error.{AudioLoadError, AudioSaveError}
 import scalasound.model.processing.AudioEffect
 import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 import scalasound.model.state.Command.*
-import scalasound.model.state.{AppState, ExportState, ImportState}
 import scalasound.model.state.ImportState.Imported
 import scalasound.model.state.PlaybackState.*
+import scalasound.model.state.{AppState, ExportState, ImportState}
 
 class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
   private val track = MonoTrack(

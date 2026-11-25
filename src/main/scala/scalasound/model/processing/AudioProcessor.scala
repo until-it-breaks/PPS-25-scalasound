@@ -1,8 +1,8 @@
 package scalasound.model.processing
 
-import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import AudioError.AudioProcessorError
-import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, SampleRate, StereoTrack}
+import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.model.domain.*
 import scalasound.model.processing.processors.{AudioProcessorWithRules, SimpleAudioProcessor}
 
 /**

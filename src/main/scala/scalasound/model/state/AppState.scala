@@ -36,9 +36,9 @@ enum Command:
   case UpdateImport(state: ImportState)
   case UpdateExport(state: ExportState)
 
-import PlaybackState.*
-import ImportState.*
 import Command.*
+import ImportState.*
+import PlaybackState.*
 
 /** Core immutable application state and state machine for the audio system.
   *

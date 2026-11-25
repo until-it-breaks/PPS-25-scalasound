@@ -61,6 +61,60 @@ meeting nel corso dello sprint per chiarire le idee tra i vari componenti del gr
 
 ## Sprint 3
 
+### Descrizione dell'andamento dello sviluppo
+In questo sprint ci siamo dedicati alla gestione dei controller (`EffectsController`, `LoadSaveController`, `PlaybackController`)
+e la loro interazione con la GUI, al fine di reagire ai cambiamenti in modo reattivo alle azione che l'utente esegue
+nell'applicazione. Al termine dello sprint abbiamo ottenuto una GUI funzionante e quasi completa, che interagisce con i 
+controller, anch'essi funzionanti. Inoltre, alla traccia importata, a cui si può interagire tramite i pulsanti messi a 
+disposizione, possono essere applicati correttamente tutti gli effetti descritti. 
+
+### Backlog
+- Aggiunta spostamento del seek in secondi al `PlaybackController` e adeguamento dei test(completato in 4 ore da JS)
+- Definizione di una GUI demo con i soli comandi di riproduzione (completato in 4 ore da JS)
+- Stesura iniziale del report: introduzione processo (completato in 5 ore da JS)
+- Correzioni minori alla configurazione di progetto (completato in 2 ore da JS)
+- Completamento della GUI e di tutti i suoi pannelli (completato in 8 ore da SC)
+- Aggiunta di `ParameterConfiguration` negli effetti e successivo refactoring di `AudioEffect` (completato in 3 ore da SC)
+- Miglioramento delle formule presenti negli effetti e correzione di errori (completato in 3 ore da SC)
+- Puliza del codice e miglioramento della documentazione (completato in 1 ora da SC)
+
+### Iterazioni
+
+### Commenti sullo sprint
+Tutte le funzionalità richieste sono state completate con successo nei tempi previsti. In particolare in questa tappa
+ci si è concentrati sul perfezionamento della codebase esistente e all'introduzione della componente Controller per 
+completare il modello MVC.
+
 ## Sprint 4
 
+### Descrizione dell'andamento dello sviluppo
+L'ultimo sprint è stato necessario per rifinire il codice (pulizia e refactoring), migliorare i test, finalizzare il report
+e generare gli eseguibili. 
+
+### Backlog
+- Collegamento della logica di riproduzione alla GUI e refactoring dell'entry point (completato in 2 ore da JS)
+- Refactoring di `AudioOutput`, `AudioPlayer` e `SpeakerAudioOutput` con aggiunta dei relativi test (completato in 2 ore da JS)
+- Refactoring di `PlaybackController` e relativa suite di test (completato in 2 ore da JS)
+- Configurazione della build: *scalafmt*, *scalacOptions*, *sbt-coverage* e correzione dei warning (completato in 2 ore da JS)
+- Rifinitura della GUI (completato in 1 ora da JS)
+- Stesura del report - Proseguimento - (completato in 6 ore da JS)
+- Refactoring di `AudioProcessor` (completato in 2 ore da SC)
+- Implementazione di `EffectsController` e modifiche in `AppState` (completato in 1 ora da SC)
+- Gestione della logica dei widget degli effetti nella GUI (completato in 1 ora da SC)
+- Refactoring della GUI e rimozione di warning (completato in 1 ora da SC)
+- Miglioramento dei test per `AudioEffects` e `AudioProcessors`, e aggiunta suite di test per `EffectsController` (completato in 2 ora da SC)
+- Refactoring dei singoli effetti e del package `processing` (completato in 3 ore da SC)
+- Stesura del report (completato in 5 ore da SC)
+
+### Iterazioni
+
+### Commenti sullo sprint
+Le funzionalità di dominio sono state completate con qualche giorno di anticipo rispetto alla data di consegna, lasciandoci
+il tempo necessario a migliorare il codice e la documentazione presente, sia per quanto riguarda il report sia per la *scaladoc*.
+
 # Conclusioni
+Il gruppo si ritiene soddisfatto del risultato raggiunto nella realizzazione di un sistema di *importazione*, *modifica* ed
+*esportazione* di un file audio. Nonostante le complessità tecniche derivanti da un dominio del *Digital Signal Processing* (DSP), 
+poco familiare a tutti i membri del team, il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a 
+ciascuno Sprint, assieme ad una corretta pianificazione delle attività e una forte collaborazione tra i componenti del team,
+ha permesso la riuscita del progetto nei tempi stabiliti.

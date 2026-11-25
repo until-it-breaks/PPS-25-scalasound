@@ -40,7 +40,7 @@ final class EffectsPanelContainer extends BorderPane:
   val resetAllButton: Button             = EffectsPanelContainer.resetAllButton
 
   padding = Insets(20)
-  style = s"-fx-background-color: ${Utility.BackgroundColor};"
+  style = s"-fx-background-color: ${EffectPane.BackgroundColor};"
   top = titleBox(resetAllButton)
   right = echoAutopanBox
   center = distortionPanBox

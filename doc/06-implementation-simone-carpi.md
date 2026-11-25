@@ -17,10 +17,9 @@ Il mio contributo al progetto si è focalizzato nelle seguenti aree:
 - **Testing**: definizione e implementazione di tutti i test relativi agli effetti, ai processori e al controller.
 
 
-\
 ### Effetti
 
-Gli effetti audio trasformazioni matematiche applicate alla traccia presa in carico (costituita da un insieme
+Gli effetti audio sono trasformazioni matematiche applicate alla traccia presa in carico (costituita da un insieme
 di chunk).
 Al fine di garantire uniformità all'interno della pipeline di elaborazione gestita da `AudioProcessor`, la gerarchia è
 stata definita su un `sealed trait` denominato `AudioEffect`,
@@ -34,7 +33,7 @@ contratti, `trait` separati:
   che prende in ingresso il chunk e il suo indice. Quest'ultimo agisce come punto di riferimento
   temporale necessario al calcolo della trasformazione.
 
-Per evitare di lanciare eccezioni a *runtime* ogni effetto restituisce un tipo `Either[AudioError, AudioChunk]`. In questo
+Per evitare di lanciare eccezioni a *runtime*, ogni effetto restituisce un tipo `Either[AudioError, AudioChunk]`. In questo
 modo, in caso di eventuali situazioni di errore causate dall'immisione di parametri non validi o al di fuori degli
 intervalli
 consentiti, il calcolo dell'effetto (trasformazione) verrà interrotto tramite il ritorno di un `Left` contenente un
@@ -48,14 +47,15 @@ sealed trait AudioEffect:
 
 trait StatelessAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
+  ...
 
 trait TimeAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
 ```
 \
-Per poter gestire al meglio la creazione degli effetti (disaccoppiandola dall'effettiva implementazione, si è deciso di applicare il **Factory Pattern** all'interno del
+Per poter gestire al meglio la creazione degli effetti (disaccoppiandola dall'effettiva implementazione), si è deciso di applicare il **Factory Pattern** all'interno del
 companion object di `AudioEffect`. Questo approccio fornisce un unico punto di ingresso per le chiamate e la relativa istanziazione, riducendo il numero di possibili
-dipendenze.
+dipendenze. Inoltre, questo approccio garantisce che gli unici effetti applicabili sono quelli messi a disposizione da `AudioEffect`. 
 
 ```scala
 object AudioEffect:
@@ -81,7 +81,7 @@ object AudioEffect:
   def volume(volumeValue: Float): StatelessAudioEffect =
     VolumeEffect(volumeValue)
 ```
-
+\
 Ogni effetto viene implementato tramite un `case class` (oppure un `case object` per l'`IdentityEffect`), il cui costruttore prende i parametri necessari a modulare la
 trasformazione. Di seguito viene mostrata l'implementazione dell'effetto `Gain`.
 
@@ -150,17 +150,16 @@ dei casi noti, mentre restituirà un `None` per tutti gli effetti non specificat
         case _: VolumeEffect     => AudioEffectType.Volume
 ```
 
-\
 ### Processori Audio
 Il processore audio è il componente responsabile dell'applicazione sequenziale degli effetti sui singoli *chunk* e
 viene modellato tramite il `trait` `AudioProcessor`. Il contratto contiene due implementazioni disitinte del metodo `apply`, 
-tramite overloading del metodo, per gestire sia per singoli chunk sia intere tracce.
+tramite overloading del metodo, per gestire sia singoli chunk sia intere tracce.
 A seguito dei controlli preliminari sugli input, la logica di gestione degli effetti sul chunk, risulta la seguente:
 
 ```scala
 protected def processChunk(chunk: AudioChunk,
-                             effects: List[AudioEffect],
-                             chunkIndex: Int): Either[AudioError, AudioChunk] =
+                           effects: List[AudioEffect],
+                           chunkIndex: Int): Either[AudioError, AudioChunk] =
     effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)):
       (currentChunk, effect) =>
         currentChunk.flatMap:
@@ -232,12 +231,21 @@ private[processing] object AudioProcessorWithRules extends AudioProcessor:
     super.processTrack(track, sortEffects(effects))
 ```
 
+Infine, come già fatto con `AudioEffect`, è stato introdotto un *companion object* per `AudioProcessor` così da fornire
+un unico punto di accesso per la creazione delle sue istanze: `SimpleAudioProcessor` e `AudioProcessorWithRules`.
 
-\
+```scala
+object AudioProcessor:
+
+  def simple: AudioProcessor = SimpleAudioProcessor
+ 
+  def withRules: AudioProcessor = AudioProcessorWithRules
+```
+
 ### Logica degli effetti
 `EffectsLogic` si occupa di gestire i widget, nello specifico sliders e bottoni, degli effetti che l'utente può applicare in tempo reale all'interno dell'applicazione.
-Il compito di questa componente è di inviare al relativo controller le azioni dell'utente e adattare i cambiamenti di stato nelle *label* dei widget.
-Data la massiccia presenza di *slider* nel pannello, per evitare duplicazioni di codice è stato aggiunto un **extension method** incapsulato nel *companion object* `EffectsLogic`:
+Il compito di questa componente è di inviare al relativo controller (`EffectsController`) le azioni dell'utente e adattare i cambiamenti di stato nelle *label* dei widget.
+Data la massiccia presenza di *slider* nel pannello, per evitare duplicazioni di codice è stato aggiunto un **extension method** incapsulato nel *companion object* di `EffectsLogic`:
 
 ```scala
   extension (slider: Slider)

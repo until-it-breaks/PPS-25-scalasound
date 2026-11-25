@@ -14,7 +14,7 @@ Per il testing sono stati usati due framework e uno strumento per misurare la co
 
 Il team **non ha adottato il TDD** poichè si trattava del primo progetto in Scala per i membri del gruppo, e la scarsa dimestichezza sia con il linguaggio sia con lo stack di librerie (`cats-effect`, `fs2`) rendeva poco praticabile scrivere i test prima del codice. Si è quindi scelto di scrivere i test dopo l'implementazione, una volta stabilizzate le interfacce dei componenti.
 
-L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 199 test e una copertura del *93.02%* a livello di statement e dell'*90.40%* a livello di branch.
+L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 294 test e una copertura del *93.02%* a livello di statement e dell'*90.40%* a livello di branch.
 
 Le suite in `src/test` sono di tipologie diverse, riassunte nella tabella seguente.
 

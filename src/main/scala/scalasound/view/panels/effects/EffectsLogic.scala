@@ -2,7 +2,7 @@ package scalasound.view.panels.effects
 
 import scalafx.scene.control.Slider
 import scalasound.model.processing.AudioEffect
-import scalasound.view.panels.effects.DistortionEnum.Tanh
+import scalasound.view.panels.effects.DistortionType.Tanh
 
 object EffectsLogic:
   /*
@@ -20,7 +20,7 @@ object EffectsLogic:
       slider.onMouseReleased = _ =>
         if !slider.valueChanging.value then onUpdate(slider.sliderValue)
 
-  extension (filter: DistortionEnum)
+  extension (filter: DistortionType)
     /* Checks if the distortion to be applied is SoftClipping or not. */
     private def isSoftClipping: Boolean = filter == Tanh
 
@@ -76,7 +76,7 @@ final class EffectsLogic(controller: EffectsControllerWrapper):
    * Defines how to treat the clipping function when a
    * specific DistortionEnum value is inserted.
    */
-  private def updateDistortion(value: Float, filter: DistortionEnum): Unit =
+  private def updateDistortion(value: Float, filter: DistortionType): Unit =
     controller.addEffect(AudioEffect.distortion(value, isSoftClipping = filter.isSoftClipping))
 
   /*

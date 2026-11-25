@@ -83,7 +83,7 @@ Le operazioni di importazione ed esportazione procedono per fasi, registrate nel
 
 Scelte di design:
 
-- la posizione nella traccia è rappresentata principalmente dall'indice del chunk da riprodurre (`chunkIndex`) e non da un tempo in secondi, che si ricava dall'indice solo quando serve; le richieste espresse in secondi sono convertite in indice dal livello dei controller. Inoltre, se la dimensione dei chunk è ben configurata, l'indice offre una risoluzione molto più fine del secondo: con chunk di 1024 frame a 44100 Hz, ad esempio, ogni chunk dura circa 23 ms;
+- la posizione nella traccia è rappresentata principalmente dall'indice del chunk da riprodurre (`chunkIndex`) e non da un valore temporale (per esempio i secondi dall'inizio), che si ricava dall'indice solo quando serve; le richieste di posizione, espresse come durata, sono convertite in indice dalla traccia stessa. Inoltre, se la dimensione dei chunk è ben configurata, l'indice offre una risoluzione molto più fine del secondo: con chunk di 1024 frame a 44100 Hz, ad esempio, ogni chunk dura circa 23 ms;
 - l'esito di un'importazione o di un'esportazione, riuscito o fallito, resta nello stato finché non viene riconosciuto e solo allora si torna a `Idle`. In questo modo si forza il riconoscimento dell'esito;
 - gli effetti sono configurati dall'utente e non sono legati alla traccia. Per questo motivo l'importazione di un nuovo file li lascia invariati;
 - l'importazione di una nuova traccia ferma la riproduzione e riporta `chunkIndex` a zero, così il nuovo file non parte da un indice che aveva senso solo per la traccia precedente;
@@ -162,7 +162,7 @@ Anche il trait `AudioOutput` ha un solo metodo, `write(chunk, sampleRate)`. Nell
 
 `StreamingAudioPlayer` elabora i chunk seguendo l'approccio just-in-time: non processa la traccia in anticipo, ma prepara ogni chunk subito prima di mandarlo in uscita. Una modifica degli effetti o un riposizionamento si applica quindi già dal chunk successivo. Supponendo che come `AudioOutput` sia usato `SpeakerAudioOutput`, il ritmo non deriva da un timer ma dall'output stesso, che accetta un nuovo chunk solo quando ha spazio nel buffer.
 
-Nello specifico, `StreamingAudioPlayer` ascolta il flusso `changes` e reagisce solo ai cambiamenti di `playbackState` e di `chunkIndex` in `AppState`. Quando `playbackState` diventa `Playing`, esso prende il chunk in posizione `chunkIndex`, lo elabora con `AudioProcessor` usando gli `effects` correnti, lo manda in output attraverso `AudioOutput` e invia `NextChunk` allo store. Il ciclo riparte ogni volta che `chunkIndex` è diverso dal precedente, per effetto di `NextChunk` o di `SeekToIndex`, e finisce quando `playbackState` non è più `Playing` o quando la traccia è arrivata all'ultimo chunk, nel qual caso il player stesso invia `Stop` allo store.
+Nello specifico, `StreamingAudioPlayer` ascolta l'`AppState` e reagisce solo ai cambiamenti di `playbackState` e di `chunkIndex` in `AppState`. Quando `playbackState` diventa `Playing`, esso prende il chunk in posizione `chunkIndex`, lo elabora con `AudioProcessor` usando gli `effects` correnti, lo manda in output attraverso `AudioOutput` e invia `NextChunk` allo store. Il ciclo riparte ogni volta che `chunkIndex` è diverso dal precedente, per effetto di `NextChunk` o di `SeekToIndex`, e finisce quando `playbackState` non è più `Playing` o quando la traccia è arrivata all'ultimo chunk, nel qual caso il player stesso invia `Stop` allo store.
 
 ![Stati di `StreamingAudioPlayer`](doc/img/05-detailed-design/stati-player.png){ width=90% }
 
@@ -216,23 +216,23 @@ I controller sono il livello che collega la View al Model. Essi rispecchiano le 
 
 Il compito di ciascun controller è il seguente:
 
-- `PlaybackController` permette di controllare la riproduzione con play, pause, stop e seek. Il seek riceve una posizione in secondi, la converte nell'indice del chunk corrispondente (il primo o l'ultimo, se è fuori dalla traccia) e invia `SeekToIndex` con tale indice allo store.
+- `PlaybackController` permette di controllare la riproduzione con play, pause, stop e seek. Il seek riceve una posizione come durata, la converte tramite la traccia nell'indice del chunk corrispondente (il primo o l'ultimo, se è fuori dalla traccia) e invia `SeekToIndex` con tale indice allo store.
 - `EffectsController` permette di aggiungere un effetto e di rimuoverli tutti, inviando `AddEffect` e `RemoveAllEffects`.
 - `LoadSaveController` permette di importare un file audio come traccia corrente e di esportare la traccia con gli effetti attivi. È l'unico controller con una logica complessa, poiché gestisce operazioni bloccanti. Esso interagisce con `AudioReader`, `AudioWriter` e `AudioProcessor`, e modifica lo stato impartendo i comandi `UpdateImport` e `UpdateExport` allo store. Per questo è descritto nella sezione seguente.
 
 \newpage
 
-![Controller e metodi esposti](doc/img/05-detailed-design/controller-metodi.png){ width=70% }
+![Controller e metodi esposti](doc/img/05-detailed-design/controller-metodi.png){ width=60% }
 
 ### Importazione ed esportazione
 
-`LoadSaveController` riceve dall'esterno lo store, `AudioReader`, `AudioWriter` e `AudioProcessor`, e offre quattro operazioni:
+`LoadSaveController` riceve dall'esterno lo store, un registro dei formati (`AudioFormatRegistry`) e `AudioProcessor`, e offre quattro operazioni. Il registro sceglie il reader o il writer in base all'estensione del file, quindi il controller non dipende da un formato specifico:
 
 - `load(path)` importa il file audio indicato e lo rende la traccia corrente;
 - `save(path)` esporta la traccia corrente, con gli effetti attivi, nel file indicato;
 - `acknowledgeImport` e `acknowledgeExport` confermano l'esito di un'importazione o di un'esportazione, riportando lo stato a `Idle`.
 
-`load` e `save` avviano l'operazione in background e restituiscono subito il controllo, mentre il progresso e l'esito sono osservabili nell'`AppState`. Nell'applicazione sono usati `WavAudioReader`, `WavAudioWriter` e `AudioProcessorWithRules`.
+`load` e `save` avviano l'operazione in background e restituiscono subito il controllo, mentre il progresso e l'esito sono osservabili nell'`AppState`. Nell'applicazione è registrato il formato WAV (`WavAudioReader` e `WavAudioWriter`) e l'elaborazione è affidata ad `AudioProcessorWithRules`.
 
 Durante l'importazione `importState` passa da `Idle` a `Importing` e poi a `Imported(track)` o `Failed(error)`. A lettura finita il controller aggiorna l'`AppState` con la nuova traccia, che ferma la riproduzione e mantiene gli effetti, oppure con l'errore.
 
@@ -278,8 +278,8 @@ L'applicazione è assemblata nella radice dei package da due classi con compiti 
 `AppSetup.make` costruisce il grafo degli oggetti in una `Resource` e svolge i seguenti compiti:
 
 - crea un unico `AppStateStore`;
-- sceglie le implementazioni concrete (`WavAudioReader` e `WavAudioWriter` per i file, `AudioProcessorWithRules` per l'elaborazione e `SpeakerAudioOutput` per l'uscita audio) e le collega con i costruttori;
-- costruisce i controller e le logiche della view;
+- sceglie le implementazioni concrete (il formato WAV, con `WavAudioReader` e `WavAudioWriter`, incluso nel registro dei formati, `AudioProcessorWithRules` per l'elaborazione e `SpeakerAudioOutput` per l'uscita audio) e le collega con i costruttori;
+- costruisce i controller e le logiche della View;
 - avvia in background lo `StreamingAudioPlayer` e gli osservatori della view, che partono solo quando la finestra è pronta;
 - restituisce alla View le sole logiche, raccolte in `AppDependencies`.
 

@@ -1,11 +1,12 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import cats.effect.unsafe.implicits.global
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.{AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.WavFixtures.*
-import scalasound.model.io.{AudioLoadError, WavAudioReader}
+import scalasound.model.io.error.AudioLoadError
+import scalasound.model.io.fixtures.WavFixtures.*
+import scalasound.model.io.wav.WavAudioReader
 
 import java.nio.file.{Files, Path}
 import scala.reflect.ClassTag

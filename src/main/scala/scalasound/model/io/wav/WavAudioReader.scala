@@ -1,8 +1,10 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import cats.effect.{IO, Resource}
 import scalasound.model.domain.{AudioDomainError, AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.AudioLoadError.*
+import scalasound.model.io.AudioReader
+import scalasound.model.io.error.AudioLoadError
+import scalasound.model.io.error.AudioLoadError.*
 
 import java.io.{EOFException, File, IOException}
 import javax.sound.sampled.{AudioInputStream, AudioSystem, UnsupportedAudioFileException}

@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.integration
 
 import cats.effect.unsafe.implicits.global
 import org.scalatest.EitherValues
@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.{AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.{WavAudioReader, WavAudioWriter}
+import scalasound.model.io.wav.{WavAudioReader, WavAudioWriter}
 
 import java.nio.file.{Files, Path, StandardCopyOption}
 import scala.reflect.ClassTag

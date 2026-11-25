@@ -1,11 +1,12 @@
 package scalasound.model.io
 
-import FormatResolutionError.*
 import cats.effect.IO
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioTrack
+import scalasound.model.io.error.FormatResolutionError.*
+import scalasound.model.io.error.{AudioLoadError, AudioSaveError}
 
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.atomic.AtomicInteger

@@ -1,7 +1,7 @@
 package scalasound.model.state
 
 import scalasound.model.domain.AudioTrack
-import scalasound.model.io.{AudioLoadError, AudioSaveError}
+import scalasound.model.io.error.{AudioLoadError, AudioSaveError}
 import scalasound.model.processing.AudioEffect
 
 /** Represents the current playback lifecycle status. */

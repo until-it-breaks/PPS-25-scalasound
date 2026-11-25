@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
@@ -7,8 +7,11 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.{AudioTrack, MonoTrack}
-import scalasound.model.io.FormatResolutionError.*
-import scalasound.model.io.WavFixtures.*
+import scalasound.model.io.error.AudioLoadError
+import scalasound.model.io.error.FormatResolutionError.*
+import scalasound.model.io.fixtures.WavFixtures.*
+import scalasound.model.io.wav.{WavAudioFormat, WavAudioReader, WavAudioWriter}
+import scalasound.model.io.{AudioFileType, AudioFormatRegistry, AudioReader}
 
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.atomic.AtomicInteger

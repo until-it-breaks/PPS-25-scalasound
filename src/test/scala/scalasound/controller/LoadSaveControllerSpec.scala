@@ -5,7 +5,8 @@ import munit.CatsEffectSuite
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.{AudioTrack, MonoTrack}
 import scalasound.model.io.*
-import scalasound.model.io.FormatResolutionError.*
+import scalasound.model.io.error.FormatResolutionError.*
+import scalasound.model.io.error.{AudioLoadError, AudioSaveError}
 import scalasound.model.state.{AppStateStore, Command, ExportState, ImportState}
 
 import java.nio.file.{Path, Paths}

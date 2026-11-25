@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 /** Conversions for 16-bit signed little-endian PCM, the sample format of the supported WAV subset.
   *
@@ -9,7 +9,7 @@ package scalasound.model.io
   * The opposite direction maps a PCM value `s` to the normalised sample `s / 32768f`, so that
   * -32768 becomes -1.0 and 32767 becomes 32767/32768.
   */
-private[io] object Pcm16:
+private[wav] object Pcm16:
 
   final val BitsPerSample         = 16
   final val BytesPerSample        = 2

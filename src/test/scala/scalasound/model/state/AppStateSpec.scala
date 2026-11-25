@@ -5,7 +5,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.MonoChunk
 import scalasound.model.domain.MonoTrack
-import scalasound.model.io.{AudioLoadError, AudioSaveError}
+import scalasound.model.io.error.{AudioLoadError, AudioSaveError}
 import scalasound.model.processing.AudioEffect
 import scalasound.model.processing.AudioEffectType.{Gain, Volume}
 import scalasound.model.state.Command.*

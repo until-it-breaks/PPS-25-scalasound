@@ -1,9 +1,11 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
+import Pcm16.{BitsPerSample, BytesPerSample, isRepresentable}
 import cats.effect.IO
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.AudioSaveError.*
-import scalasound.model.io.Pcm16.{BitsPerSample, BytesPerSample, isRepresentable}
+import scalasound.model.io.AudioWriter
+import scalasound.model.io.error.AudioSaveError
+import scalasound.model.io.error.AudioSaveError.*
 
 import java.io.{ByteArrayInputStream, SequenceInputStream}
 import java.nio.file.Path

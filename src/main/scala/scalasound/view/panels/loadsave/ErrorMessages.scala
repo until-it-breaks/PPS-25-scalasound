@@ -1,6 +1,6 @@
 package scalasound.view.panels.loadsave
 
-import scalasound.model.io.{AudioLoadError, AudioSaveError, FormatResolutionError}
+import scalasound.model.io.error.{AudioLoadError, AudioSaveError, FormatResolutionError}
 
 /** Turns import and export errors into messages that can be shown to the user. */
 object ErrorMessages:

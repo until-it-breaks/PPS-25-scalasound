@@ -1,7 +1,7 @@
 package scalasound
 
 import cats.effect.{IO, IOApp}
-import scalasound.model.io.WavAudioReader
+import scalasound.model.io.wav.WavAudioReader
 import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.SimpleAudioProcessor
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}

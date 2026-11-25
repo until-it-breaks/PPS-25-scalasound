@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import cats.effect.unsafe.implicits.global
 import org.scalatest.EitherValues
@@ -6,8 +6,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.*
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.model.io.WavFixtures.*
-import scalasound.model.io.{AudioSaveError, WavAudioWriter}
+import scalasound.model.io.error.AudioSaveError
+import scalasound.model.io.fixtures.WavFixtures.*
+import scalasound.model.io.wav.{PcmChunks, WavAudioWriter}
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN

@@ -1,7 +1,8 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
 import scalasound.model.domain.SampleRate
-import scalasound.model.io.AudioLoadError.*
+import scalasound.model.io.error.AudioLoadError
+import scalasound.model.io.error.AudioLoadError.*
 
 import javax.sound.sampled.AudioFormat
 
@@ -12,9 +13,9 @@ import javax.sound.sampled.AudioFormat
   * @param sampleRate
   *   the validated sample rate
   */
-private[io] final case class WavFormat(layout: ChannelLayout, sampleRate: SampleRate)
+private[wav] final case class WavFormat(layout: ChannelLayout, sampleRate: SampleRate)
 
-private[io] object WavFormat:
+private[wav] object WavFormat:
 
   /** Validates a Java Sound format with the supported subset.
     *

@@ -2,6 +2,7 @@ package scalasound.model.io
 
 import cats.effect.IO
 import scalasound.model.domain.AudioTrack
+import scalasound.model.io.error.AudioLoadError
 
 trait AudioReader:
 

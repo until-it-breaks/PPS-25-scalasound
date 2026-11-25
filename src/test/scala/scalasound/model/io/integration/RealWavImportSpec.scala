@@ -1,10 +1,10 @@
-package scalasound.model.io
+package scalasound.model.io.integration
 
 import cats.effect.unsafe.implicits.global
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.StereoTrack
-import scalasound.model.io.WavAudioReader
+import scalasound.model.io.wav.WavAudioReader
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN

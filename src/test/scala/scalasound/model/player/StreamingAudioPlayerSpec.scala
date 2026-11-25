@@ -4,11 +4,7 @@ import cats.effect.IO
 import munit.CatsEffectSuite
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
 import scalasound.model.player.AudioOutput
-import scalasound.model.processing.{
-  AudioEffect,
-  AudioError,
-  AudioProcessor
-}
+import scalasound.model.processing.{AudioEffect, AudioError, AudioProcessor}
 import scalasound.model.state.*
 
 import scala.concurrent.duration.{Duration, DurationInt}

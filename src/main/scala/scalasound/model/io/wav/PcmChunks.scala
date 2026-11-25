@@ -1,13 +1,13 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
+import Pcm16.{fromLittleEndianBytes, toNormalised, toPcm16}
 import scalasound.model.domain.AudioChunk
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
-import scalasound.model.io.Pcm16.{fromLittleEndianBytes, toNormalised, toPcm16}
 
 import java.nio.{ByteBuffer, ByteOrder}
 
 /** Conversions between [[AudioChunk]]s and interleaved 16-bit little-endian PCM bytes. */
-private[io] object PcmChunks:
+private[wav] object PcmChunks:
 
   /** Encodes a chunk as interleaved little-endian PCM bytes, two bytes per sample.
     *

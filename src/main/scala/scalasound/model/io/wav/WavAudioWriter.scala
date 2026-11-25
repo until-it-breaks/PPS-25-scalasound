@@ -1,14 +1,17 @@
-package scalasound.model.io
+package scalasound.model.io.wav
 
+import Pcm16.{BitsPerSample, BytesPerSample, isRepresentable}
+import cats.effect.IO
 import scalasound.model.domain.{AudioChunk, AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.AudioSaveError.*
-import scalasound.model.io.Pcm16.{BitsPerSample, BytesPerSample, isRepresentable}
+import scalasound.model.io.AudioWriter
+import scalasound.model.io.error.AudioSaveError
+import scalasound.model.io.error.AudioSaveError.*
 
 import java.io.{ByteArrayInputStream, SequenceInputStream}
 import java.nio.file.Path
 import javax.sound.sampled.{AudioFileFormat, AudioFormat, AudioInputStream, AudioSystem}
 import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Success, Try, Using}
+import scala.util.{Try, Using}
 
 /** Saves tracks as WAV files in the file system, using the Java Sound API.
   *
@@ -28,23 +31,21 @@ object WavAudioWriter extends AudioWriter:
   private final val MaxSampleRateRepresentedByFloat = 1 << 24          // (2^24 Hz)
   private final val MaxDataSizeHandledByPCM         = 0xffffffffL - 43 // (2^32 - 44) bytes
 
-  /** Saves a track as a WAV file in the file system.
-    *
-    * @param track
-    *   the audio track to save
-    * @param path
-    *   the destination path of the WAV file; if it exists, it will be overwritten
-    * @return
-    *   [[Right]] on success or [[Left]] with an error description on failure
-    */
-  override def save(track: AudioTrack, path: Path): Either[AudioSaveError, Unit] =
+  override def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]] =
+    for
+      prepared <- IO.delay(prepare(track))
+      result   <- prepared match
+        case Right(format) => writeAudioToFile(path, format, track.frameCount, track.chunks)
+        case Left(error)   => IO.pure(Left(error))
+    yield result
+
+  private def prepare(track: AudioTrack): Either[AudioSaveError, AudioFormat] =
     for
       layout <- determineChannelLayout(track)
       format <- buildAudioFormat(layout, track.sampleRate.value)
       _      <- calculateDataSize(track.frameCount, layout.channels)
       _      <- validateFiniteSamples(track)
-      _      <- writeAudioToFile(path, format, track.frameCount, track.chunks)
-    yield ()
+    yield format
 
   private def determineChannelLayout(track: AudioTrack): Either[AudioSaveError, ChannelLayout] =
     track match
@@ -97,18 +98,27 @@ object WavAudioWriter extends AudioWriter:
       format: AudioFormat,
       frameCount: Long,
       chunks: Vector[AudioChunk]
-  ): Either[AudioSaveError, Unit] =
-    Using(AudioInputStream(createPcmInputStream(chunks), format, frameCount)): stream =>
-      AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile) 
-    match
-      case Success(_)         => Right(())
-      case Failure(exception) =>
-        Left(
-          WriteFailure(
-            path,
-            Option(exception.getMessage).getOrElse(exception.getClass.getSimpleName)
+  ): IO[Either[AudioSaveError, Unit]] =
+    for attempted <- IO.blocking(writeBlocking(path, format, frameCount, chunks)).attempt
+      yield attempted match
+        case Right(_)        => Right(())
+        case Left(exception) =>
+          Left(
+            WriteFailure(
+              path,
+              Option(exception.getMessage).getOrElse(exception.getClass.getSimpleName)
+            )
           )
-        )
+
+  private def writeBlocking(
+      path: Path,
+      format: AudioFormat,
+      frameCount: Long,
+      chunks: Vector[AudioChunk]
+  ): Unit =
+    Using.resource(AudioInputStream(createPcmInputStream(chunks), format, frameCount)): stream =>
+      AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile)
+      ()
 
   private def createPcmInputStream(chunks: Vector[AudioChunk]): SequenceInputStream =
     SequenceInputStream(

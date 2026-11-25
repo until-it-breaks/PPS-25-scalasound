@@ -3,9 +3,9 @@ package scalasound.model.processing
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.AudioChunk
-import scalasound.model.processing.AudioEffectType.{Autopan, Distortion, Echo, Gain, Pan, Volume}
+import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
+import scalasound.model.processing.AudioEffectType.*
 import scalasound.model.processing.effects.{AutopanEffect, EchoEffect}
 
 /**

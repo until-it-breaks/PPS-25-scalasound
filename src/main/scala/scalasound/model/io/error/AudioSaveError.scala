@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.error
 
 import java.nio.file.Path
 

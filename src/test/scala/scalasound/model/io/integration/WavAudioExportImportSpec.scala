@@ -1,11 +1,12 @@
-package scalasound.model.io
+package scalasound.model.io.integration
 
+import cats.effect.unsafe.implicits.global
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scalasound.model.domain.{AudioTrack, MonoTrack, StereoTrack}
-import scalasound.model.io.{WavAudioReader, WavAudioWriter}
+import scalasound.model.io.wav.{WavAudioReader, WavAudioWriter}
 
 import java.nio.file.{Files, Path, StandardCopyOption}
 import scala.reflect.ClassTag
@@ -22,8 +23,8 @@ class WavAudioExportImportSpec extends AnyFlatSpec with Matchers with EitherValu
   ): AudioTrack =
     withTempDir: dir =>
       val path = dir.resolve(name)
-      WavAudioWriter.save(track, path) shouldBe Right(())
-      WavAudioReader.load(path.toString) match
+      WavAudioWriter.save(track, path).unsafeRunSync() shouldBe Right(())
+      WavAudioReader.load(path.toString).unsafeRunSync() match
         case Right(loaded) => loaded
         case Left(error)   => fail(s"the exported file could not be imported: $error")
 
@@ -136,6 +137,7 @@ class WavAudioExportImportSpec extends AnyFlatSpec with Matchers with EitherValu
       )
       val rawImported = WavAudioReader
         .load(source.toString)
+        .unsafeRunSync()
         .getOrElse(fail("the test resource could not be imported"))
       val before = expectTrack[StereoTrack](rawImported)
       val after  = expectTrack[StereoTrack](exportToImportSameTrack(before))

@@ -1,7 +1,7 @@
 package scalasound
 
 import cats.effect.{IO, IOApp}
-import scalasound.model.io.WavAudioReader
+import scalasound.model.io.wav.WavAudioReader
 import scalasound.model.player.{AudioOutput, AudioPlayer}
 import scalasound.model.processing.AudioProcessor
 import scalasound.model.state.{AppStateStore, Command, ImportState, PlaybackState}
@@ -17,8 +17,8 @@ object AudioPlaybackDemo extends IOApp.Simple:
 
       _ <- IO.println("[DEMO] Loading sample WAV file from resources...")
       path = "src/test/resources/file_example_WAV_5MG.wav"
-      track <- IO
-        .blocking(WavAudioReader.load(path))
+      track <- WavAudioReader
+        .load(path)
         .map(_.left.map(e => new RuntimeException(e.toString)))
         .rethrow
 

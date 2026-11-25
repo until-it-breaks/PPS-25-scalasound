@@ -1,4 +1,4 @@
-package scalasound.model.io
+package scalasound.model.io.fixtures
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder.LITTLE_ENDIAN

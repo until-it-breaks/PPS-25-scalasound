@@ -1,36 +1,32 @@
-\newpage
-
 # Retrospettiva
-
-Descrizione finale dettagliata dell'andamento dello sviluppo, del backlog, delle iterazioni e commenti finali
 
 ## Sprint 1
 
-### Descrizione dell'andamento dello sviluppo
+Periodo: dal 16/10/2026 al 26/10/2026
+
+### Descrizione
 In questo primo sprint ci siamo concentrati nell'avvio e nell'impostazione del progetto, creandone il repository e definendo il workflow
-tramite le **Github Actions**. A seguire, ci siamo suddivisi i ruoli, abbiamo analizzato il dominio con l'obiettivo di definire le entità
-base. Inoltre, ciascuno di noi si è dedicato ad una iniziale struttura dei propri moduli e interfacce principali.
-Al termine dello sprint si ha ottenuto una macchina a stati playback di base, la capacità per di importare un *wav* nell'applicazione e
-una implementazione iniziale di effetti di base e dell'audio processor funzionante.
+tramite le **GitHub Actions**. A seguire, ci siamo suddivisi i ruoli, abbiamo analizzato il dominio con l'obiettivo di definire le entità
+base. Inoltre, ciascuno si è dedicato ad una iniziale struttura dei propri moduli e interfacce principali.
+Al termine dello sprint abbiamo ottenuto una macchina a stati per il playback di base, la capacità di importare un file WAV nelle classi di dominio e
+un'implementazione di base degli effetti e del processore audio.
 
 ### Backlog
 Il backlog conteneva le seguenti attività:
-- Setup del repository e definizione del workflow (5 ore a testa)
-- Aggiunta delle entità di base del dominio, classi e traits (3 ore a testa)
-- Implementazione iniziale di un `AudioOutput` console-based (completato in 3 ore da JS)
-- Definizione di base dell'`AppStateStore` (completato in 2 ore da JS)
-- Definizione di base dell'`AudioPlayer` (completato in 2 ore da JS)
-- Definizione di base dell'`AudioEffects` (completato in 2 ore da SC)
-- Prima implementazione di effetti di base: `Identity`, `Gain`, `Volume`, `Pan` (completato in 3 ore da SC)
-- Definizione di base dell'`AudioProcessor` per soli chunks (completato in 2 ore da SC)
-- Implementazione del calcolo della durata delle tracce audio (completato in 1,5 ore da MT)
-- Definizione degli errori tipizzati `AudioLoadError` e aggiornamento del contratto `AudioReader` mediante `Either` (completato in 1 ora da MT)
-- Implementazione dell'importazione di file WAV Mono PCM 16-bit (completato in 3 ore da MT)
-- Estensione dell'Importer per il supporto di file WAV Stereo PCM 16-bit (completato in 2,5 ore da MT)
-- Implementazione degli Unit Tests per la validazione WAV e la gestione dei casi di errore (completato in 4 ore da MT)
-- Verifica dell'importazione di file WAV reali mediante test sui campioni e hash SHA-256 (completato in 3 ore da MT)
 
-### Iterazioni
+- Setup del repository e definizione del workflow (2 ore a testa)
+- Aggiunta delle entità di base del dominio, classi e trait (0,5 ore a testa)
+- Implementazione di base dell'`AudioOutput` su console (completato in 4 ore da JS)
+- Implementazione di base dell'`AppStateStore` (completato in 4,5 ore da JS)
+- Implementazione di base dell'`AudioPlayer` (completato in 4 ore da JS)
+- Implementazione di base dell'`AudioEffect` (completato in 4 ore da SC)
+- Implementazione di base degli effetti `Identity`, `Gain`, `Volume` e `Pan` (completato in 4,5 ore da SC)
+- Implementazione di base dell'`AudioProcessor` per soli chunk (completato in 4 ore da SC)
+- Definizione degli errori tipizzati di caricamento (`AudioLoadError`) e aggiornamento del contratto `AudioReader` mediante `Either` (completato in 1 ora da MT)
+- Implementazione dell'importazione di file WAV mono PCM 16-bit (completato in 3 ore da MT)
+- Estensione del `WavAudioReader` per il supporto di file WAV stereo PCM 16-bit (completato in 2,5 ore da MT)
+- Implementazione dei test unitari per la validazione WAV e la gestione dei casi di errore (completato in 3 ore da MT)
+- Verifica dell'importazione di file WAV reali mediante test sui campioni e hash SHA-256 (completato in 3 ore da MT)
 
 ### Commenti sullo sprint
 Sprint di base necessario per avviare l'intero progetto, garantendo una base solida. I tempi per le rispettive parti
@@ -38,109 +34,98 @@ sono stati rispettati, permettendo il passaggio allo sprint successivo senza int
 
 ## Sprint 2
 
-### Descrizione dell'andamento dello sviluppo
-Avendo ottenuto una base solida da cui partire, grazie allo sprint precedente, abbiamo definito una GUI minimale per
-definire una prima idea di interfaccia con l'utente. In seguito, è stato aggiornato l'`AudioProcessor` per gestire una
-traccia intera, sono state aggiunte le prime implementazioni di base degli effetti più complessi ed è stato implementato
-l'Exporter WAV per tracce Mono e Stereo insieme al refactoring funzionale dell'Importer, in modo che al termine
-dello sprint corrente si potesse riprodurre ed esportare una track con audio funzionante correttamente attraverso le casse del
-dispositivo.
+Periodo: dal 26/10/2026 al 5/11/2026
+
+### Descrizione
+Avendo ottenuto una base solida dallo sprint precedente, abbiamo realizzato una GUI minimale per farci una prima idea dell'interfaccia utente. L'`AudioProcessor` è stato esteso per gestire una traccia intera e sono stati aggiunti gli effetti più complessi (`Distortion`, `Echo` e `Autopan`). Per la riproduzione sono stati implementati lo `StreamingAudioPlayer` e l'output audio sulle casse del dispositivo, mentre per l'I/O è stato implementato il `WavAudioWriter` per tracce mono e stereo, insieme al refactoring funzionale del `WavAudioReader`. Al termine dello sprint era possibile riprodurre una traccia con audio funzionante attraverso le casse ed esportarla in un file WAV.
 
 ### Backlog
 Il backlog conteneva le seguenti attività:
-- Output sonoro di base via impianto audio del dispositivo (completato in 5 ore da JS)
-- Miglioramento delle funzionalità dell'`AppState` (completato in 3 ore da JS)
-- Miglioramento delle funzionalità dell'`AppStateStore` (completato in 2 ore da JS)
-- Definizione dello `StreamingAudioPlayer` (completato in 3 ore da JS)
-- Demo playback via console (completato in 2 ore da JS)
+
+- Implementazione di base dell'output audio sulle casse del dispositivo (completato in 5 ore da JS)
+- Miglioramento di `AppState` (completato in 3 ore da JS)
+- Miglioramento di `AppStateStore` (completato in 2 ore da JS)
+- Implementazione dello `StreamingAudioPlayer` (completato in 3 ore da JS)
+- Demo di riproduzione da console (completato in 2 ore da JS)
 - Miglioramento dell'`AudioProcessor` per gestire una traccia (completato in 3 ore da SC)
-- Aggiunta di base dell'effetto `Distortion` (completato in 2 ore da SC)
+- Implementazione di base dell'effetto `Distortion` (completato in 2 ore da SC)
+- Definizione dei test (completato in 2 ore da SC)
 - Implementazione di base dell'effetto `Echo` (completato in 2 ore da SC)
-- Modifica time-based del `trait AudioEffect` e implementazione base dell'effetto `Autopan` (completato in 3 ore da SC)
-- Definizione e implementazione di base dell'interfaccia grafica (completato in 3 ore da SC)
+- Modifica time-based del trait `AudioEffect` e implementazione di base dell'effetto `Autopan` (completato in 3 ore da SC)
+- Implementazione di base dell'interfaccia grafica (completato in 3 ore da SC)
 - Definizione del contratto `AudioWriter` e degli errori tipizzati di esportazione `AudioSaveError` (completato in 1 ora da MT)
-- Definizione degli Unit Tests per l'esportazione WAV Mono e Stereo (completato in 1,5 ore da MT)
-- Implementazione dell'esportazione di tracce Mono in formato PCM WAV 16-bit (completato in 2 ore da MT)
-- Implementazione dell'esportazione di tracce Stereo in formato PCM WAV 16-bit (completato in 2 ore da MT)
-- Gestione degli errori I/O e dei casi limite dell'Exporter (completato in 1 ora da MT)
+- Definizione dei test unitari per l'esportazione WAV mono e stereo (completato in 1,5 ore da MT)
+- Implementazione dell'esportazione di tracce mono in formato PCM WAV 16-bit (completato in 2 ore da MT)
+- Implementazione dell'esportazione di tracce stereo in formato PCM WAV 16-bit (completato in 2 ore da MT)
+- Gestione degli errori I/O e dei casi limite del `WavAudioWriter` (completato in 1 ora da MT)
 - Test di esportazione e verifica del round-trip Import/Export (completato in 0,5 ore da MT)
-- Refactoring funzionale della validazione del formato e dei dati nell'Importer (completato in 1,5 ore da MT)
-- Refactoring funzionale della decodifica e della costruzione delle tracce Mono e Stereo (completato in 2 ore da MT)
-- Aggiornamento e verifica degli Unit Tests di regressione dell'Importer (completato in 1,5 ore da MT)
+- Refactoring funzionale della validazione del formato e dei dati nel `WavAudioReader` (completato in 1,5 ore da MT)
+- Refactoring funzionale della decodifica e della costruzione delle tracce mono e stereo (completato in 2 ore da MT)
+- Aggiornamento e verifica dei test unitari di regressione del `WavAudioReader` (completato in 1,5 ore da MT)
 - Integrazione dei moduli, aggiornamento Scaladoc e verifica finale (completato in 2 ore da MT)
 
-### Iterazioni
-
 ### Commenti sullo sprint
-Lo sprint è risultato essere più impegnativo del previsto, richiedendo un tempo superiore alle aspettative per
-la gestione della traccia, la sua importazione ed esportazione e la gestione degli effetti in tempo reale. Sono stati necessari alcuni
-meeting nel corso dello sprint per chiarire le idee tra i vari componenti del gruppo.
+Lo sprint è stato più impegnativo del previsto. La gestione di una traccia intera, la riproduzione in streaming, gli effetti dipendenti dal tempo e l'esportazione hanno richiesto più tempo del previsto, e sono serviti alcuni meeting per chiarire le interfacce tra i componenti del gruppo.
 
 ## Sprint 3
 
-### Descrizione dell'andamento dello sviluppo
-In questo sprint ci siamo dedicati alla gestione dei controller (`EffectsController`, `LoadSaveController`, `PlaybackController`)
-e la loro interazione con la GUI, al fine di reagire ai cambiamenti in modo reattivo alle azione che l'utente esegue
-nell'applicazione. Al termine dello sprint abbiamo ottenuto una GUI funzionante e quasi completa, che interagisce con i 
-controller, anch'essi funzionanti. Inoltre, alla traccia importata, a cui si può interagire tramite i pulsanti messi a 
-disposizione, possono essere applicati correttamente tutti gli effetti descritti. 
+Periodo: dal 5/11/2026 al 15/11/2026
+
+### Descrizione
+In questo sprint ci siamo dedicati ai controller di riproduzione e di importazione ed esportazione (`PlaybackController` e `LoadSaveController`) e alla loro interazione con la GUI, in modo che l'interfaccia reagisca in tempo reale alle azioni dell'utente e ai cambiamenti di stato. Sono stati integrati i pulsanti di importazione ed esportazione, con la scelta dei file e la visualizzazione degli errori, ed è iniziata la stesura del report. Al termine dello sprint abbiamo ottenuto una GUI funzionante e quasi completa, con tutti i suoi pannelli, che interagisce con i controller. Il collegamento degli effetti allo stato dell'applicazione è stato rimandato allo sprint successivo.
 
 ### Backlog
-- Aggiunta spostamento del seek in secondi al `PlaybackController` e adeguamento dei test(completato in 4 ore da JS)
-- Definizione di una GUI demo con i soli comandi di riproduzione (completato in 4 ore da JS)
-- Stesura iniziale del report: introduzione processo (completato in 5 ore da JS)
-- Correzioni minori alla configurazione di progetto (completato in 2 ore da JS)
+Il backlog conteneva le seguenti attività:
+
+- Spostamento del seek in secondi nel `PlaybackController` e adeguamento dei test (completato in 4 ore da JS)
+- Demo della GUI con i soli comandi di riproduzione (completato in 4 ore da JS)
+- Stesura iniziale del report: introduzione e processo (completato in 5 ore da JS)
+- Correzioni alla configurazione del progetto (completato in 2 ore da JS)
 - Completamento della GUI e di tutti i suoi pannelli (completato in 8 ore da SC)
 - Aggiunta di `ParameterConfiguration` negli effetti e successivo refactoring di `AudioEffect` (completato in 3 ore da SC)
 - Miglioramento delle formule presenti negli effetti e correzione di errori (completato in 3 ore da SC)
-- Puliza del codice e miglioramento della documentazione (completato in 1 ora da SC)
+- Pulizia del codice e miglioramento della documentazione (completato in 1 ora da SC)
 - Analisi dell'architettura esistente e definizione delle responsabilità del `LoadSaveController` (completato in 0,5 ore da MT)
 - Implementazione del `LoadSaveController` per la gestione di Load e Save mediante `Cats Effect` `IO` e `Fiber` (completato in 2 ore da MT)
-- Implementazione degli Unit Tests del `LoadSaveController`, inclusi errori e gestione delle operazioni concorrenti (completato in 1,5 ore da MT)
+- Implementazione dei test unitari del `LoadSaveController`, inclusi errori e gestione delle operazioni concorrenti (completato in 1,5 ore da MT)
 - Implementazione dell'osservazione reattiva mediante `FS2` degli aggiornamenti di `AppStateStore` (completato in 1,5 ore da MT)
-- Implementazione degli Unit Tests dell'osservazione dello stato e verifica delle transizioni (completato in 1 ora da MT)
+- Implementazione dei test unitari dell'osservazione dello stato e verifica delle transizioni (completato in 1 ora da MT)
 - Integrazione dei pulsanti Load e Save nella GUI, gestione dei `FileChooser` e aggiornamento della View (completato in 2,5 ore da MT)
-- Refactoring funzionale di `WavAudioWriter`, con aggiornamento degli Unit Tests (completato in 2 ore da MT)
-- Refactoring funzionale di `WavAudioReader`, con aggiornamento degli Unit Tests (completato in 2 ore da MT)
+- Refactoring funzionale di `WavAudioWriter`, con aggiornamento dei test unitari (completato in 2 ore da MT)
+- Refactoring funzionale di `WavAudioReader`, con aggiornamento dei test unitari (completato in 2 ore da MT)
 - Test di integrazione Import/Export, verifica del round-trip e test di regressione (completato in 1,5 ore da MT)
 
-### Iterazioni
-
 ### Commenti sullo sprint
-Tutte le funzionalità richieste sono state completate con successo nei tempi previsti. In particolare in questa tappa
-ci si è concentrati sul perfezionamento della codebase esistente e all'introduzione della componente Controller per
-completare il modello MVC.
+Le funzionalità previste sono state completate nei tempi, ad eccezione del controller degli effetti e della loro modellazione nello stato dell'applicazione, rimandati allo sprint successivo. In questa tappa ci si è concentrati sul perfezionamento della codebase esistente e sull'introduzione dei controller per completare il modello MVC.
 
 ## Sprint 4
 
-### Descrizione dell'andamento dello sviluppo
-L'ultimo sprint è stato necessario per rifinire il codice (pulizia e refactoring), migliorare i test, finalizzare il report
-e generare gli eseguibili. 
+Periodo: dal 15/11/2026 al 25/11/2026
+
+### Descrizione
+Nell'ultimo sprint abbiamo completato le funzionalità rimaste e rifinito il progetto. Sono stati implementati l'`EffectsController` e la gestione degli effetti nello stato dell'applicazione. Il codice è stato rifinito con diversi refactoring, in particolare sui componenti di riproduzione, sul package `processing` e sull'I/O dei file, dove `AudioFormatRegistry` sceglie ora il reader o il writer in base all'estensione. Sono stati inoltre migliorati i test, configurati `scalafmt` e la coverage, finalizzato il report e generati gli eseguibili.
 
 ### Backlog
-- Collegamento della logica di riproduzione alla GUI e refactoring dell'entry point (completato in 2 ore da JS)
-- Refactoring di `AudioOutput`, `AudioPlayer` e `SpeakerAudioOutput` con aggiunta dei relativi test (completato in 2 ore da JS)
-- Refactoring di `PlaybackController` e relativa suite di test (completato in 2 ore da JS)
-- Configurazione della build: *scalafmt*, *scalacOptions*, *sbt-coverage* e correzione dei warning (completato in 2 ore da JS)
+Il backlog conteneva le seguenti attività:
+
+- Refactoring di `AudioOutput`, `AudioPlayer` e `SpeakerAudioOutput`, con i relativi test (completato in 2 ore da JS)
+- Refactoring di `PlaybackController`, con i relativi test (completato in 2 ore da JS)
+- Refactoring di `AudioTrack` (durata e conversione tra posizione e indice del chunk) e del seek del `PlaybackController` con `FiniteDuration` (completato in 2 ore da JS)
+- Configurazione della build (`scalafmt`, `scalacOptions`, `sbt-coverage`) e correzione dei warning (completato in 2 ore da JS)
 - Rifinitura della GUI (completato in 1 ora da JS)
-- Stesura del report - Proseguimento - (completato in 6 ore da JS)
+- Stesura del report (completato in 6 ore da JS)
 - Refactoring di `AudioProcessor` (completato in 2 ore da SC)
 - Implementazione di `EffectsController` e modifiche in `AppState` (completato in 1 ora da SC)
 - Gestione della logica dei widget degli effetti nella GUI (completato in 1 ora da SC)
 - Refactoring della GUI e rimozione di warning (completato in 1 ora da SC)
-- Miglioramento dei test per `AudioEffects` e `AudioProcessors`, e aggiunta suite di test per `EffectsController` (completato in 2 ora da SC)
+- Miglioramento dei test per `AudioEffects` e `AudioProcessors`, e aggiunta suite di test per `EffectsController` (completato in 2 ore da SC)
 - Refactoring dei singoli effetti e del package `processing` (completato in 3 ore da SC)
 - Stesura del report (completato in 5 ore da SC)
 
-### Iterazioni
-
 ### Commenti sullo sprint
-Le funzionalità di dominio sono state completate con qualche giorno di anticipo rispetto alla data di consegna, lasciandoci
-il tempo necessario a migliorare il codice e la documentazione presente, sia per quanto riguarda il report sia per la *scaladoc*.
+Le funzionalità previste sono state completate con alcuni giorni di anticipo rispetto alla data di consegna. Il tempo rimasto è stato usato per rifinire il codice, ampliare i test, curare la Scaladoc e finalizzare il report.
 
-# Conclusioni
-Il gruppo si ritiene soddisfatto del risultato raggiunto nella realizzazione di un sistema di *importazione*, *modifica* ed
-*esportazione* di un file audio. Nonostante le complessità tecniche derivanti da un dominio del *Digital Signal Processing* (DSP), 
-poco familiare a tutti i membri del team, il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a 
+## Commenti finali
+Il gruppo si ritiene soddisfatto del risultato raggiunto. ScalaSound permette di importare un file audio, modificarlo con una serie di effetti, riprodurlo ed esportarlo. Il dominio dell'elaborazione digitale del segnale (*Digital Signal Processing*, DSP) era poco familiare a tutti i membri del team, ma le difficoltà tecniche sono state superate e il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a
 ciascuno Sprint, assieme ad una corretta pianificazione delle attività e una forte collaborazione tra i componenti del team,
 ha permesso la riuscita del progetto nei tempi stabiliti.

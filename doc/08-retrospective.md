@@ -25,10 +25,10 @@ Il backlog conteneva le seguenti attività:
 - Definizione di base dell'`AudioProcessor` per soli chunks (completato in 2 ore da SC)
 - Implementazione del calcolo della durata delle tracce audio (completato in 1,5 ore da MT)
 - Definizione degli errori tipizzati `AudioLoadError` e aggiornamento del contratto `AudioReader` mediante `Either` (completato in 1 ora da MT)
-- Implementazione dell'importazione di file WAV Mono PCM 16-bit (completato in 3 ore da MT)
-- Estensione dell'Importer per il supporto di file WAV Stereo PCM 16-bit (completato in 2,5 ore da MT)
+- Implementazione dell'importazione di file WAV in formato Mono PCM 16-bit (completato in 3 ore da MT)
+- Implementazione dell'importazione di file WAV in formato Stereo PCM WAV 16-bit (completato in 2,5 ore da MT)
 - Implementazione degli Unit Tests per la validazione WAV e la gestione dei casi di errore (completato in 4 ore da MT)
-- Verifica dell'importazione di file WAV reali mediante test sui campioni e hash SHA-256 (completato in 3 ore da MT)
+- Unit Tests per la verifica dell'importazione di file WAV reali (completato in 3 ore da MT)
 
 ### Iterazioni
 
@@ -58,16 +58,12 @@ Il backlog conteneva le seguenti attività:
 - Implementazione di base dell'effetto `Echo` (completato in 2 ore da SC)
 - Modifica time-based del `trait AudioEffect` e implementazione base dell'effetto `Autopan` (completato in 3 ore da SC)
 - Definizione e implementazione di base dell'interfaccia grafica (completato in 3 ore da SC)
-- Definizione del contratto `AudioWriter` e degli errori tipizzati di esportazione `AudioSaveError` (completato in 1 ora da MT)
-- Definizione degli Unit Tests per l'esportazione WAV Mono e Stereo (completato in 1,5 ore da MT)
-- Implementazione dell'esportazione di tracce Mono in formato PCM WAV 16-bit (completato in 2 ore da MT)
-- Implementazione dell'esportazione di tracce Stereo in formato PCM WAV 16-bit (completato in 2 ore da MT)
-- Gestione degli errori I/O e dei casi limite dell'Exporter (completato in 1 ora da MT)
-- Test di esportazione e verifica del round-trip Import/Export (completato in 0,5 ore da MT)
-- Refactoring funzionale della validazione del formato e dei dati nell'Importer (completato in 1,5 ore da MT)
+- Definizione del contratto `AudioWriter` e degli errori tipizzati di esportazione `AudioSaveError` (completato in 1,5 ora da MT)
+- Implementazione dell'esportazione di tracce Mono in formato PCM WAV 16-bit (completato in 4 ore da MT)
+- Implementazione dell'esportazione di tracce Stereo in formato PCM WAV 16-bit (completato in 3 ore da MT)
+- Integration Tests di importazione ed esportazione (completato in 2 ore da MT)
+- Refactoring funzionale della validazione del formato e dei dati nell'Importer (completato in 2,5 ore da MT)
 - Refactoring funzionale della decodifica e della costruzione delle tracce Mono e Stereo (completato in 2 ore da MT)
-- Aggiornamento e verifica degli Unit Tests di regressione dell'Importer (completato in 1,5 ore da MT)
-- Integrazione dei moduli, aggiornamento Scaladoc e verifica finale (completato in 2 ore da MT)
 
 ### Iterazioni
 
@@ -83,7 +79,7 @@ In questo sprint ci siamo dedicati alla gestione dei controller (`EffectsControl
 e la loro interazione con la GUI, al fine di reagire ai cambiamenti in modo reattivo alle azione che l'utente esegue
 nell'applicazione. Al termine dello sprint abbiamo ottenuto una GUI funzionante e quasi completa, che interagisce con i 
 controller, anch'essi funzionanti. Inoltre, alla traccia importata, a cui si può interagire tramite i pulsanti messi a 
-disposizione, possono essere applicati correttamente tutti gli effetti descritti. 
+disposizione, possono essere applicati correttamente tutti gli effetti descritti.
 
 ### Backlog
 - Aggiunta spostamento del seek in secondi al `PlaybackController` e adeguamento dei test(completato in 4 ore da JS)
@@ -95,14 +91,12 @@ disposizione, possono essere applicati correttamente tutti gli effetti descritti
 - Miglioramento delle formule presenti negli effetti e correzione di errori (completato in 3 ore da SC)
 - Puliza del codice e miglioramento della documentazione (completato in 1 ora da SC)
 - Analisi dell'architettura esistente e definizione delle responsabilità del `LoadSaveController` (completato in 0,5 ore da MT)
-- Implementazione del `LoadSaveController` per la gestione di Load e Save mediante `Cats Effect` `IO` e `Fiber` (completato in 2 ore da MT)
-- Implementazione degli Unit Tests del `LoadSaveController`, inclusi errori e gestione delle operazioni concorrenti (completato in 1,5 ore da MT)
-- Implementazione dell'osservazione reattiva mediante `FS2` degli aggiornamenti di `AppStateStore` (completato in 1,5 ore da MT)
-- Implementazione degli Unit Tests dell'osservazione dello stato e verifica delle transizioni (completato in 1 ora da MT)
+- Implementazione del `LoadSaveController` per la gestione di Load e Save mediante `Cats Effect`, inclusi Unit Tests (completato in 4 ore da MT)
+- Implementazione dell'osservazione reattiva degli aggiornamenti di `AppStateStore` mediante `FS2`, inclusi Unit Tests (completato in 2 ore da MT)
 - Integrazione dei pulsanti Load e Save nella GUI, gestione dei `FileChooser` e aggiornamento della View (completato in 2,5 ore da MT)
 - Refactoring funzionale di `WavAudioWriter`, con aggiornamento degli Unit Tests (completato in 2 ore da MT)
 - Refactoring funzionale di `WavAudioReader`, con aggiornamento degli Unit Tests (completato in 2 ore da MT)
-- Test di integrazione Import/Export, verifica del round-trip e test di regressione (completato in 1,5 ore da MT)
+- Integrations Tests riguardante l'importazione ed esportazione di file audio (completato in 1,5 ore da MT)
 
 ### Iterazioni
 
@@ -115,7 +109,7 @@ completare il modello MVC.
 
 ### Descrizione dell'andamento dello sviluppo
 L'ultimo sprint è stato necessario per rifinire il codice (pulizia e refactoring), migliorare i test, finalizzare il report
-e generare gli eseguibili. 
+e generare gli eseguibili.
 
 ### Backlog
 - Collegamento della logica di riproduzione alla GUI e refactoring dell'entry point (completato in 2 ore da JS)
@@ -128,9 +122,16 @@ e generare gli eseguibili.
 - Implementazione di `EffectsController` e modifiche in `AppState` (completato in 1 ora da SC)
 - Gestione della logica dei widget degli effetti nella GUI (completato in 1 ora da SC)
 - Refactoring della GUI e rimozione di warning (completato in 1 ora da SC)
-- Miglioramento dei test per `AudioEffects` e `AudioProcessors`, e aggiunta suite di test per `EffectsController` (completato in 2 ora da SC)
+- Miglioramento dei test per `AudioEffects` e `AudioProcessors`, e aggiunta suite di test per `EffectsController` (completato in 2 ore da SC)
 - Refactoring dei singoli effetti e del package `processing` (completato in 3 ore da SC)
 - Stesura del report (completato in 5 ore da SC)
+- Refactoring della codifica/decodifica WAV tramite `WavFormat` e `PcmChunks` (completato in 1,5 ore da MT)
+- Implementazione dell'utility `FileExtensions` per estrazione, normalizzazione e validazione delle estensioni e relativi Unit Tests (completato in 1,5 ore da MT)
+- Progettazione e implementazione di `AudioFormatRegistry` e `AudioFileType` per la risoluzione dinamica dei formati e gestione degli alias (completato in 2,5 ore da MT)
+- Estensione degli errori tipizzati (`UnresolvedFormat`), aggiornamento di `ErrorMessages` ed integrazione in `AppSetup` e `LoadSaveController` (completato in 2 ore da MT)
+- Refactoring di `AudioReader` ed `AudioWriter` con `Cats Effect` (completato in 2,5 ore da MT)
+- Aggiornamento ed estensione delle suite di Unit ed Integration Tests (completato in 2 ore da MT)
+- Stesura del report di progetto (completato in 3 ore da MT)
 
 ### Iterazioni
 
@@ -140,7 +141,7 @@ il tempo necessario a migliorare il codice e la documentazione presente, sia per
 
 # Conclusioni
 Il gruppo si ritiene soddisfatto del risultato raggiunto nella realizzazione di un sistema di *importazione*, *modifica* ed
-*esportazione* di un file audio. Nonostante le complessità tecniche derivanti da un dominio del *Digital Signal Processing* (DSP), 
-poco familiare a tutti i membri del team, il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a 
+*esportazione* di un file audio. Nonostante le complessità tecniche derivanti da un dominio del *Digital Signal Processing* (DSP),
+poco familiare a tutti i membri del team, il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a
 ciascuno Sprint, assieme ad una corretta pianificazione delle attività e una forte collaborazione tra i componenti del team,
 ha permesso la riuscita del progetto nei tempi stabiliti.

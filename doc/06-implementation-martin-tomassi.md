@@ -5,13 +5,13 @@
 Il mio contributo al progetto si è focalizzato nelle seguenti aree:
 
 - **Astrazioni I/O, registro dei formati e gestione degli errori**: i trait `AudioReader` e `AudioWriter`, il descrittore `AudioFileType`, l'`AudioFormatRegistry` e la gerarchia degli errori (`AudioLoadError`, `AudioSaveError`, `FormatResolutionError`, `AudioFormatRegistryError`).
-- **Implementazione del formato WAV**: `WavAudioReader` e `WavAudioWriter`, basati sulla *Java Sound API*, insieme ai componenti ausiliari `WavFormat`, `ChannelLayout`, `Pcm16`, `PcmChunks` ed al descrittore `WavAudioFormat`.
+- **Implementazione del formato WAV**: `WavAudioReader` e `WavAudioWriter`, basati sulla `Java Sound API`, insieme ai componenti ausiliari `WavFormat`, `ChannelLayout`, `Pcm16`, `PcmChunks` ed al descrittore `WavAudioFormat`.
 - **Controller di importazione ed esportazione**: `LoadSaveController`, che coordina in background le operazioni di caricamento e salvataggio aggiornando lo stato applicativo.
 - **Interfaccia grafica e logica Load/Save**: `TitlePane`, `LoadSaveLogic` ed `ErrorMessages`.
 - **Modello di dominio**: l'`opaque type` `SampleRate`, gli errori di dominio (`AudioDomainError`) ed i costruttori di `MonoTrack` e `StereoTrack`.
 - **Testing**: definizione ed implementazione dei test relativi alla parte I/O ed al relativo controller, oltre ai test di integrazione del flusso di importazione ed esportazione.
 
-## Astrazioni I/O, gestione degli errori e registro dei formati
+### Astrazioni I/O, gestione degli errori e registro dei formati
 
 L'importazione e l'esportazione sono modellate da due trait distinti, ciascuno con un solo metodo ed un tipo di ritorno `IO[Either[E, A]]`:
 
@@ -33,7 +33,7 @@ final case class AudioFileType(
 
 `IO` incapsula l'operazione di I/O come descrizione dell'effetto, delegandone l'esecuzione al chiamante, mentre `Either` rappresenta i fallimenti previsti come valori tipizzati, riservando la gestione degli errori interna di `IO` (`Throwable`) alle sole eccezioni impreviste. La separazione dei due contratti applica l'*Interface Segregation Principle (ISP)*: importazione ed esportazione hanno errori diversi ed un formato può supportare una sola delle due operazioni. Il descrittore `AudioFileType` riflette questa scelta modellando reader e writer come `Option`.
 
-`AudioFormatRegistry` centralizza la selezione della *strategia* per importazione ed esportazione del file audio, a partire dall'estensione del percorso: il controller riceve un `AudioReader` o un `AudioWriter` senza conoscere il formato concreto (*Dependency Inversion Principle (DIP)*). La classe è immutabile, ha costruttore privato e viene istanziata tramite la *Factory* `AudioFormatRegistry.make`, che verifica la buona formazione e l'unicità delle estensioni normalizzate (`FileExtensions`). Un registro costruito correttamente è quindi valido rispetto a tali vincoli. In `AppSetup`, `IO.fromEither` converte un eventuale `AudioFormatRegistryError` in `IllegalStateException`, impedendo l'avvio dell'applicazione in presenza di una configurazione errata.
+`AudioFormatRegistry` centralizza la selezione della *strategia* per importazione ed esportazione del file audio, a partire dall'estensione del percorso: il controller riceve un `AudioReader` o un `AudioWriter` senza conoscere il formato concreto (*Dependency Inversion Principle (DIP)*). La classe è immutabile, ha costruttore privato e viene istanziata tramite la *Factory* `AudioFormatRegistry.make`, che verifica la buona formazione e l'unicità delle estensioni normalizzate (`FileExtensions`). Un registro costruito correttamente è quindi valido rispetto a tali vincoli. In `AppSetup`, un eventuale `AudioFormatRegistryError` viene mappato in `IllegalStateException` tramite `.left.map` e sollevato in `IO` con `IO.fromEither`, impedendo l'avvio dell'applicazione in presenza di una configurazione errata.
 
 ```scala
 def readerFor(path: Path): Either[FormatResolutionError, AudioReader] =
@@ -55,41 +55,41 @@ def writerFor(path: Path): Either[FormatResolutionError, ResolvedWriter] =
 
 In `readerFor` e `writerFor`, la `for`-comprehension opera sulla monade `Either`: ogni passaggio converte un eventuale `Option` tramite `toRight`, così il primo fallimento interrompe la catena e propaga il caso specifico di `FormatResolutionError`. Nella scrittura, l'assenza di estensione non genera necessariamente un errore: `withDefaultFormat` seleziona il primo formato registrato dotato di writer e aggiunge la relativa `primaryExtension` al percorso tramite `ResolvedWriter`.
 
-In `AudioFormatRegistry.make`, le for-comprehension operano sulla monade `List`. La prima associa ogni formato alle rispettive estensioni normalizzate, mentre la seconda individua quelle malformate. Le collisioni vengono rilevate successivamente raggruppando le associazioni per estensione tramite `groupMap` ed individuando quelle presenti in più formati (`DuplicateExtension`). Il risultato è il primo errore di validazione riscontrato oppure un registro costruito a partire dalle associazioni valide. Il registro si basa unicamente sul nome del file: la verifica che il contenuto rispetti davvero il formato spetta al reader.
+In `AudioFormatRegistry.make`, le `for`-comprehension operano sulla monade `List`. La prima associa ogni formato alle rispettive estensioni normalizzate, mentre la seconda individua quelle malformate. Le collisioni vengono rilevate successivamente raggruppando le associazioni per estensione tramite `groupMap` ed individuando quelle presenti in più formati (`DuplicateExtension`). Il risultato è il primo errore di validazione riscontrato oppure un registro costruito a partire dalle associazioni valide. Il registro si basa unicamente sul nome del file: la verifica che il contenuto rispetti davvero il formato spetta al reader.
 
 ```scala
-  def make(fileTypes: AudioFileType*): Either[AudioFormatRegistryError, AudioFormatRegistry] =
-    val formats = fileTypes.toList
-    val claims =
-      for
-        fileType  <- formats
-        extension <- fileType.allExtensions.map(FileExtensions.normalise).distinct
-      yield extension -> fileType
+def make(fileTypes: AudioFileType*): Either[AudioFormatRegistryError, AudioFormatRegistry] =
+  val formats = fileTypes.toList
+  val claims =
+    for
+      fileType  <- formats
+      extension <- fileType.allExtensions.map(FileExtensions.normalise).distinct
+    yield extension -> fileType
 
-    val malformed =
-      for
-        fileType  <- formats
-        extension <- fileType.allExtensions
-        if !FileExtensions.isWellFormed(extension)
-      yield AudioFormatRegistryError.MalformedExtension(fileType.name, extension)
+  val malformed =
+    for
+      fileType  <- formats
+      extension <- fileType.allExtensions
+      if !FileExtensions.isWellFormed(extension)
+    yield AudioFormatRegistryError.MalformedExtension(fileType.name, extension)
 
-    val duplicated = claims
-      .groupMap((extension, _) => extension)((_, fileType) => fileType.name)
-      .toList
-      .sortBy((extension, _) => extension)
-      .collect:
-        case (extension, names) if names.lengthIs > 1 =>
-          AudioFormatRegistryError.DuplicateExtension(extension, names)
+  val duplicated = claims
+    .groupMap((extension, _) => extension)((_, fileType) => fileType.name)
+    .toList
+    .sortBy((extension, _) => extension)
+    .collect:
+      case (extension, names) if names.lengthIs > 1 =>
+        AudioFormatRegistryError.DuplicateExtension(extension, names)
 
-    malformed.headOption.orElse(duplicated.headOption).toLeft:
-      AudioFormatRegistry(claims.toMap, defaultFormatOf(formats))
+  malformed.headOption.orElse(duplicated.headOption).toLeft:
+    AudioFormatRegistry(claims.toMap, defaultFormatOf(formats))
 ```
 
 Gli errori sono organizzati in quattro `enum` (`AudioLoadError`, `AudioSaveError`, `FormatResolutionError`, `AudioFormatRegistryError`). Sia `AudioLoadError` sia `AudioSaveError` incapsulano i fallimenti di selezione nel caso `UnresolvedFormat(cause: FormatResolutionError)`, evitando di duplicare i casi di risoluzione e consentendo a `ErrorMessages` di tradurli in un unico punto.
 
 Dal punto di vista dell'*Open/Closed Principle (OCP)*, aggiungere un nuovo formato richiede una coppia reader/writer (o il solo componente necessario), un nuovo `AudioFileType` e la sua registrazione in `AudioFormatRegistry.make` dentro `AppSetup`, lasciando invariati il registro, il controller e `ErrorMessages`. Attualmente l'applicazione registra soltanto il WAV (`WavAudioFormat.fileType`).
 
-## Implementazione del formato WAV
+### Implementazione del formato WAV
 
 Poiché reader e writer producono e consumano `AudioTrack`, il modello di dominio garantisce gli invarianti strutturali delle tracce prima dell'I/O. In `SampleRate.scala`, la frequenza di campionamento è definita come `opaque type`:
 
@@ -107,9 +107,20 @@ All'interno del file di definizione `SampleRate` coincide con `Int`, consentendo
 
 `MonoTrack` e `StereoTrack` hanno costruttore privato e due factory: `make` accetta un `Int` e lo valida con `SampleRate.from`, mentre `fromValidated` accetta un `SampleRate` già garantito. Quest'ultimo è usato dal reader dopo l'analisi dell'intestazione. `MonoTrack.fromValidated` è totale, mentre `StereoTrack.fromValidated` restituisce comunque un `Either[AudioDomainError, StereoTrack]`, perché l'uguaglianza delle lunghezze dei canali sinistro e destro in ogni chunk (`DifferentLengthsStereoChannels`) resta un invariante da verificare a runtime.
 
-Il package `scalasound.model.io.wav` è organizzato secondo il principio *Functional Core / Imperative Shell*. Gli effetti di I/O e le chiamate alla *Java Sound API* sono confinati in `WavAudioReader` e `WavAudioWriter` (*imperative shell*). Il resto del package costituisce il *functional core*: `WavFormat` funge da adattatore che converte un `AudioFormat` in un tipo del dominio valido, senza eseguire operazioni di I/O, mentre `ChannelLayout`, `Pcm16` e `PcmChunks` sono componenti puri di trasformazione dei dati.
+Il package `scalasound.model.io.wav` è organizzato secondo il principio *Functional Core / Imperative Shell*. Gli effetti di I/O e le chiamate alla `Java Sound API` sono confinati in `WavAudioReader` e `WavAudioWriter` (*imperative shell*). Il resto del package costituisce il *functional core*: `WavFormat` funge da convertitore e validatore che trasforma un `AudioFormat` in un tipo del dominio valido senza eseguire operazioni di I/O, mentre `ChannelLayout`, `Pcm16` e `PcmChunks` sono componenti puri di trasformazione dei dati.
 
-Il sottoinsieme supportato è il PCM con segno a 16 bit, little-endian, mono o stereo. `WavFormat.from` converte e valida l'`AudioFormat` di `Java Sound` in un valore del dominio (`WavFormat(layout, sampleRate)`) mediante una `for`-comprehension su `Either`, distinguendo i formati validi ma non supportati (`UnsupportedFormat`: codifica diversa, big-endian, più di due canali) dalle intestazioni incoerenti (`CorruptedData`: `frameSize` errato o frequenza non valida).
+Il sottoinsieme supportato è il PCM con segno a 16 bit, little-endian, mono o stereo. `WavFormat.from` converte e valida l'`AudioFormat` di `Java Sound` in un valore del dominio (`WavFormat(layout, sampleRate)`) mediante una `for`-comprehension su `Either`, distinguendo i formati validi ma non supportati (`UnsupportedFormat`: codifica diversa, big-endian, più di due canali) dalle intestazioni incoerenti (`CorruptedData`: `frameSize` errato o frequenza non valida):
+
+```scala
+def from(format: AudioFormat): Either[AudioLoadError, WavFormat] =
+  for
+    _          <- ensurePcm16Encoding(format)
+    _          <- ensureLittleEndian(format)
+    layout     <- determineLayout(format)
+    _          <- ensureConsistentFrameSize(format, layout)
+    sampleRate <- extractSampleRate(format)
+  yield WavFormat(layout, sampleRate)
+```
 
 I campioni del dominio sono `Float` normalizzati in `[-1.0, 1.0)`. `Pcm16` definisce le conversioni come extension method su `Float` e `Short`:
 
@@ -132,7 +143,7 @@ def fromLittleEndianBytes(bytes: Array[Byte], sampleIndex: Int): Short =
   ((high << 8) | low).toShort
 ```
 
-La quantizzazione calcola il prodotto in `Double` per preservare precisione e satura i valori, finiti fuori scala, all'intervallo `[-32768, 32767]` (così `+1.0` viene limitato a `32767`). Poiché `math.round(Float.NaN)` vale `0` e trasformerebbe un campione non finito in "silenzio", `WavAudioWriter` verifica `isRepresentable` sull'intera traccia prima di scrivere.
+La quantizzazione calcola il prodotto in `Double` per preservare precisione e satura i valori finiti fuori scala all'intervallo `[-32768, 32767]` (così `+1.0` viene limitato a `32767`). Poiché `math.round(Float.NaN)` vale `0` e trasformerebbe un campione non finito in "silenzio", `WavAudioWriter` verifica `isRepresentable` sull'intera traccia prima di scrivere.
 
 Nella decodifica little-endian, il byte basso viene mascherato con `0xff` per evitare l'estensione del segno, mentre quello alto mantiene il segno del `Byte` per ricostruire correttamente il `Short` con segno. `PcmChunks` estende le conversioni ai chunk: in scrittura, `encode` utilizza un `ByteBuffer` locale configurato in little-endian per produrre dati PCM interleaved; per lo stereo, i campioni vengono accoppiati nell'ordine `(left, right)` tramite `left.iterator.zip(right.iterator)`. L'invariante di `StereoTrack` garantisce che i due canali abbiano la stessa lunghezza. In lettura, `decodeMono` e `decodeStereo` ricostruiscono i campioni dall'array di byte e li suddividono in chunk da 1024 frame, senza padding sull'ultimo blocco. Un file valido ma privo di frame produce zero chunk.
 
@@ -144,9 +155,9 @@ private def openStream(file: File): Resource[IO, AudioInputStream] =
 
 private def readRawAudioFile(file: File): IO[Either[AudioLoadError, RawAudio]] =
   for attempted <- openStream(file).use(stream => IO.blocking(readFromStream(stream))).attempt
-    yield attempted match
-      case Right(result)   => result
-      case Left(exception) => Left(fromThrowable(exception))
+  yield attempted match
+    case Right(result)   => result
+    case Left(exception) => Left(fromThrowable(exception))
 ```
 
 In `WavAudioReader.load`, dopo aver verificato `Files.isRegularFile(path)` (in caso contrario restituisce `FileNotFound`), l'apertura dello stream è gestita da una `Resource` che ne assicura la chiusura anche in caso di errore o cancellazione. `.attempt` cattura le eccezioni sollevate durante l'apertura e la lettura, mentre `fromThrowable` le mappa negli errori di dominio (`EOFException` precede `IOException` nella gerarchia e produce `CorruptedData` anziché `ReadFailure`).
@@ -155,9 +166,42 @@ La lettura non avviene in streaming continuo: `readFromStream` carica l'intero f
 
 In `WavAudioWriter.save`, `prepare(track)` è racchiusa in `IO.delay` ed esegue tutte le validazioni prima di toccare il file system: tipo di traccia, frequenza non superiore a `2^24 Hz` (limite di rappresentabilità esatta nel `Float` richiesto da `AudioFormat`), dimensione entro il limite PCM a 32 bit (`FileTooLarge`) e assenza di campioni non finiti.
 
-Solo se la validazione ha esito positivo, `writeAudioToFile` esegue la scrittura bloccante tramite `IO.blocking`. `AudioSystem.write` riceve uno `SequenceInputStream` che concatena gli stream dei singoli chunk: la codifica di ciascun chunk avviene progressivamente, senza costruire in anticipo un unico array contenente tutti i dati PCM della traccia. L'eventuale file già presente nella destinazione viene sovrascritto.
+Solo se la validazione ha esito positivo, `writeAudioToFile` esegue la scrittura bloccante tramite `IO.blocking`. `AudioSystem.write` riceve uno `SequenceInputStream` che concatena gli stream dei singoli chunk: la codifica di ciascun chunk avviene progressivamente, senza costruire in anticipo un unico array contenente tutti i dati PCM della traccia. L'eventuale file già presente nella destinazione viene sovrascritto:
 
-## Controller di importazione ed esportazione
+```scala
+override def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]] =
+  for
+    prepared <- IO.delay(prepare(track))
+    result   <- prepared match
+      case Right(format) => writeAudioToFile(path, format, track.frameCount, track.chunks)
+      case Left(error)   => IO.pure(Left(error))
+  yield result
+
+private def prepare(track: AudioTrack): Either[AudioSaveError, AudioFormat] =
+  for
+    layout <- determineChannelLayout(track)
+    format <- buildAudioFormat(layout, track.sampleRate.value)
+    _      <- calculateDataSize(track.frameCount, layout.channels)
+    _      <- validateFiniteSamples(track)
+  yield format
+
+private def writeBlocking(
+    path: Path,
+    format: AudioFormat,
+    frameCount: Long,
+    chunks: Vector[AudioChunk]
+): Unit =
+  Using.resource(AudioInputStream(createPcmInputStream(chunks), format, frameCount)): stream =>
+    AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile)
+    ()
+
+private def createPcmInputStream(chunks: Vector[AudioChunk]): SequenceInputStream =
+  SequenceInputStream(
+    chunks.iterator.map(chunk => ByteArrayInputStream(PcmChunks.encode(chunk))).asJavaEnumeration
+  )
+```
+
+### Controller di importazione ed esportazione
 
 `LoadSaveController` funge da *Facade* verso la GUI, esponendo quattro operazioni (`load`, `save`, `acknowledgeImport`, `acknowledgeExport`) tutte di tipo `IO[Unit]` e nascondendo la sua implementazione `LoadSaveControllerImpl`. Le dipendenze (`AppStateStore`, `AudioFormatRegistry`, `AudioProcessor = AudioProcessor.withRules`) sono fornite esplicitamente tramite costruttore (*Dependency Injection (DI)*).
 
@@ -211,7 +255,7 @@ All'avvio della fibra in background, l'esportazione legge lo stato corrente tram
 
 Il controller non esegue direttamente operazioni bloccanti sul file system: delega `IO.blocking` ai singoli reader e writer, occupandosi esclusivamente di comporre e coordinare gli effetti `IO` mediante `IO.delay` e `IO.defer`.
 
-## Interfaccia grafica e logica di importazione ed esportazione
+### Interfaccia grafica e logica di importazione ed esportazione
 
 L'interfaccia grafica e la relativa logica sono suddivise in tre componenti:
 
@@ -239,10 +283,11 @@ override def observe: IO[Unit] =
 ```
 
 L'interazione bidirezionale tra `view` e stato applicativo declina il pattern *Observer* in due forme:
+
 - **Event listener sulla view:** in `attach`, `LoadSaveLogic` registra le callback sui pulsanti (`onAction`), incapsula in `Option[Path]` l'esito annullabile dei dialoghi della `view` ed avvia gli effetti `IO` del controller tramite `unsafeRunAndForget()`.
 - **Monitoraggio dello stato:** in `observe`, la logica si sottoscrive ai due `Stream` FS2 esposti dallo store (`importStateChanges` ed `exportStateChanges`), già filtrati con `.changes` per scartare stati consecutivi identici. `evalMap` pianifica l'aggiornamento per ciascuna transizione, mentre `merge` consuma entrambi i flussi concorrentemente fino a `compile.drain`.
 
-Poiché le fibre di `Cats Effect` eseguono sul pool di *compute* mentre `JavaFX` consente le modifiche al grafo della scena esclusivamente sul thread UI, `runOnGUIThread` (che per impostazione predefinita delega a `Platform.runLater`) delega `handleImport` e `handleExport` al thread `JavaFX`. Di conseguenza, i campi mutabili interni (`titlePane`, `importInProgress`, `exportInProgress`) risultano confinati a tale thread, evitando aggiornamenti concorrenti della `view`. In `AppSetup`, l'espressione `(ready >> loadSaveLogic.observe).background` avvia l'esecuzione in background di `loadSaveLogic.observe` soltanto dopo il completamento del `Deferred` `ready` in `ScalaFxApp.start`, garantendo che `attach` abbia già collegato il `TitlePane` prima che vengano elaborati i cambiamenti di stato dello store.
+Poiché le fibre di `Cats Effect` eseguono sul pool di `compute` mentre `JavaFX` consente le modifiche al grafo della scena esclusivamente sul thread UI, `runOnGUIThread` (che per impostazione predefinita delega a `Platform.runLater`) esegue `handleImport` e `handleExport` sul thread `JavaFX`. Di conseguenza, i campi mutabili interni (`titlePane`, `importInProgress`, `exportInProgress`) risultano confinati a tale thread, evitando aggiornamenti concorrenti della `view`. In `AppSetup`, l'espressione `(ready >> loadSaveLogic.observe).background` avvia l'esecuzione in background di `loadSaveLogic.observe` soltanto dopo il completamento del `Deferred` `ready` in `ScalaFxApp.start`, garantendo che `attach` abbia già collegato il `TitlePane` prima che vengano elaborati i cambiamenti di stato dello store.
 
 ```scala
 private def handleImport(importState: ImportState): Unit =
@@ -261,8 +306,8 @@ private def handleImport(importState: ImportState): Unit =
 
 In `handleImport` e `handleExport`, sugli stati terminali (`Imported`, `Failed`, `Exported`), dopo la chiusura del dialogo modale (`showAndWait`), la logica invoca `acknowledgeImport` o `acknowledgeExport` per riportare lo stato a `Idle`.
 
-Questo reset esplicito è necessario perché, filtrando con `.changes` gli stati consecutivi uguali, due fallimenti identici di fila non verrebbero notificati come eventi distinti, se lo stato non tornasse prima a `Idle`.
+Questo reset esplicito è necessario perché, filtrando con `.changes` gli stati consecutivi uguali, due fallimenti identici di fila non verrebbero notificati come eventi distinti se lo stato non tornasse prima a `Idle`.
 
-I parametri `runOnGUIThread` e `showAlert` di `LoadSaveLogic.apply` incapsulano le strategie di scheduling sul thread UI e di visualizzazione degli avvisi, fornendo implementazioni predefinite sostituibili. Questa *Dependency Injection* (in forma di *Strategy* funzionale) consente di verificare la logica nei test senza dipendere dal thread `JavaFX` o dall'apertura effettiva di finestre modali.
+I parametri `runOnGUIThread` e `showAlert` di `LoadSaveLogic.apply` incapsulano le *strategie* di scheduling sul thread UI e di visualizzazione degli avvisi (`Alert`), fornendo implementazioni predefinite sostituibili. Questa *Dependency Injection* consente di verificare la logica nei test senza dipendere dal thread `JavaFX` o dall'apertura effettiva di finestre modali.
 
 \newpage

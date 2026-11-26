@@ -25,8 +25,8 @@ Il backlog conteneva le seguenti attività:
 - Definizione degli errori tipizzati di caricamento (`AudioLoadError`) e aggiornamento del contratto `AudioReader` mediante `Either` (completato in 1 ora da MT)
 - Implementazione dell'importazione di file WAV mono PCM 16-bit (completato in 3 ore da MT)
 - Estensione del `WavAudioReader` per il supporto di file WAV stereo PCM 16-bit (completato in 2,5 ore da MT)
-- Implementazione dei test unitari per la validazione WAV e la gestione dei casi di errore (completato in 3 ore da MT)
-- Verifica dell'importazione di file WAV reali mediante test sui campioni e hash SHA-256 (completato in 3 ore da MT)
+- Implementazione degli Unit test per la validazione WAV e la gestione dei casi di errore (completato in 3 ore da MT)
+- Verifica dell'importazione di file WAV reali mediante Unit test (completato in 3 ore da MT)
 
 ### Commenti sullo sprint
 Sprint di base necessario per avviare l'intero progetto, garantendo una base solida. I tempi per le rispettive parti
@@ -54,15 +54,12 @@ Il backlog conteneva le seguenti attività:
 - Modifica time-based del trait `AudioEffect` e implementazione di base dell'effetto `Autopan` (completato in 3 ore da SC)
 - Implementazione di base dell'interfaccia grafica (completato in 3 ore da SC)
 - Definizione del contratto `AudioWriter` e degli errori tipizzati di esportazione `AudioSaveError` (completato in 1 ora da MT)
-- Definizione dei test unitari per l'esportazione WAV mono e stereo (completato in 1,5 ore da MT)
-- Implementazione dell'esportazione di tracce mono in formato PCM WAV 16-bit (completato in 2 ore da MT)
-- Implementazione dell'esportazione di tracce stereo in formato PCM WAV 16-bit (completato in 2 ore da MT)
-- Gestione degli errori I/O e dei casi limite del `WavAudioWriter` (completato in 1 ora da MT)
-- Test di esportazione e verifica del round-trip Import/Export (completato in 0,5 ore da MT)
-- Refactoring funzionale della validazione del formato e dei dati nel `WavAudioReader` (completato in 1,5 ore da MT)
-- Refactoring funzionale della decodifica e della costruzione delle tracce mono e stereo (completato in 2 ore da MT)
-- Aggiornamento e verifica dei test unitari di regressione del `WavAudioReader` (completato in 1,5 ore da MT)
-- Integrazione dei moduli, aggiornamento Scaladoc e verifica finale (completato in 2 ore da MT)
+- Definizione dei Unit tests per l'esportazione WAV mono e stereo (completato in 2,5 ore da MT)
+- Implementazione dell'esportazione di tracce mono in formato PCM WAV 16-bit (completato in 3,5 ore da MT)
+- Estensione del `WavAudioWriter` per il supporto di tracce stereo in formato PCM WAV 16-bit (completato in 2,5 ore da MT)
+- Verifica del round-trip Import/Export (completato in 1 ora da MT)
+- Refactoring funzionale della validazione del formato e dei dati nel `WavAudioReader` (completato in 2 ore da MT)
+- Refactoring funzionale della decodifica e della costruzione delle tracce mono e stereo (completato in 2,5 ore da MT)
 
 ### Commenti sullo sprint
 Lo sprint è stato più impegnativo del previsto. La gestione di una traccia intera, la riproduzione in streaming, gli effetti dipendenti dal tempo e l'esportazione hanno richiesto più tempo del previsto, e sono serviti alcuni meeting per chiarire le interfacce tra i componenti del gruppo.
@@ -85,14 +82,14 @@ Il backlog conteneva le seguenti attività:
 - Aggiunta di `ParameterConfiguration` negli effetti e successivo refactoring di `AudioEffect` (completato in 3 ore da SC)
 - Miglioramento delle formule presenti negli effetti e correzione di errori (completato in 3 ore da SC)
 - Pulizia del codice e miglioramento della documentazione (completato in 1 ora da SC)
-- Implementazione del `LoadSaveController` per la gestione di Load e Save mediante `Cats Effect` `IO` e `Fiber` (completato in 2 ore da MT)
-- Implementazione dei test unitari del `LoadSaveController`, inclusi errori e gestione delle operazioni concorrenti (completato in 1,5 ore da MT)
-- Implementazione dell'osservazione reattiva mediante `FS2` degli aggiornamenti di `AppStateStore` (completato in 1,5 ore da MT)
-- Implementazione dei test unitari dell'osservazione dello stato e verifica delle transizioni (completato in 1 ora da MT)
-- Integrazione dei pulsanti Load e Save nella GUI, gestione dei `FileChooser` e aggiornamento della View (completato in 2,5 ore da MT)
-- Refactoring funzionale di `WavAudioWriter`, con aggiornamento dei test unitari (completato in 2 ore da MT)
-- Refactoring funzionale di `WavAudioReader`, con aggiornamento dei test unitari (completato in 2 ore da MT)
-- Test di integrazione Import/Export, verifica del round-trip e test di regressione (completato in 2,5 ore da MT)
+- Implementazione del `LoadSaveController` per la gestione di Load e Save mediante `Cats Effect` `IO` e `Fiber` (completato in 2,5 ore da MT)
+- Implementazione degli Unit test del `LoadSaveController`, inclusi errori e gestione delle operazioni concorrenti (completato in 1,5 ore da MT)
+- Implementazione del monitoraggio mediante `FS2` degli aggiornamenti di `AppStateStore` (completato in 1,5 ore da MT)
+- Implementazione degli Unit test dell'osservazione dello stato e verifica delle transizioni (completato in 1 ora da MT)
+- Collegamento della GUI al `LoadSaveController` e gestione delle finestre di dialogo `FileChooser` (completato in 3 ore da MT)
+- Refactoring funzionale di `WavAudioWriter`, con aggiornamento degli Unit test (completato in 2 ore da MT)
+- Refactoring funzionale di `WavAudioReader`, con aggiornamento degli Unit test (completato in 2 ore da MT)
+- Test di integrazione Import/Export (completato in 1,5 ore da MT)
 
 ### Commenti sullo sprint
 Le funzionalità previste sono state completate nei tempi, ad eccezione del controller degli effetti e della loro modellazione nello stato dell'applicazione, rimandati allo sprint successivo. In questa tappa ci si è concentrati sul perfezionamento della codebase esistente e sull'introduzione dei controller per completare il modello MVC.
@@ -121,12 +118,12 @@ Il backlog conteneva le seguenti attività:
 - Refactoring dei singoli effetti e del package `processing` (completato in 3 ore da SC)
 - Stesura del report (completato in 5 ore da SC)
 - Refactoring della codifica/decodifica WAV tramite `WavFormat` e `PcmChunks` (completato in 1,5 ore da MT)
-- Implementazione dell'utility `FileExtensions` per estrazione, normalizzazione e validazione delle estensioni e relativi Unit Tests (completato in 1,5 ore da MT)
-- Progettazione e implementazione di `AudioFormatRegistry` e `AudioFileType` per la risoluzione dinamica dei formati e gestione degli alias (completato in 2,5 ore da MT)
+- Implementazione dell'utility `FileExtensions` per estrazione, normalizzazione e validazione delle estensioni (completato in 1 ore da MT)
+- Implementazione di `AudioFormatRegistry` e `AudioFileType` (completato in 2,5 ore da MT)
 - Estensione degli errori tipizzati (`UnresolvedFormat`), aggiornamento di `ErrorMessages` ed integrazione in `AppSetup` e `LoadSaveController` (completato in 2 ore da MT)
-- Refactoring di `AudioReader` ed `AudioWriter` con `Cats Effect` (completato in 2,5 ore da MT)
-- Aggiornamento ed estensione delle suite di Unit ed Integration Tests (completato in 2 ore da MT)
-- Stesura del report di progetto (completato in 3 ore da MT)
+- Refactoring di `AudioReader` ed `AudioWriter` con `Cats Effect` (completato in 2 ore da MT)
+- Aggiornamento ed estensione delle suite di Unit ed Integration test (completato in 2 ore da MT)
+- Stesura del report di progetto (completato in 4 ore da MT)
 
 ### Commenti sullo sprint
 Le funzionalità previste sono state completate con alcuni giorni di anticipo rispetto alla data di consegna. Il tempo rimasto è stato usato per rifinire il codice, ampliare i test, curare la Scaladoc e finalizzare il report.

@@ -34,7 +34,7 @@ object AppSetup:
   private def supportedFormats: IO[AudioFormatRegistry] =
     IO.fromEither(
       AudioFormatRegistry
-        .of(WavAudioFormat.fileType)
+        .make(WavAudioFormat.fileType)
         .left
         .map(error => IllegalStateException(s"Invalid audio format configuration: $error"))
     )

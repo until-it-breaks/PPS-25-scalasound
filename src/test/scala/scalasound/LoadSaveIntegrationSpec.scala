@@ -30,7 +30,7 @@ class LoadSaveIntegrationSpec extends CatsEffectSuite:
   ): Resource[IO, (AppStateStore, LoadSaveController, EffectsController)] =
     for
       store              <- Resource.eval(AppStateStore.make)
-      formats            <- Resource.eval(orFail(AudioFormatRegistry.of(WavAudioFormat.fileType)))
+      formats            <- Resource.eval(orFail(AudioFormatRegistry.make(WavAudioFormat.fileType)))
       loadSaveController <- LoadSaveController.make(store, formats)
       effectsController = EffectsController(store)
       logic             = LoadSaveLogic(

@@ -169,7 +169,7 @@ object MonoTrack:
     * @return
     *   `Right(MonoTrack)` if valid, or `Left(AudioDomainError)` otherwise
     */
-  def apply(sampleRate: Int, chunks: Vector[MonoChunk]): Either[AudioDomainError, MonoTrack] =
+  def make(sampleRate: Int, chunks: Vector[MonoChunk]): Either[AudioDomainError, MonoTrack] =
     SampleRate.from(sampleRate).map(validRate => new MonoTrack(validRate, chunks))
 
   /** Constructs a [[MonoTrack]] from an already validated [[SampleRate]].
@@ -201,7 +201,7 @@ object StereoTrack:
     * @return
     *   `Right(StereoTrack)` if valid, or `Left(AudioDomainError)` otherwise
     */
-  def apply(sampleRate: Int, chunks: Vector[StereoChunk]): Either[AudioDomainError, StereoTrack] =
+  def make(sampleRate: Int, chunks: Vector[StereoChunk]): Either[AudioDomainError, StereoTrack] =
     for
       validRate <- SampleRate.from(sampleRate)
       _         <- validateChunks(chunks)

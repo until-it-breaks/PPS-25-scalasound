@@ -13,7 +13,7 @@ import javax.sound.sampled.{AudioInputStream, AudioSystem, UnsupportedAudioFileE
 /** Loads WAV files from the file system, using Java Sound API.
   *
   * Supported subset: PCM signed, 16 bit per sample, little-endian, mono or stereo (see
-  * [[WavFormat]]).
+  * [[WavFormat]]). It is the same subset accepted by [[WavAudioWriter]].
   *
   * Samples are normalised to [-1.0, 1.0): a 16 bit sample `s` becomes `s / 32768f`, so -32768 maps
   * to -1.0 and 32767 to 32767/32768 (see [[Pcm16]]).

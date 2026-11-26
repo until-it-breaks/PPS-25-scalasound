@@ -40,11 +40,11 @@ final class EffectsControllerSpec extends CatsEffectSuite:
     for
       (store, controller) <- setup
       current             <- store.current
-      _                   <- controller.removeAll()
+      _                   <- controller.removeAllEffects()
       emptyStore          <- store.current
       _                   <- controller.addEffect(gain)
       gainStore           <- store.current
-      _                   <- controller.removeAll()
+      _                   <- controller.removeAllEffects()
       newEmptyStore       <- store.current
     yield
       assert(current.effects.isEmpty)

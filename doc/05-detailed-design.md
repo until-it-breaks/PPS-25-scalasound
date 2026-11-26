@@ -124,7 +124,7 @@ Casi limite:
 
 Ogni effetto restituisce `Either[AudioError, AudioChunk]`: un parametro fuori dai limiti produce un errore come valore, e non un'eccezione.
 
-L'enumerazione `AudioEffectType` elenca gli effetti disponibili e associa a ciascuno la propria configurazione (`AudioConfiguration`, con `ParameterConfiguration` che indica minimo, massimo e valore predefinito di ogni parametro). In questo modo limiti e valori predefiniti sono definiti in un solo punto e usati sia dagli effetti stessi che dalla View.
+L'enumerazione `AudioEffectType` elenca gli effetti disponibili e associa a ciascuno il proprio companion object (estende da `AudioConfiguration`), da cui è possibile ricavare un `ParameterConfiguration` che contiene minimo, massimo e valore predefinito di ogni parametro. In questo modo limiti e valori predefiniti sono definiti in un solo punto e usati sia dagli effetti stessi che dalla View.
 
 Parametri, intervalli e comportamento di ciascun effetto sono descritti nei requisiti funzionali.
 
@@ -137,7 +137,7 @@ Chi lo usa sceglie una delle due varianti e chiama `apply`, che esiste con due s
 
 Scelte di design:
 
-- per implementare un nuovo effetto si estende uno dei due sottotipi (`StatelessAudioEffect` o `TimeAudioEffect`), lo si registra in `AudioEffectType` e gli si assegna una priorità;
+- per implementare un nuovo effetto si estende uno dei due sottotipi (`StatelessAudioEffect` o `TimeAudioEffect`) e lo si registra in `AudioEffectType` ;
 - l'ordine fisso ha una motivazione sonora, spiegata nei requisiti: il guadagno precede la distorsione perché più il segnale in ingresso è forte, più la distorsione lo satura; l'eco ripete il suono già distorto; pan e autopan spostano nello spazio stereofonico anche le ripetizioni mentre il volume regola per ultimo il livello finale;
 - quando l'applicazione di un effetto fallisce, l'elaborazione si interrompe e l'errore, che riporta il nome dell'effetto, arriva al chiamante.
 
@@ -145,6 +145,7 @@ Casi limite:
 
 - con lista di effetti vuota il chunk è restituito invariato;
 - un chunk o una traccia vuoti sono rifiutati con un errore;
+- parametri non validi o al di fuori dei vincoli consentiti producono un errore;
 - un effetto sconosciuto (non presente in `AudioEffectType`) è accettato e applicato per ultimo;
 - Pan e Autopan sono gli unici effetti che trasformano un chunk mono in stereo. Quando una traccia è elaborata per intero, basta che un chunk diventi stereo perché lo diventi l'intera traccia.
 

@@ -85,7 +85,6 @@ Il backlog conteneva le seguenti attività:
 - Aggiunta di `ParameterConfiguration` negli effetti e successivo refactoring di `AudioEffect` (completato in 3 ore da SC)
 - Miglioramento delle formule presenti negli effetti e correzione di errori (completato in 3 ore da SC)
 - Pulizia del codice e miglioramento della documentazione (completato in 1 ora da SC)
-- Analisi dell'architettura esistente e definizione delle responsabilità del `LoadSaveController` (completato in 0,5 ore da MT)
 - Implementazione del `LoadSaveController` per la gestione di Load e Save mediante `Cats Effect` `IO` e `Fiber` (completato in 2 ore da MT)
 - Implementazione dei test unitari del `LoadSaveController`, inclusi errori e gestione delle operazioni concorrenti (completato in 1,5 ore da MT)
 - Implementazione dell'osservazione reattiva mediante `FS2` degli aggiornamenti di `AppStateStore` (completato in 1,5 ore da MT)
@@ -93,7 +92,7 @@ Il backlog conteneva le seguenti attività:
 - Integrazione dei pulsanti Load e Save nella GUI, gestione dei `FileChooser` e aggiornamento della View (completato in 2,5 ore da MT)
 - Refactoring funzionale di `WavAudioWriter`, con aggiornamento dei test unitari (completato in 2 ore da MT)
 - Refactoring funzionale di `WavAudioReader`, con aggiornamento dei test unitari (completato in 2 ore da MT)
-- Test di integrazione Import/Export, verifica del round-trip e test di regressione (completato in 1,5 ore da MT)
+- Test di integrazione Import/Export, verifica del round-trip e test di regressione (completato in 2,5 ore da MT)
 
 ### Commenti sullo sprint
 Le funzionalità previste sono state completate nei tempi, ad eccezione del controller degli effetti e della loro modellazione nello stato dell'applicazione, rimandati allo sprint successivo. In questa tappa ci si è concentrati sul perfezionamento della codebase esistente e sull'introduzione dei controller per completare il modello MVC.
@@ -121,11 +120,16 @@ Il backlog conteneva le seguenti attività:
 - Miglioramento dei test per `AudioEffects` e `AudioProcessors`, e aggiunta suite di test per `EffectsController` (completato in 2 ore da SC)
 - Refactoring dei singoli effetti e del package `processing` (completato in 3 ore da SC)
 - Stesura del report (completato in 5 ore da SC)
+- Refactoring della codifica/decodifica WAV tramite `WavFormat` e `PcmChunks` (completato in 1,5 ore da MT)
+- Implementazione dell'utility `FileExtensions` per estrazione, normalizzazione e validazione delle estensioni e relativi Unit Tests (completato in 1,5 ore da MT)
+- Progettazione e implementazione di `AudioFormatRegistry` e `AudioFileType` per la risoluzione dinamica dei formati e gestione degli alias (completato in 2,5 ore da MT)
+- Estensione degli errori tipizzati (`UnresolvedFormat`), aggiornamento di `ErrorMessages` ed integrazione in `AppSetup` e `LoadSaveController` (completato in 2 ore da MT)
+- Refactoring di `AudioReader` ed `AudioWriter` con `Cats Effect` (completato in 2,5 ore da MT)
+- Aggiornamento ed estensione delle suite di Unit ed Integration Tests (completato in 2 ore da MT)
+- Stesura del report di progetto (completato in 3 ore da MT)
 
 ### Commenti sullo sprint
 Le funzionalità previste sono state completate con alcuni giorni di anticipo rispetto alla data di consegna. Il tempo rimasto è stato usato per rifinire il codice, ampliare i test, curare la Scaladoc e finalizzare il report.
 
 ## Commenti finali
-Il gruppo si ritiene soddisfatto del risultato raggiunto. ScalaSound permette di importare un file audio, modificarlo con una serie di effetti, riprodurlo ed esportarlo. Il dominio dell'elaborazione digitale del segnale (*Digital Signal Processing*, DSP) era poco familiare a tutti i membri del team, ma le difficoltà tecniche sono state superate e il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a
-ciascuno Sprint, assieme ad una corretta pianificazione delle attività e una forte collaborazione tra i componenti del team,
-ha permesso la riuscita del progetto nei tempi stabiliti.
+Il gruppo si ritiene soddisfatto del risultato raggiunto. ScalaSound permette di importare un file audio, modificarlo con una serie di effetti, riprodurlo ed esportarlo. Il dominio dell'elaborazione digitale del segnale (*Digital Signal Processing*, DSP) era poco familiare a tutti i membri del team, ma le difficoltà tecniche sono state superate e il lavoro è stato portato a termine con successo. Il rispetto del monte ore dedicato a ciascuno Sprint, assieme ad una corretta pianificazione delle attività e una forte collaborazione tra i componenti del team, ha permesso la riuscita del progetto nei tempi stabiliti.

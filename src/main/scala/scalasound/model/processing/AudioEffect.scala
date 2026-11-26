@@ -29,14 +29,14 @@ sealed trait AudioEffect:
   /* Check whether the constraints for a given effect are met. */
   protected def checkConstraints(isValid: Boolean, msg: String): Option[AudioError] =
     if isValid then Option.empty
-    else Some(AudioError.AudioEffectsError(this, msg))
+    else Some(AudioError.AudioEffectError(this, msg))
 
 /** Defines a contract that applies a transformation on an audio block with no relation to time.
   */
 trait StatelessAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
 
-  protected def applyTransformation(chunk: AudioChunk, transformation: Float => Float): AudioChunk =
+  protected def applyTransformation(chunk: AudioChunk)(transformation: Float => Float): AudioChunk =
     chunk match
       case MonoChunk(samples) =>
         MonoChunk(samples.map(transformation))

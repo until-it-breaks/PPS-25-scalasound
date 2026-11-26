@@ -34,7 +34,7 @@ private[processing] final case class DistortionEffect(distortion: Float, isSoftC
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkDistortion.toLeft:
-      applyTransformation(chunk, if isSoftClipping then tanh else sinWave)
+      applyTransformation(chunk)(if isSoftClipping then tanh else sinWave)
 
   /*
    * Hyperbolic-tangent based formula to apply the

@@ -23,6 +23,12 @@ Il backlog conteneva le seguenti attività:
 - Definizione di base dell'`AudioEffects` (completato in 2 ore da SC)
 - Prima implementazione di effetti di base: `Identity`, `Gain`, `Volume`, `Pan` (completato in 3 ore da SC)
 - Definizione di base dell'`AudioProcessor` per soli chunks (completato in 2 ore da SC)
+- Implementazione del calcolo della durata delle tracce audio (completato in 1,5 ore da MT)
+- Definizione degli errori tipizzati `AudioLoadError` e aggiornamento del contratto `AudioReader` mediante `Either` (completato in 1 ora da MT)
+- Implementazione dell'importazione di file WAV Mono PCM 16-bit (completato in 3 ore da MT)
+- Estensione dell'Importer per il supporto di file WAV Stereo PCM 16-bit (completato in 2,5 ore da MT)
+- Implementazione degli Unit Tests per la validazione WAV e la gestione dei casi di errore (completato in 4 ore da MT)
+- Verifica dell'importazione di file WAV reali mediante test sui campioni e hash SHA-256 (completato in 3 ore da MT)
 
 ### Iterazioni
 
@@ -34,9 +40,10 @@ sono stati rispettati, permettendo il passaggio allo sprint successivo senza int
 
 ### Descrizione dell'andamento dello sviluppo
 Avendo ottenuto una base solida da cui partire, grazie allo sprint precedente, abbiamo definito una GUI minimale per
-definire una prima idea di interfaccia con l'utente. In seguito, è stato aggiornato l'`AudioProcessor` per gestire una 
-traccia intera, sono state aggiunte le prime implementazioni di base degli effetti più complessi, in modo che al termine
-dello sprint corrente si potesse riprodurre una track con audio funzionante correttamente attraverso le casse del
+definire una prima idea di interfaccia con l'utente. In seguito, è stato aggiornato l'`AudioProcessor` per gestire una
+traccia intera, sono state aggiunte le prime implementazioni di base degli effetti più complessi ed è stato implementato
+l'Exporter WAV per tracce Mono e Stereo insieme al refactoring funzionale dell'Importer, in modo che al termine
+dello sprint corrente si potesse riprodurre ed esportare una track con audio funzionante correttamente attraverso le casse del
 dispositivo.
 
 ### Backlog
@@ -51,12 +58,22 @@ Il backlog conteneva le seguenti attività:
 - Implementazione di base dell'effetto `Echo` (completato in 2 ore da SC)
 - Modifica time-based del `trait AudioEffect` e implementazione base dell'effetto `Autopan` (completato in 3 ore da SC)
 - Definizione e implementazione di base dell'interfaccia grafica (completato in 3 ore da SC)
+- Definizione del contratto `AudioWriter` e degli errori tipizzati di esportazione `AudioSaveError` (completato in 1 ora da MT)
+- Definizione degli Unit Tests per l'esportazione WAV Mono e Stereo (completato in 1,5 ore da MT)
+- Implementazione dell'esportazione di tracce Mono in formato PCM WAV 16-bit (completato in 2 ore da MT)
+- Implementazione dell'esportazione di tracce Stereo in formato PCM WAV 16-bit (completato in 2 ore da MT)
+- Gestione degli errori I/O e dei casi limite dell'Exporter (completato in 1 ora da MT)
+- Test di esportazione e verifica del round-trip Import/Export (completato in 0,5 ore da MT)
+- Refactoring funzionale della validazione del formato e dei dati nell'Importer (completato in 1,5 ore da MT)
+- Refactoring funzionale della decodifica e della costruzione delle tracce Mono e Stereo (completato in 2 ore da MT)
+- Aggiornamento e verifica degli Unit Tests di regressione dell'Importer (completato in 1,5 ore da MT)
+- Integrazione dei moduli, aggiornamento Scaladoc e verifica finale (completato in 2 ore da MT)
 
 ### Iterazioni
 
 ### Commenti sullo sprint
 Lo sprint è risultato essere più impegnativo del previsto, richiedendo un tempo superiore alle aspettative per
-la gestione della traccia,la sua importazione e la gestione degli effetti in tempo reale. Sono stati necessari alcuni
+la gestione della traccia, la sua importazione ed esportazione e la gestione degli effetti in tempo reale. Sono stati necessari alcuni
 meeting nel corso dello sprint per chiarire le idee tra i vari componenti del gruppo.
 
 ## Sprint 3
@@ -77,12 +94,21 @@ disposizione, possono essere applicati correttamente tutti gli effetti descritti
 - Aggiunta di `ParameterConfiguration` negli effetti e successivo refactoring di `AudioEffect` (completato in 3 ore da SC)
 - Miglioramento delle formule presenti negli effetti e correzione di errori (completato in 3 ore da SC)
 - Puliza del codice e miglioramento della documentazione (completato in 1 ora da SC)
+- Analisi dell'architettura esistente e definizione delle responsabilità del `LoadSaveController` (completato in 0,5 ore da MT)
+- Implementazione del `LoadSaveController` per la gestione di Load e Save mediante `Cats Effect` `IO` e `Fiber` (completato in 2 ore da MT)
+- Implementazione degli Unit Tests del `LoadSaveController`, inclusi errori e gestione delle operazioni concorrenti (completato in 1,5 ore da MT)
+- Implementazione dell'osservazione reattiva mediante `FS2` degli aggiornamenti di `AppStateStore` (completato in 1,5 ore da MT)
+- Implementazione degli Unit Tests dell'osservazione dello stato e verifica delle transizioni (completato in 1 ora da MT)
+- Integrazione dei pulsanti Load e Save nella GUI, gestione dei `FileChooser` e aggiornamento della View (completato in 2,5 ore da MT)
+- Refactoring funzionale di `WavAudioWriter`, con aggiornamento degli Unit Tests (completato in 2 ore da MT)
+- Refactoring funzionale di `WavAudioReader`, con aggiornamento degli Unit Tests (completato in 2 ore da MT)
+- Test di integrazione Import/Export, verifica del round-trip e test di regressione (completato in 1,5 ore da MT)
 
 ### Iterazioni
 
 ### Commenti sullo sprint
 Tutte le funzionalità richieste sono state completate con successo nei tempi previsti. In particolare in questa tappa
-ci si è concentrati sul perfezionamento della codebase esistente e all'introduzione della componente Controller per 
+ci si è concentrati sul perfezionamento della codebase esistente e all'introduzione della componente Controller per
 completare il modello MVC.
 
 ## Sprint 4

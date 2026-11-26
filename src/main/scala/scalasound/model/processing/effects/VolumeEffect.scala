@@ -35,4 +35,4 @@ private[processing] final case class VolumeEffect(volume: Float) extends Statele
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkVolume.toLeft:
       if volume == DefaultVolume then chunk
-      else applyTransformation(chunk, x => x * volume)
+      else applyTransformation(chunk)(x => x * volume)

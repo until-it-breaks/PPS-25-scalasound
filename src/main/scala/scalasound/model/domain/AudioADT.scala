@@ -5,43 +5,6 @@ import scalasound.model.domain.AudioChunk.{MonoChunk, StereoChunk}
 import scala.annotation.tailrec
 import scala.concurrent.duration.*
 
-/** Represents domain validation errors that can occur when constructing audio tracks. */
-enum AudioDomainError:
-
-  /** The provided sample rate is invalid (non-positive).
-    *
-    * @param rate
-    *   the invalid sample rate value
-    */
-  case InvalidSampleRate(rate: Int)
-
-  /** The stereo channels, in a chunk, have different lengths.
-    *
-    * @param chunkIndex
-    *   the index of the chunk with channels of different lengths
-    * @param leftLength
-    *   the length of the left channel
-    * @param rightLength
-    *   the length of the right channel
-    */
-  case DifferentLengthsStereoChannels(chunkIndex: Int, leftLength: Int, rightLength: Int)
-
-opaque type SampleRate = Int
-
-object SampleRate:
-
-  /** Creates a [[SampleRate]] if the given value is strictly positive.
-    *
-    * @param value
-    *   the sampling rate in hertz
-    * @return
-    *   `Right(SampleRate)` if positive, or `Left(AudioDomainError.InvalidSampleRate)` otherwise
-    */
-  def from(value: Int): Either[AudioDomainError, SampleRate] =
-    Either.cond(value > 0, value, AudioDomainError.InvalidSampleRate(value))
-
-  extension (sampleRate: SampleRate) def value: Int = sampleRate
-
 /** Represents a block of audio samples for either a mono or a stereo signal.
   *
   * A mono chunk contains one sample per frame, while a stereo chunk contains one sample for the

@@ -11,7 +11,7 @@ enum AudioError:
    * @param effect specify in which effect the error happened.
    * @param msg    the error message.
    */
-  case AudioEffectsError(effect: AudioEffect, msg: String)
+  case AudioEffectError(effect: AudioEffect, msg: String)
   /**
    * Error for the AudioProcessor.
    *
@@ -24,7 +24,7 @@ enum AudioError:
    * Returns the content of the error.
    */
   def getContent: String = this match
-    case AudioEffectsError(effect, msg) => s"${effectName(effect)} -> $msg"
+    case AudioEffectError(effect, msg) => s"${effectName(effect)} -> $msg"
     case AudioProcessorError(processor, msg) => s"${processorName(processor)} -> $msg"
 
   /* Returns the name of the audio effect. */

@@ -27,8 +27,10 @@ stata definita su un `sealed trait` denominato `AudioEffect`, evitando che venga
 
 ```scala
 sealed trait AudioEffect:
-  protected def checkConstraints(isValid: Boolean, 
-                                 msg: String): Option[AudioError] =
+  protected def checkConstraints(
+      isValid: Boolean,
+      msg: String
+  ): Option[AudioError] =
     if isValid then Option.empty
     else Some(AudioError.AudioEffectsError(this, msg))
 ```
@@ -49,12 +51,16 @@ in fase di elaborazione audio):
 trait StatelessAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
 
-  protected def applyTransformation(chunk: AudioChunk)
-                                   (transformation: Float => Float): AudioChunk =
+  protected def applyTransformation(chunk: AudioChunk)(
+      transformation: Float => Float
+  ): AudioChunk =
     ...
 
 trait TimeAudioEffect extends AudioEffect:
-  def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
+  def apply(
+      chunk: AudioChunk,
+      chunkIndex: Int
+  ): Either[AudioError, AudioChunk]
 ```
 
 Per evitare di lanciare eccezioni a *runtime*, ogni effetto restituisce un tipo `Either[AudioError, AudioChunk]`. In questo
@@ -65,9 +71,7 @@ tra i singoli effetti e i processori audio, e favorendo distinzione e analisi pi
 
 ```scala
 enum AudioError:
-  
   case AudioEffectError(effect: AudioEffect, msg: String)
-
   case AudioProcessorError(processor: AudioProcessor, msg: String)
 ```
 
@@ -85,20 +89,26 @@ object AudioEffect:
   def gain(gainValue: Float): StatelessAudioEffect =
     GainEffect(gainValue)
 
-  def distortion(distortionValue: Float, 
-                 isSoftClipping: Boolean = true): StatelessAudioEffect =
+  def distortion(
+      distortionValue: Float,
+      isSoftClipping: Boolean = true
+  ): StatelessAudioEffect =
     DistortionEffect(distortionValue, isSoftClipping)
 
-  def echo(alpha: Float, 
-           delay: Int, 
-           sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
+  def echo(
+      alpha: Float,
+      delay: Int,
+      sampleRate: Float = DefaultSampleRate
+  ): TimeAudioEffect =
     EchoEffect(alpha, delay, sampleRate)
 
   def pan(panValue: Float): StatelessAudioEffect =
     PanEffect(panValue)
 
-  def autopan(autopanValue: Float, 
-              sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
+  def autopan(
+      autopanValue: Float,
+      sampleRate: Float = DefaultSampleRate
+  ): TimeAudioEffect =
     AutopanEffect(autopanValue, sampleRate)
 
   def volume(volumeValue: Float): StatelessAudioEffect =
@@ -109,13 +119,13 @@ Ogni effetto viene implementato tramite un `case class` (oppure un `case object`
 trasformazione. Di seguito viene mostrata l'implementazione dell'effetto `Gain`.
 
 ```scala
-private[processing] final case class GainEffect(gain: Float) 
-        extends StatelessAudioEffect:
+private[processing] final case class GainEffect(gain: Float)
+    extends StatelessAudioEffect:
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkGain.toLeft:
       applyTransformation(chunk)(x => clamp(x * gain))
-  
+
   ...
 ```
 
@@ -179,17 +189,22 @@ viene modellato tramite il `trait` `AudioProcessor`. Il contratto contiene due i
 tramite overloading del metodo, per gestire sia singoli chunk sia intere tracce.
 A seguito dei controlli preliminari sugli input, la logica di gestione degli effetti sul chunk, risulta la seguente:
 
+\newpage
+
 ```scala
-protected def processChunk(chunk: AudioChunk,
-                           effects: List[AudioEffect],
-                           chunkIndex: Int): Either[AudioError, AudioChunk] =
-    effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)):
-      (currentChunk, effect) =>
-        currentChunk.flatMap:
-          chunky =>
-            effect match
-              case timeEffect: TimeAudioEffect => timeEffect(chunky, chunkIndex)
-              case standardEffect: StatelessAudioEffect => standardEffect(chunky)
+protected def processChunk(
+    chunk: AudioChunk,
+    effects: List[AudioEffect],
+    chunkIndex: Int
+): Either[AudioError, AudioChunk] =
+  effects.foldLeft[Either[AudioError, AudioChunk]](Right(chunk)):
+    (currentChunk, effect) =>
+      currentChunk.flatMap: chunky =>
+        effect match
+          case timeEffect: TimeAudioEffect =>
+            timeEffect(chunky, chunkIndex)
+          case standardEffect: StatelessAudioEffect =>
+            standardEffect(chunky)
 ```
 Tramite il `foldLeft` vengono applicati in sequenza gli effetti sul *chunk* ricevuto in ingresso e, con il supporto
 dell'approccio *monadico* degli `Either`, l'elaborazione si interrompe immediatamente al primo errore propagando un `Left(AudioError)`.
@@ -204,20 +219,23 @@ e sfrutta le *for-comprehension* per ottenere un approccio più dichiarativo ed 
 e propagando eventuali `Left(AudioError)`.
 
 ```scala
-private def processedAudioTrack(track: AudioTrack, 
-                                effects: List[AudioEffect]
-                               ): Either[AudioError, (List[AudioChunk], Int)] =
-  track.chunksAsList.
-    foldLeft[Either[AudioError, (List[AudioChunk], Int)]](Right((Nil, 0))):
+private def processedAudioTrack(
+    track: AudioTrack,
+    effects: List[AudioEffect]
+): Either[AudioError, (List[AudioChunk], Int)] =
+  track.chunksAsList
+    .foldLeft[Either[AudioError, (List[AudioChunk], Int)]](
+      Right((Nil, 0))
+    ):
       (accumulator, currentChunk) =>
         for
           (acc, idx) <- accumulator
-          chunk <- processChunk(currentChunk, effects, idx)
-        yield
-          (chunk :: acc, idx + 1)
+          chunk      <- processChunk(currentChunk, effects, idx)
+        yield (chunk :: acc, idx + 1)
 ```
 
-\
+\newpage
+
 Per quanto riguarda il `trait` `AudioProcessor`, questo viene specializzato in due sottotipi distinti: 
 `SimpleAudioProcessor` e `AudioProcessorWithRules`, entrambi definiti come implementazioni concrete stateless modellate 
 come *singleton* (`object`).
@@ -233,26 +251,33 @@ private enum EffectPriority:
   case GainEffect
   ...
 
-private[processing] object AudioProcessorWithRules extends AudioProcessor:
+private[processing] object AudioProcessorWithRules
+    extends AudioProcessor:
 
   given Ordering[AudioEffect] = Ordering.by(orderingByPriority)
 
-  private def orderingByPriority(effect: AudioEffect): Int = effect match
-    case IdentityEffect => EffectPriority.IdentityEffect.ordinal
-    case _: GainEffect => EffectPriority.GainEffect.ordinal
-    ...
-  
-  private def sortEffects(effects: List[AudioEffect]): List[AudioEffect] =
+  private def orderingByPriority(effect: AudioEffect): Int =
+    effect match
+      case IdentityEffect => EffectPriority.IdentityEffect.ordinal
+      case _: GainEffect  => EffectPriority.GainEffect.ordinal
+      ...
+
+  private def sortEffects(
+      effects: List[AudioEffect]
+  ): List[AudioEffect] =
     if effects.length <= 1 then effects else effects.sorted
-  
-  override protected def processChunk(chunk: AudioChunk,
-                                      effects: List[AudioEffect],
-                                      chunkIndex: Int): Either[AudioError, AudioChunk] =
+
+  override protected def processChunk(
+      chunk: AudioChunk,
+      effects: List[AudioEffect],
+      chunkIndex: Int
+  ): Either[AudioError, AudioChunk] =
     super.processChunk(chunk, sortEffects(effects), chunkIndex)
-  
-  override protected def processTrack(track: AudioTrack,
-                                      effects: List[AudioEffect]
-                                     ): Either[AudioError, AudioTrack] =
+
+  override protected def processTrack(
+      track: AudioTrack,
+      effects: List[AudioEffect]
+  ): Either[AudioError, AudioTrack] =
     super.processTrack(track, sortEffects(effects))
 ```
 
@@ -262,6 +287,7 @@ un unico punto di accesso per la creazione delle sue istanze: `SimpleAudioProces
 ```scala
 object AudioProcessor:
   def simple: AudioProcessor = SimpleAudioProcessor
+
   def withRules: AudioProcessor = AudioProcessorWithRules
 ```
 
@@ -274,13 +300,15 @@ Il controller agisce come mediatore verso l'`AppStateStore`, delegando le operaz
 ```scala
 trait EffectsController:
   def addEffect(effect: AudioEffect): IO[Unit]
+
   def removeAll(): IO[Unit]
-  
+
 object EffectsController:
   def apply(store: AppStateStore): EffectsController =
     EffectsControllerImpl(store)
-  
-private final class EffectsControllerImpl(store: AppStateStore) extends EffectsController:
+
+private final class EffectsControllerImpl(store: AppStateStore)
+    extends EffectsController:
 
   override def addEffect(effect: AudioEffect): IO[Unit] =
     store.dispatch(AddEffect(effect)).void
@@ -293,6 +321,8 @@ private final class EffectsControllerImpl(store: AppStateStore) extends EffectsC
 `EffectsLogic` si occupa di gestire i widget, nello specifico sliders e bottoni, degli effetti che l'utente può applicare in tempo reale all'interno dell'applicazione.
 Il compito di questa componente è di inviare al relativo controller (`EffectsController`) le azioni dell'utente e adattare i cambiamenti di stato nelle *label* dei widget.
 Data la massiccia presenza di *slider* nel pannello, per evitare duplicazioni di codice è stato aggiunto un **extension method** incapsulato nel *companion object* di `EffectsLogic`:
+
+\newpage
 
 ```scala
   extension (slider: Slider)

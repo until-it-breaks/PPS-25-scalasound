@@ -48,7 +48,8 @@ def writerFor(path: Path): Either[FormatResolutionError, ResolvedWriter] =
     case Some(extension) =>
       for
         fileType <- typeOf(extension)
-        writer   <- fileType.writer.toRight(WritingNotSupported(fileType.name))
+        writer   <- fileType.writer
+          .toRight(WritingNotSupported(fileType.name))
       yield ResolvedWriter(writer, path)
     case None => withDefaultFormat(path)
 ```
@@ -57,13 +58,17 @@ In `readerFor` e `writerFor`, la `for`-comprehension opera sulla monade `Either`
 
 In `AudioFormatRegistry.make`, le `for`-comprehension operano sulla monade `List`. La prima associa ogni formato alle rispettive estensioni normalizzate, mentre la seconda individua quelle malformate. Le collisioni vengono rilevate successivamente raggruppando le associazioni per estensione tramite `groupMap` ed individuando quelle presenti in più formati (`DuplicateExtension`). Il risultato è il primo errore di validazione riscontrato oppure un registro costruito a partire dalle associazioni valide. Il registro si basa unicamente sul nome del file: la verifica che il contenuto rispetti davvero il formato spetta al reader.
 
+\newpage
+
 ```scala
-def make(fileTypes: AudioFileType*): Either[AudioFormatRegistryError, AudioFormatRegistry] =
+def make(fileTypes: AudioFileType*)
+    : Either[AudioFormatRegistryError, AudioFormatRegistry] =
   val formats = fileTypes.toList
   val claims =
     for
       fileType  <- formats
-      extension <- fileType.allExtensions.map(FileExtensions.normalise).distinct
+      extension <- fileType.allExtensions
+        .map(FileExtensions.normalise).distinct
     yield extension -> fileType
 
   val malformed =
@@ -71,7 +76,8 @@ def make(fileTypes: AudioFileType*): Either[AudioFormatRegistryError, AudioForma
       fileType  <- formats
       extension <- fileType.allExtensions
       if !FileExtensions.isWellFormed(extension)
-    yield AudioFormatRegistryError.MalformedExtension(fileType.name, extension)
+    yield AudioFormatRegistryError
+      .MalformedExtension(fileType.name, extension)
 
   val duplicated = claims
     .groupMap((extension, _) => extension)((_, fileType) => fileType.name)
@@ -151,10 +157,15 @@ Lettura e scrittura incapsulano le operazioni bloccanti con `IO.blocking`:
 
 ```scala
 private def openStream(file: File): Resource[IO, AudioInputStream] =
-  Resource.fromAutoCloseable(IO.blocking(AudioSystem.getAudioInputStream(file)))
+  Resource.fromAutoCloseable(
+    IO.blocking(AudioSystem.getAudioInputStream(file))
+  )
 
 private def readRawAudioFile(file: File): IO[Either[AudioLoadError, RawAudio]] =
-  for attempted <- openStream(file).use(stream => IO.blocking(readFromStream(stream))).attempt
+  for
+    attempted <- openStream(file)
+      .use(stream => IO.blocking(readFromStream(stream)))
+      .attempt
   yield attempted match
     case Right(result)   => result
     case Left(exception) => Left(fromThrowable(exception))
@@ -169,15 +180,18 @@ In `WavAudioWriter.save`, `prepare(track)` è racchiusa in `IO.delay` ed esegue 
 Solo se la validazione ha esito positivo, `writeAudioToFile` esegue la scrittura bloccante tramite `IO.blocking`. `AudioSystem.write` riceve uno `SequenceInputStream` che concatena gli stream dei singoli chunk: la codifica di ciascun chunk avviene progressivamente, senza costruire in anticipo un unico array contenente tutti i dati PCM della traccia. L'eventuale file già presente nella destinazione viene sovrascritto:
 
 ```scala
-override def save(track: AudioTrack, path: Path): IO[Either[AudioSaveError, Unit]] =
+override def save(track: AudioTrack, path: Path)
+    : IO[Either[AudioSaveError, Unit]] =
   for
     prepared <- IO.delay(prepare(track))
     result   <- prepared match
-      case Right(format) => writeAudioToFile(path, format, track.frameCount, track.chunks)
+      case Right(format) =>
+        writeAudioToFile(path, format, track.frameCount, track.chunks)
       case Left(error)   => IO.pure(Left(error))
   yield result
 
-private def prepare(track: AudioTrack): Either[AudioSaveError, AudioFormat] =
+private def prepare(track: AudioTrack)
+    : Either[AudioSaveError, AudioFormat] =
   for
     layout <- determineChannelLayout(track)
     format <- buildAudioFormat(layout, track.sampleRate.value)
@@ -191,13 +205,18 @@ private def writeBlocking(
     frameCount: Long,
     chunks: Vector[AudioChunk]
 ): Unit =
-  Using.resource(AudioInputStream(createPcmInputStream(chunks), format, frameCount)): stream =>
+  val input =
+    AudioInputStream(createPcmInputStream(chunks), format, frameCount)
+  Using.resource(input): stream =>
     AudioSystem.write(stream, AudioFileFormat.Type.WAVE, path.toFile)
     ()
 
-private def createPcmInputStream(chunks: Vector[AudioChunk]): SequenceInputStream =
+private def createPcmInputStream(chunks: Vector[AudioChunk])
+    : SequenceInputStream =
   SequenceInputStream(
-    chunks.iterator.map(chunk => ByteArrayInputStream(PcmChunks.encode(chunk))).asJavaEnumeration
+    chunks.iterator
+      .map(chunk => ByteArrayInputStream(PcmChunks.encode(chunk)))
+      .asJavaEnumeration
   )
 ```
 
@@ -215,7 +234,9 @@ def make(
     supervisor <- Supervisor[IO](await = false)
     importBusy <- Resource.eval(Ref.of[IO, Boolean](false))
     exportBusy <- Resource.eval(Ref.of[IO, Boolean](false))
-  yield LoadSaveControllerImpl(store, formats, processor, supervisor, importBusy, exportBusy)
+  yield LoadSaveControllerImpl(
+    store, formats, processor, supervisor, importBusy, exportBusy
+  )
 
 private def runInBackground(task: IO[Unit]): IO[Unit] =
   supervisor.supervise(task).void
@@ -237,7 +258,9 @@ private def runImport(path: Path): IO[Unit] =
       result <- loadFrom(path).attempt
       _      <- store.dispatch(Command.UpdateImport(toImportState(result)))
     yield ()
-  operation.onCancel(store.dispatch(Command.UpdateImport(ImportState.Idle)).void)
+  operation.onCancel(
+    store.dispatch(Command.UpdateImport(ImportState.Idle)).void
+  )
 
 override def save(path: Path): IO[Unit] =
   runInBackground:
@@ -245,7 +268,9 @@ override def save(path: Path): IO[Unit] =
       state <- store.current
       _     <- state.importState match
         case ImportState.Importing => IO.unit
-        case _ => startIfIdle(exportBusy)(runExport(state.track, state.effects, path))
+        case _ =>
+          startIfIdle(exportBusy):
+            runExport(state.track, state.effects, path)
     yield ()
 ```
 
@@ -253,7 +278,7 @@ In `runImport`, `loadFrom` seleziona il reader adatto dal registro ed incapsula 
 
 All'avvio della fibra in background, l'esportazione legge lo stato corrente tramite `store.current`. La traccia e gli effetti estratti da quello stato vengono mantenuti invariati per tutta la durata del salvataggio, indipendentemente dalle modifiche successive apportate all'applicativo. In `processAndSave`, `IO.delay(resolveAndProcess(...))` seleziona il writer adatto dal registro, e solo successivamente applica gli effetti con `processor.apply(track, effects)`, evitando elaborazioni inutili su formati non supportati. Completata l'elaborazione, il controller avvia la scrittura tramite `IO.defer`.
 
-Il controller non esegue direttamente operazioni bloccanti sul file system: delega `IO.blocking` ai singoli reader e writer, occupandosi esclusivamente di comporre e coordinare gli effetti `IO` mediante `IO.delay` e `IO.defer`.
+Il controller non esegue direttamente operazioni bloccanti sul file system: delega `IO.blocking` ai singoli reader e writer e si limita a comporre gli effetti `IO` con `IO.delay` e `IO.defer`.
 
 ### Interfaccia grafica e logica di importazione ed esportazione
 
@@ -277,8 +302,10 @@ override def attach(pane: TitlePane): Unit =
     chooseSaveFile(pane).foreach(controller.save(_).unsafeRunAndForget())
 
 override def observe: IO[Unit] =
-  val imports = store.importStateChanges.evalMap(state => IO(runOnGUIThread(handleImport(state))))
-  val exports = store.exportStateChanges.evalMap(state => IO(runOnGUIThread(handleExport(state))))
+  val imports = store.importStateChanges
+    .evalMap(state => IO(runOnGUIThread(handleImport(state))))
+  val exports = store.exportStateChanges
+    .evalMap(state => IO(runOnGUIThread(handleExport(state))))
   imports.merge(exports).compile.drain
 ```
 
@@ -296,10 +323,16 @@ private def handleImport(importState: ImportState): Unit =
 
   importState match
     case ImportState.Imported(_) =>
-      showAlert(AlertType.Information, "Import completed", "The track has been imported.")
+      showAlert(
+        AlertType.Information,
+        "Import completed",
+        "The track has been imported."
+      )
       controller.acknowledgeImport.unsafeRunAndForget()
     case ImportState.Failed(error) =>
-      showAlert(AlertType.Error, "Import failed", ErrorMessages.describe(error))
+      showAlert(
+        AlertType.Error, "Import failed", ErrorMessages.describe(error)
+      )
       controller.acknowledgeImport.unsafeRunAndForget()
     case _ => ()
 ```

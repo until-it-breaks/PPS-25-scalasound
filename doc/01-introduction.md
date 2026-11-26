@@ -13,7 +13,7 @@ Nel dettaglio, le capacità principali dell'applicativo comprendono:
 - L'importazione e la decodifica di file audio e la successiva esportazione della traccia elaborata.
 - L'applicazione di una serie di effetti audio componibili, tra cui regolazioni di
   guadagno e volume, distorsioni non lineari, echi temporali e gestione della spazialità stereofonica.
-- La riproduzione dell'audio, con gli effetti configurati applicati se presenti, e il suo controllo attraverso le
+- La riproduzione dell'audio, con gli effetti configurati se presenti, e il suo controllo attraverso le
   funzioni di avvio, pausa, arresto e cambiamento dello stato di avanzamento.
 
 L'applicazione è pensata come un semplice riproduttore audio e non si intende replicare i controlli di una tipica workstation audio

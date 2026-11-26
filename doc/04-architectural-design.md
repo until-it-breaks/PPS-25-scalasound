@@ -42,21 +42,21 @@ ScalaSound è un'applicazione eseguita in un unico processo, quindi i componenti
 - **`LoadSaveController`:**
   Gestisce importazione ed esportazione dei file senza bloccare l'interfaccia. Per esportare legge dallo stato la traccia e gli effetti attivi, li fa elaborare da `AudioProcessor` e fa scrivere il risultato ad `AudioWriter`.
 - **`AppStateStore`:**
-  Custodisce lo stato dell'applicazione, applica i comandi e avvisa chi lo osserva quando cambia.
+  Custodisce lo stato dell'applicazione, applica i comandi e notifica gli osservatori quando cambia lo stato.
 - **`AudioPlayer`:**
-  Riproduce la traccia un blocco di campioni (chunk) alla volta. Per ciascun blocco chiede ad `AudioProcessor` di applicare gli effetti e lo invia ad `AudioOutput`.
+  Riproduce la traccia un chunk alla volta. Per ciascun chunk chiede ad `AudioProcessor` di applicare gli effetti e lo invia ad `AudioOutput` per riprodurlo.
 - **`AudioProcessor`:**
-  Applica una sequenza di effetti a un blocco o a un'intera traccia, nell'ordine di priorità stabilito.
+  Applica una sequenza di effetti a un chunk o a un'intera traccia, nell'ordine di priorità stabilito.
 - **`AudioOutput`:**
   Riceve i blocchi da riprodurre e li porta in uscita.
 - **`AudioReader`:**
   Legge un file audio e lo trasforma in una traccia.
 - **`AudioWriter`:**
-  Scrive una traccia in un file audio.
+  Scrive una traccia caricata in un file audio su disco.
 
 I dati scambiati tra i componenti sono i seguenti:
 
-- View → Controller: azioni dell'utente (avvio, pausa e arresto, posizione scelta nella traccia, parametri degli effetti, percorso del file);
+- View → Controller: azioni dell'utente (avvio, pausa e arresto, posizione nella traccia, parametri degli effetti, percorsi nel file system);
 - Controller → `AppStateStore`: comandi;
 - `AppStateStore` → `PlaybackController` e `LoadSaveController`: stato corrente (ad esempio la traccia e gli effetti attivi);
 - `AppStateStore` → View e `AudioPlayer`: flussi di stato;
@@ -70,11 +70,9 @@ I dati scambiati tra i componenti sono i seguenti:
 ## Scelte tecnologiche
 
 - **Scala 3:** linguaggio di programmazione con cui è stato implementato il sistema.
-- **ScalaFX:** libreria per l'interfaccia grafica, basata su JavaFX. È usata solo nella View.
+- **ScalaFX:** libreria per l'interfaccia grafica, basata su JavaFX.
 - **Java Sound API (`javax.sound.sampled`):** libreria usata per la lettura e la scrittura dei file WAV e la riproduzione attraverso la scheda audio.
-- **Cats Effect:** libreria per la programmazione funzionale con effetti. Un'operazione con effetti collaterali (leggere un file, scrivere sulla scheda audio, modificare lo stato) è descritta come un valore di tipo `IO`, che non fa nulla finché non viene eseguito. Ciò permette di comporre le operazioni e di eseguirle in modo concorrente come fibre (`fiber`), thread leggeri gestiti dalla libreria e distribuiti su pool di thread, senza bloccare l'interfaccia.
-- **FS2:** libreria usata per rappresentare la riproduzione e le variazioni dello stato come flussi di dati. In questo modo la View e l'`AudioPlayer` reagiscono ai cambiamenti di stato senza ricorrere a meccanismi di polling.
-
-Cats Effect e FS2 sono usati solo dai componenti che presentano effetti collaterali durante l'esecuzione: `AppStateStore`, `AudioPlayer`, `AudioOutput`, i controller (`PlaybackController`, `EffectsController` e `LoadSaveController`) e le classi della View che gestiscono la logica dei componenti grafici a cui sono collegati.
+- **Cats Effect:** libreria per la programmazione funzionale con effetti. Un'operazione con side effect (leggere un file, scrivere sulla scheda audio, modificare lo stato) è descritta come un valore di tipo `IO`, che non fa nulla finché non viene eseguito. Ciò permette di comporre le operazioni e di eseguirle in modo concorrente come fibre (`fiber`), thread leggeri gestiti dalla libreria e distribuiti su un pool di thread dedicati.
+- **FS2:** libreria usata per rappresentare la riproduzione e le variazioni dello stato come `Stream`. In questo modo la View e l'`AudioPlayer` reagiscono ai cambiamenti di stato senza ricorrere a meccanismi di polling.
 
 \newpage

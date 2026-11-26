@@ -38,4 +38,4 @@ private final class EffectsControllerWrapperImpl(controller: EffectsController)(
     controller.addEffect(effect).unsafeRunAndForget()
 
   override def removeAll(): Unit =
-    controller.removeAll().unsafeRunAndForget()
+    controller.removeAllEffects().unsafeRunAndForget()

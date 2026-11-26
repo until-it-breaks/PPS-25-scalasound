@@ -23,7 +23,7 @@ trait EffectsController:
    * Clears the list of all existing effects,
    * so no effect will be applied to the current track.
    */
-  def removeAll(): IO[Unit]
+  def removeAllEffects(): IO[Unit]
 
 /**
  * A [[EffectsController]] that carries out each request by
@@ -44,5 +44,5 @@ private final class EffectsControllerImpl(store: AppStateStore) extends EffectsC
   override def addEffect(effect: AudioEffect): IO[Unit] =
     store.dispatch(AddEffect(effect)).void
 
-  override def removeAll(): IO[Unit] =
+  override def removeAllEffects(): IO[Unit] =
     store.dispatch(RemoveAllEffects).void

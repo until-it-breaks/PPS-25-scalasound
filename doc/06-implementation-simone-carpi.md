@@ -118,7 +118,7 @@ private[processing] final case class GainEffect(gain: Float)
   
   ...
 ```
-\
+
 A fianco di ogni `case class` è stato definito un proprio **Companion Object**, incaricato di contenere costanti, metodi
 di utilità, e il range accettabile dei parametri inseriti per il corrispettivo effetto. Grazie all'adozione del
 *Factory Pattern* e al modificatore di visibilità dei relativi effetti `private[processing]`, i dettagli
@@ -132,7 +132,6 @@ private[processing] object GainEffect extends AudioConfiguration:
 
   def gainConfiguration: ParameterConfiguration =
     ParameterConfiguration(MinGain, MaxGain, DefaultGain)
-
   ...
 ```
 
@@ -155,7 +154,7 @@ enum AudioEffectType[+T <: AudioConfiguration](
   case Autopan    extends AudioEffectType("Autopan", AutopanEffect)
   case Volume     extends AudioEffectType("Volume", VolumeEffect)
 ```
-\
+
 Infine, per evitare di fare *pattern matching* ogni volta che occorre determinare il tipo dell'effetto,
 è stato introdotto un *extension method* opportuno su `AudioEffect`, che restituisce il `AudioEffectType` appropriato. 
 Sfruttando `PartialFunction.condOpt`, l'effetto in ingresso viene racchiuso in un `Some(AudioEffectType)` se corrisponde ad uno
@@ -197,7 +196,7 @@ dell'approccio *monadico* degli `Either`, l'elaborazione si interrompe immediata
 Inoltre, applicando l'exhaustive *pattern matching*, gli effetti vengono distinti in base alla necessità o meno di usare l'indice per
 avere il riferimento temporale, permettendo di applicare la trasformazione evitando problemi legati al tipo.
 
-\
+
 Per l'elaborazione della traccia (`AudioTrack`) è stato applicato un approccio simile a quello precedentemente mostrato, iterando sulla collezione di *chunk* che
 compongono la traccia. Tramite una operazione di riduzione con accumulatore (`foldLeft`), su ogni elemento viene invocato il metodo protetto `processChunk` per applicare i filtri. 
 Questo procedimento permette di creare una nuova lista inserendo i chunk in testa (per mezzo dell'operatore *cons* `::`), riducendone il costo computazionale con inserimento a complessità costante,
@@ -262,9 +261,7 @@ un unico punto di accesso per la creazione delle sue istanze: `SimpleAudioProces
 
 ```scala
 object AudioProcessor:
-
   def simple: AudioProcessor = SimpleAudioProcessor
- 
   def withRules: AudioProcessor = AudioProcessorWithRules
 ```
 
@@ -276,13 +273,10 @@ Il controller agisce come mediatore verso l'`AppStateStore`, delegando le operaz
 
 ```scala
 trait EffectsController:
-  
   def addEffect(effect: AudioEffect): IO[Unit]
-
   def removeAll(): IO[Unit]
   
 object EffectsController:
-  
   def apply(store: AppStateStore): EffectsController =
     EffectsControllerImpl(store)
   
@@ -302,7 +296,6 @@ Data la massiccia presenza di *slider* nel pannello, per evitare duplicazioni di
 
 ```scala
   extension (slider: Slider)
-
     private def sliderValue: Float = slider.value.value.toFloat
 
     private def sliderListener(onUpdate: Float => Unit): Unit =

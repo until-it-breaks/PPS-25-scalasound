@@ -9,9 +9,10 @@ Il mio contributo al progetto si è focalizzato nelle seguenti aree:
   `Identity`, `Gain`, `Distortion`, `Echo`, `Volume`, `Pan` e `Autopan`.
 - **Processori Audio**: definizione e implementazione di `AudioProcessor`, componente dedito alla gestione e alla
   applicazione sequenziale degli effetti sull'input ricevuto.
-- **Controller**: implementazione di `EffectsController` che espone le azione che l'utente esegue durante l'interazione
-  con la traccia.
-- **AudioADT**: parziale definizione e implementazione degli aspetti principali legati al dominio.
+- **Controller**: implementazione di `EffectsController` che espone le azioni che l'utente esegue durante l'interazione
+  con la traccia: `addEffect` e `removeAll`.
+- **AudioADT**: parziale definizione e implementazione degli aspetti principali legati al dominio (`AudioChunk` e 
+  `AudioTrack`).
 - **Interfaccia grafica**: realizzazione completa dei pannelli che costituiscono la GUI e gestione della logica
   associata agli effetti.
 - **Testing**: definizione e implementazione di tutti i test relativi agli effetti, ai processori e al controller.
@@ -22,36 +23,54 @@ Il mio contributo al progetto si è focalizzato nelle seguenti aree:
 Gli effetti audio sono trasformazioni matematiche applicate alla traccia presa in carico (costituita da un insieme
 di chunk).
 Al fine di garantire uniformità all'interno della pipeline di elaborazione gestita da `AudioProcessor`, la gerarchia è
-stata definita su un `sealed trait` denominato `AudioEffect`,
-consentendo il *pattern matching* in fase di elaborazione, applicando l'**Interface Segregation Principle**.
-Infatti, a causa della presenza di effetti legati al tempo, si è considerato di specializzare ulteriormente `AudioEffect` in due
-contratti, `trait` separati:
-
-- `StatelessAudioEffect`: definisce l'interfaccia per gli effetti indipendenti dal tempo (`Identity`, `Gain`,
-  `Distortion`, `Volume` e `Pan`), esponendo un metodo `apply` che richiede il chunk da elaborare.
-- `TimeAudioEffect`: definisce l'interfaccia per gli effetti temporali (`Echo` e `Autopan`) e fornendo un metodo `apply`
-  che prende in ingresso il chunk e il suo indice. Quest'ultimo agisce come punto di riferimento
-  temporale necessario al calcolo della trasformazione.
-
-Per evitare di lanciare eccezioni a *runtime*, ogni effetto restituisce un tipo `Either[AudioError, AudioChunk]`. In questo
-modo, in caso di eventuali situazioni di errore causate dall'immisione di parametri non validi o al di fuori degli
-intervalli
-consentiti, il calcolo dell'effetto (trasformazione) verrà interrotto tramite il ritorno di un `Left` contenente un
-`AudioError` (modellato tramite gli `enum` di Scala 3).
+stata definita su un `sealed trait` denominato `AudioEffect`, evitando che venga esteso al di fuori del package `processing`.
 
 ```scala
 sealed trait AudioEffect:
-  protected def checkConstraints(isValid: Boolean, msg: String): Option[AudioError] =
+  protected def checkConstraints(isValid: Boolean, 
+                                 msg: String): Option[AudioError] =
     if isValid then Option.empty
     else Some(AudioError.AudioEffectsError(this, msg))
+```
+\
+Vista la necessità di avere effetti legati al tempo, si è considerato di specializzare `AudioEffect` in due
+contratti, `trait` separati (applicando l'*Interface Segregation Principle*, **ISP**, e favorendo il *pattern matching* 
+in fase di elaborazione audio):
 
+- `StatelessAudioEffect`: definisce l'interfaccia per gli effetti indipendenti dal tempo (`Identity`, `Gain`,
+  `Distortion`, `Volume` e `Pan`), esponendo un metodo `apply` che richiede il chunk da elaborare. Inoltre, per
+  evitare duplicazione di logica negli effetti, mette a disposizione la *Higher-Order function* `applyTransformation`, 
+  che riceve in ingresso una trasformazione (realizzando lo *Strategy Pattern* in FP) e la applica al chunk.
+- `TimeAudioEffect`: definisce l'interfaccia per gli effetti temporali (`Echo` e `Autopan`), fornendo un metodo `apply`
+  che prende in ingresso il chunk e il suo indice. Quest'ultimo agisce come punto di riferimento
+  temporale necessario al calcolo della trasformazione.
+
+```scala
 trait StatelessAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk): Either[AudioError, AudioChunk]
-  ...
+
+  protected def applyTransformation(chunk: AudioChunk)
+                                   (transformation: Float => Float): AudioChunk =
+    ...
 
 trait TimeAudioEffect extends AudioEffect:
   def apply(chunk: AudioChunk, chunkIndex: Int): Either[AudioError, AudioChunk]
 ```
+
+Per evitare di lanciare eccezioni a *runtime*, ogni effetto restituisce un tipo `Either[AudioError, AudioChunk]`. In questo
+modo, in caso di eventuali situazioni di errore causate dall'immisione di parametri non validi o al di fuori degli
+intervalli consentiti, il calcolo dell'effetto (trasformazione) verrà interrotto tramite il ritorno di un `Left` 
+contenente un `AudioError` (modellato tramite gli `enum` di Scala 3). Questo approccio uniforma la gestione degli errori 
+tra i singoli effetti e i processori audio, e favorendo distinzione e analisi più approfondita tramite *pattern matching*.
+
+```scala
+enum AudioError:
+  
+  case AudioEffectError(effect: AudioEffect, msg: String)
+
+  case AudioProcessorError(processor: AudioProcessor, msg: String)
+```
+
 \
 Per poter gestire al meglio la creazione degli effetti (disaccoppiandola dall'effettiva implementazione), si è deciso di applicare il **Factory Pattern** all'interno del
 companion object di `AudioEffect`. Questo approccio fornisce un unico punto di ingresso per le chiamate e la relativa istanziazione, riducendo il numero di possibili
@@ -66,31 +85,36 @@ object AudioEffect:
   def gain(gainValue: Float): StatelessAudioEffect =
     GainEffect(gainValue)
 
-  def distortion(distortionValue: Float, isSoftClipping: Boolean = true): StatelessAudioEffect =
+  def distortion(distortionValue: Float, 
+                 isSoftClipping: Boolean = true): StatelessAudioEffect =
     DistortionEffect(distortionValue, isSoftClipping)
 
-  def echo(alpha: Float, delay: Int, sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
+  def echo(alpha: Float, 
+           delay: Int, 
+           sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
     EchoEffect(alpha, delay, sampleRate)
 
   def pan(panValue: Float): StatelessAudioEffect =
     PanEffect(panValue)
 
-  def autopan(autopanValue: Float, sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
+  def autopan(autopanValue: Float, 
+              sampleRate: Float = DefaultSampleRate): TimeAudioEffect =
     AutopanEffect(autopanValue, sampleRate)
 
   def volume(volumeValue: Float): StatelessAudioEffect =
     VolumeEffect(volumeValue)
 ```
-\
+
 Ogni effetto viene implementato tramite un `case class` (oppure un `case object` per l'`IdentityEffect`), il cui costruttore prende i parametri necessari a modulare la
 trasformazione. Di seguito viene mostrata l'implementazione dell'effetto `Gain`.
 
 ```scala
-private[processing] final case class GainEffect(gain: Float) extends StatelessAudioEffect:
+private[processing] final case class GainEffect(gain: Float) 
+        extends StatelessAudioEffect:
 
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkGain.toLeft:
-      applyTransformation(chunk, x => clamp(x * gain))
+      applyTransformation(chunk)(x => clamp(x * gain))
   
   ...
 ```
@@ -195,12 +219,13 @@ private def processedAudioTrack(track: AudioTrack,
 ```
 
 \
-Il `trait` `AudioProcessor` viene specializzato in due sottotipi distinti: `SimpleAudioProcessor` e `AudioProcessorWithRules`, entrambi definiti come implementazioni concrete
-stateless modellate come *singleton* (`object`).
+Per quanto riguarda il `trait` `AudioProcessor`, questo viene specializzato in due sottotipi distinti: 
+`SimpleAudioProcessor` e `AudioProcessorWithRules`, entrambi definiti come implementazioni concrete stateless modellate 
+come *singleton* (`object`).
 
 Nel processore `AudioProcessorWithRules`, al fine di applicare secondo una logica gli effetti selezionati dall'utente, è stato
 definito un ordinamento interno sugli effetti disponibili. Per realizzare questo meccanismo, è stato introdotto un `enum` privato (`EffectPriority`), utilizzando la proprietà `.ordinal` (che identifica l'indice
-numerico dell'effetto all'interno dell'enum), è stata creata una associazione effetto-priorità. Inoltre, con la *contextual abstraction* di Scala 3, ovvero
+numerico dell'effetto all'interno dell'enum), creando una associazione effetto-priorità. Inoltre, con la *contextual abstraction* di Scala 3, ovvero
 il meccanismo dei `given`, è stata fornita una istanza di `Ordering[AudioEffect]` che viene passata implicitamente dal compilatore al metodo `.sorted` delle liste per ordinare gli effetti ricevuti.
 
 ```scala
@@ -227,7 +252,8 @@ private[processing] object AudioProcessorWithRules extends AudioProcessor:
     super.processChunk(chunk, sortEffects(effects), chunkIndex)
   
   override protected def processTrack(track: AudioTrack,
-                                      effects: List[AudioEffect]): Either[AudioError, AudioTrack] =
+                                      effects: List[AudioEffect]
+                                     ): Either[AudioError, AudioTrack] =
     super.processTrack(track, sortEffects(effects))
 ```
 
@@ -242,7 +268,34 @@ object AudioProcessor:
   def withRules: AudioProcessor = AudioProcessorWithRules
 ```
 
-### Logica degli effetti
+### Controller
+`EffectsController` è un `trait` che definisce due metodi: `addEffect` e `removeAll`, per la gestione della traccia da parte
+dell'utente. Al fine di nascondere eventuali dettagli implementativi, il controller viene creato esclusivamente tramite 
+una chiamata al metodo `apply` del *companion object* che restituisce un'implementazione privata (`EffectsControllerImpl`).
+Il controller agisce come mediatore verso l'`AppStateStore`, delegando le operazioni al metodo `dispatch`.
+
+```scala
+trait EffectsController:
+  
+  def addEffect(effect: AudioEffect): IO[Unit]
+
+  def removeAll(): IO[Unit]
+  
+object EffectsController:
+  
+  def apply(store: AppStateStore): EffectsController =
+    EffectsControllerImpl(store)
+  
+private final class EffectsControllerImpl(store: AppStateStore) extends EffectsController:
+
+  override def addEffect(effect: AudioEffect): IO[Unit] =
+    store.dispatch(AddEffect(effect)).void
+
+  override def removeAll(): IO[Unit] =
+    store.dispatch(RemoveAllEffects).void
+```
+
+### Logica degli effetti (GUI)
 `EffectsLogic` si occupa di gestire i widget, nello specifico sliders e bottoni, degli effetti che l'utente può applicare in tempo reale all'interno dell'applicazione.
 Il compito di questa componente è di inviare al relativo controller (`EffectsController`) le azioni dell'utente e adattare i cambiamenti di stato nelle *label* dei widget.
 Data la massiccia presenza di *slider* nel pannello, per evitare duplicazioni di codice è stato aggiunto un **extension method** incapsulato nel *companion object* di `EffectsLogic`:
@@ -259,15 +312,15 @@ Data la massiccia presenza di *slider* nel pannello, per evitare duplicazioni di
       slider.onMouseReleased = _ =>
         if !slider.valueChanging.value then onUpdate(slider.sliderValue)
 ```
-Il metodo `sliderListener` definito come una **higher-order functions** accetta una funzione di callback (`onUpdate: Float => Unit`).
+Il metodo `sliderListener`, definito come una **Higher-Order functions**, accetta una funzione di callback (`onUpdate: Float => Unit`).
 Questo approccio permette ai singoli componenti di poter definire l'azione da eseguire quando un evento viene intercettato. Per evitare di inviare un segnale
 continuo durante il movimento cursore, è stata combinata la proprietà `valueChanging` che  si occupa di analizzare `wasChanging && !isChanging` al termine di un trascinamento,
 con l'evento `onMouseReleased` e il controllo di `!slider.valueChanging.value` per gestire i clic diretti. In questo modo, l'invio del comando al controller *wrapped* viene attivato **una sola volta** a interazione completata.
 
 Inoltre, per rendere più comprensibile la presenza del filtro di *SoftClipping*, è stata introdotta un'ulteriore *extension* denominata `isSoftClipping`,
-la quale mappa il filtro `DistortionEnum` di input in un valore booleano.
+la quale mappa il filtro `DistortionType` di input in un valore booleano.
 
 ```scala
-  extension (filter: DistortionEnum)
+  extension (filter: DistortionType)
     private def isSoftClipping: Boolean = filter == Tanh
 ```

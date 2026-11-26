@@ -41,7 +41,7 @@ private[processing] final case class GainEffect(gain: Float) extends StatelessAu
    */
   override def apply(chunk: AudioChunk): Either[AudioError, AudioChunk] =
     checkGain.toLeft:
-      applyTransformation(chunk, x => clamp(x * gain))
+      applyTransformation(chunk)(x => clamp(x * gain))
 
   /*
    * Defines the "clamp" logic necessary to maintain

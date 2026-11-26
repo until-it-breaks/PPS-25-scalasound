@@ -317,3 +317,5 @@ la quale mappa il filtro `DistortionType` di input in un valore booleano.
   extension (filter: DistortionType)
     private def isSoftClipping: Boolean = filter == Tanh
 ```
+
+\newpage

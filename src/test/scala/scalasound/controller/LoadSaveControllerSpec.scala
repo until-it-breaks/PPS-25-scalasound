@@ -16,9 +16,9 @@ import scala.concurrent.duration.*
 class LoadSaveControllerSpec extends CatsEffectSuite:
 
   private val trackA =
-    MonoTrack(44100, Vector(MonoChunk(Vector(0.5f)))).fold(e => fail(e.toString), identity)
+    MonoTrack.make(44100, Vector(MonoChunk(Vector(0.5f)))).fold(e => fail(e.toString), identity)
   private val trackB =
-    MonoTrack(48000, Vector(MonoChunk(Vector(-0.25f)))).fold(e => fail(e.toString), identity)
+    MonoTrack.make(48000, Vector(MonoChunk(Vector(-0.25f)))).fold(e => fail(e.toString), identity)
   private val inputPath  = Paths.get("in.wav")
   private val outputPath = Paths.get("out.wav")
 
@@ -36,7 +36,7 @@ class LoadSaveControllerSpec extends CatsEffectSuite:
   private def withFormats(fileTypes: AudioFileType*)(
     test: (AppStateStore, LoadSaveController) => IO[Unit]
   ): IO[Unit] =
-    val formats = AudioFormatRegistry.of(fileTypes*).fold(error => fail(error.toString), identity)
+    val formats = AudioFormatRegistry.make(fileTypes*).fold(error => fail(error.toString), identity)
     AppStateStore.make.flatMap: store =>
       LoadSaveController.make(store, formats).use(controller => test(store, controller))
 

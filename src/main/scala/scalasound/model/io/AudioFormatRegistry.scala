@@ -53,11 +53,11 @@ final class AudioFormatRegistry private (
     *   the reader or why no reader was selected
     */
   def readerFor(path: Path): Either[FormatResolutionError, AudioReader] =
-    FileExtensions
-      .of(path)
-      .toRight(MissingExtension(path))
-      .flatMap(typeOf)
-      .flatMap(fileType => fileType.reader.toRight(ReadingNotSupported(fileType.name)))
+    for
+      extension <- FileExtensions.of(path).toRight(MissingExtension(path))
+      fileType  <- typeOf(extension)
+      reader    <- fileType.reader.toRight(ReadingNotSupported(fileType.name))
+    yield reader
 
   /** The writer of the format of the file, given its path.
     *
@@ -70,19 +70,21 @@ final class AudioFormatRegistry private (
   def writerFor(path: Path): Either[FormatResolutionError, ResolvedWriter] =
     FileExtensions.of(path) match
       case Some(extension) =>
-        typeOf(extension).flatMap(fileType =>
-          fileType.writer.map(ResolvedWriter(_, path)).toRight(WritingNotSupported(fileType.name))
-        )
+        for
+          fileType <- typeOf(extension)
+          writer   <- fileType.writer.toRight(WritingNotSupported(fileType.name))
+        yield ResolvedWriter(writer, path)
       case None => withDefaultFormat(path)
 
   private def typeOf(extension: String): Either[FormatResolutionError, AudioFileType] =
     typesByExtension.get(extension).toRight(UnsupportedExtension(extension))
 
   private def withDefaultFormat(path: Path): Either[FormatResolutionError, ResolvedWriter] =
-    (defaultForSaving, Option(path.getFileName)) match
-      case (Some(default), Some(fileName)) =>
-        Right(ResolvedWriter(default.writer, path.resolveSibling(s"$fileName.${default.extension}")))
-      case _ => Left(MissingExtension(path))
+    (for
+      default  <- defaultForSaving
+      fileName <- Option(path.getFileName)
+    yield ResolvedWriter(default.writer, path.resolveSibling(s"$fileName.${default.extension}")))
+      .toRight(MissingExtension(path))
 
 object AudioFormatRegistry:
 
@@ -93,16 +95,21 @@ object AudioFormatRegistry:
     * @return
     *   the registry or the first error found when validating the file types
     */
-  def of(fileTypes: AudioFileType*): Either[AudioFormatRegistryError, AudioFormatRegistry] =
+  def make(fileTypes: AudioFileType*): Either[AudioFormatRegistryError, AudioFormatRegistry] =
     val formats = fileTypes.toList
-    val claims = formats.flatMap(fileType =>
-      fileType.allExtensions.map(FileExtensions.normalise).distinct.map(_ -> fileType)
-    )
-    val malformed = formats.flatMap(fileType =>
-      fileType.allExtensions
-        .filterNot(FileExtensions.isWellFormed)
-        .map(AudioFormatRegistryError.MalformedExtension(fileType.name, _))
-    )
+    val claims =
+      for
+        fileType  <- formats
+        extension <- fileType.allExtensions.map(FileExtensions.normalise).distinct
+      yield extension -> fileType
+
+    val malformed =
+      for
+        fileType  <- formats
+        extension <- fileType.allExtensions
+        if !FileExtensions.isWellFormed(extension)
+      yield AudioFormatRegistryError.MalformedExtension(fileType.name, extension)
+
     val duplicated = claims
       .groupMap((extension, _) => extension)((_, fileType) => fileType.name)
       .toList

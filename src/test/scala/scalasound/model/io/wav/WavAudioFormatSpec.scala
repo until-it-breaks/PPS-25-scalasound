@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
 
-  private val registry: AudioFormatRegistry = AudioFormatRegistry.of(WavAudioFormat.fileType).value
+  private val registry: AudioFormatRegistry = AudioFormatRegistry.make(WavAudioFormat.fileType).value
 
   private def withTempDir[A](test: Path => A): A =
     val dir = Files.createTempDirectory("scalasound-wav-format-test-")
@@ -28,7 +28,7 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
       Files.deleteIfExists(dir)
 
   private def track(samples: Seq[Int]): AudioTrack =
-    MonoTrack(44100, Vector(MonoChunk(samples.map(_ / 32768f).toVector))).value
+    MonoTrack.make(44100, Vector(MonoChunk(samples.map(_ / 32768f).toVector))).value
 
   "The WAV format" should "select the WAV reader and the WAV writer for a .wav path" in:
     Seq("song.wav", "song.WAV", "dir/song.Wav").foreach: name =>
@@ -57,7 +57,7 @@ class WavAudioFormatSpec extends AnyFlatSpec with Matchers with EitherValues:
             calls.incrementAndGet()
             Left(AudioLoadError.ReadFailure("must not be called"))
       val both = AudioFormatRegistry
-        .of(WavAudioFormat.fileType, AudioFileType("Other", "other", reader = Some(other)))
+        .make(WavAudioFormat.fileType, AudioFileType("Other", "other", reader = Some(other)))
         .value
       val notAudio =
         Files.write(dir.resolve("song.wav"), "this is text, not an audio file".getBytes("UTF-8"))

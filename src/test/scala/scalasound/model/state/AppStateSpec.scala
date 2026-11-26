@@ -14,7 +14,7 @@ import scalasound.model.state.PlaybackState.*
 import scalasound.model.state.{AppState, ExportState, ImportState}
 
 class AppStateSpec extends AnyFlatSpec with Matchers with EitherValues:
-  private val track = MonoTrack(
+  private val track = MonoTrack.make(
     sampleRate = 44100,
     chunks = Vector(
       MonoChunk(Vector.fill(44100)(0f)), // 0.0s to 1.0s chunk (Index 0)

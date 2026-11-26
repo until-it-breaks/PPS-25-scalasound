@@ -52,7 +52,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
             case standardEffect: StatelessAudioEffect => standardEffect(chunky)
 
   private def createTrack: AudioTrack =
-    MonoTrack(SampleRate, Vector.fill(SizeTrack)(MonoChunk(chunk.channels.head))).value
+    MonoTrack.make(SampleRate, Vector.fill(SizeTrack)(MonoChunk(chunk.channels.head))).value
 
   /*
    * New type of effect added to check how the processor
@@ -74,7 +74,7 @@ final class AudioProcessorTest extends AnyFlatSpec with Matchers with EitherValu
     resultChunk.left.value.getContent should include("SimpleAudioProcessor")
 
   it should "return an AudioError when the track is empty" in:
-    val emptyTrack = MonoTrack(SampleRate, Vector.empty).value
+    val emptyTrack = MonoTrack.make(SampleRate, Vector.empty).value
     val resultTrack = SimpleAudioProcessor(emptyTrack, simpleEffectsList)
     resultTrack.left.value shouldBe a [AudioError.AudioProcessorError]
 

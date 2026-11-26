@@ -1,5 +1,3 @@
-\newpage
-
 # Testing
 
 ## Tecnologie utilizzate
@@ -14,7 +12,7 @@ Per il testing sono stati usati due framework e uno strumento per misurare la co
 
 Il team **non ha adottato il TDD** poiché si trattava del primo progetto in Scala per i membri del gruppo, e la scarsa dimestichezza sia con il linguaggio sia con lo stack di librerie (`cats-effect`, `fs2`) rendeva poco praticabile scrivere i test prima del codice. Si è quindi scelto di scrivere i test dopo l'implementazione, una volta stabilizzate le interfacce dei componenti.
 
-L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 297 test e una copertura del 93.55 % a livello di statement e del 91.80 % a livello di branch.
+L'assenza del TDD non ha però ridotto il rigore della verifica: i componenti principali sono stati testati in modo sistematico, con 297 test e una copertura del 93.52 % a livello di statement e del 91.57 % a livello di branch.
 
 Le suite in `src/test` sono di tipologie diverse, riassunte nella tabella seguente.
 
@@ -65,9 +63,9 @@ La coverage è misurata con sbt-scoverage, escludendo il package `view` e i punt
 | Metrica                  | Valore                                 |
 |--------------------------|----------------------------------------|
 | Numero di test           | 297 (224 ScalaTest + 73 MUnit)         |
-| Statement coverage       | 93.55 % (1189 / 1271)                  |
-| Branch coverage          | 91.80 % (168 / 183)                    |
-| Righe di codice misurate | 2499 in 32 file, 45 classi, 232 metodi |
+| Statement coverage       | 93.52 % (1184 / 1266)                  |
+| Branch coverage          | 91.57 % (163 / 178)                    |
+| Righe di codice misurate | 2492 in 33 file, 45 classi, 232 metodi |
 
 | Package                                   | Statement coverage |
 |-------------------------------------------|--------------------|

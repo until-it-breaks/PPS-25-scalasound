@@ -123,7 +123,7 @@ Il backlog conteneva le seguenti attività:
 - Estensione degli errori tipizzati (`UnresolvedFormat`), aggiornamento di `ErrorMessages` ed integrazione in `AppSetup` e `LoadSaveController` (completato in 2 ore da MT)
 - Refactoring di `AudioReader` ed `AudioWriter` con `Cats Effect` (completato in 2 ore da MT)
 - Aggiornamento ed estensione delle suite di Unit ed Integration test (completato in 2 ore da MT)
-- Stesura del report di progetto (completato in 4 ore da MT)
+- Stesura del report (completato in 4 ore da MT)
 
 ### Commenti sullo sprint
 Le funzionalità previste sono state completate con alcuni giorni di anticipo rispetto alla data di consegna. Il tempo rimasto è stato usato per rifinire il codice, ampliare i test, curare la Scaladoc e finalizzare il report.

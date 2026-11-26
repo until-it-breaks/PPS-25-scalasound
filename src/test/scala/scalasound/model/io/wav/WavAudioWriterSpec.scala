@@ -20,12 +20,12 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   private val KnownSamples = Vector(0, 16384, -16384, 32767, -32768, 1, -1, 256)
 
   private def monoTrack(rate: Int, chunks: Seq[Int]*): MonoTrack =
-    MonoTrack(rate, chunks.map[MonoChunk](c => MonoChunk(toFloats(c))).toVector).value
+    MonoTrack.make(rate, chunks.map[MonoChunk](c => MonoChunk(toFloats(c))).toVector).value
 
   private def toFloats(ints: Seq[Int]): Vector[Float] = ints.map(_ / 32768f).toVector
 
   private def stereoTrack(rate: Int, chunks: (Seq[Int], Seq[Int])*): StereoTrack =
-    StereoTrack(
+    StereoTrack.make(
       rate,
       chunks.map[StereoChunk] { case (l, r) => StereoChunk(toFloats(l), toFloats(r)) }.toVector
     ).value
@@ -72,7 +72,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     )
 
   private def invalidSampleTrack(bad: Float): MonoTrack =
-    MonoTrack(44100, Vector(MonoChunk(Vector(0.1f, bad, 0.2f)))).value
+    MonoTrack.make(44100, Vector(MonoChunk(Vector(0.1f, bad, 0.2f)))).value
 
   private case class Header(
       riff: String,
@@ -121,7 +121,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     bytes shouldBe pcm16Wav(44100, 1, Seq(1, 2, 3, -4, -5, 6))
 
   it should "produce a header-only file for an empty track or empty chunks" in:
-    val emptyTrackBytes = exported(MonoTrack(44100, Vector.empty).value)
+    val emptyTrackBytes = exported(MonoTrack.make(44100, Vector.empty).value)
     emptyTrackBytes shouldBe pcm16Wav(44100, 1, Seq.empty)
     emptyTrackBytes.length shouldBe 44
 
@@ -162,7 +162,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
     bytes.length shouldBe 44 + 2000
 
   it should "produce a header-only file for an empty stereo track" in:
-    exported(StereoTrack(44100, Vector.empty).value) shouldBe pcm16Wav(44100, 2, Seq.empty)
+    exported(StereoTrack.make(44100, Vector.empty).value) shouldBe pcm16Wav(44100, 2, Seq.empty)
     exported(stereoTrack(44100, (Seq.empty, Seq.empty)), "empty-chunk.wav") shouldBe pcm16Wav(
       44100,
       2,
@@ -187,7 +187,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
 
       val path = tempDir.resolve("late-nan.wav")
 
-      runSave(MonoTrack(44100, chunks).value, path) should matchPattern {
+      runSave(MonoTrack.make(44100, chunks).value, path) should matchPattern {
         case Left(AudioSaveError.InvalidSample(_)) =>
       }
       Files.exists(path) shouldBe false
@@ -213,7 +213,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
         MonoChunk(toFloats(pcmSampleSequence(300)))
       )
 
-    val bytes = exported(MonoTrack(44100, chunks).value)
+    val bytes = exported(MonoTrack.make(44100, chunks).value)
     bytes.drop(44).toSeq shouldBe chunks.flatMap(chunk => PcmChunks.encode(chunk).toSeq)
 
   it should "be exactly the concatenation of the encoded chunks, in stereo" in:
@@ -223,7 +223,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
       StereoChunk(toFloats(pcmSampleSequence(300)), toFloats(pcmSampleSequence(300).reverse))
     )
 
-    val bytes = exported(StereoTrack(44100, chunks).value)
+    val bytes = exported(StereoTrack.make(44100, chunks).value)
 
     bytes.drop(44).toSeq shouldBe chunks.flatMap(chunk => PcmChunks.encode(chunk).toSeq)
 
@@ -248,7 +248,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
   it should "reject a non-finite sample in the right channel of a stereo track" in withTempDir:
     tempDir =>
       val track =
-        StereoTrack(44100, Vector(StereoChunk(Vector(0f, 0f), Vector(0f, Float.NaN)))).value
+        StereoTrack.make(44100, Vector(StereoChunk(Vector(0f, 0f), Vector(0f, Float.NaN)))).value
 
       runSave(track, tempDir.resolve("stereo-nan.wav")) should matchPattern {
         case Left(AudioSaveError.InvalidSample(_)) =>
@@ -301,8 +301,8 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
 
   it should "reject a sample rate a float cannot represent exactly, and accept 2^24 Hz" in withTempDir:
     tempDir =>
-      val veryFast = StereoTrack(Int.MaxValue, Vector.empty).value
-      val tooFast  = StereoTrack((1 << 24) + 1, Vector.empty).value
+      val veryFast = StereoTrack.make(Int.MaxValue, Vector.empty).value
+      val tooFast  = StereoTrack.make((1 << 24) + 1, Vector.empty).value
 
       runSave(veryFast, tempDir.resolve("fast.wav")) should matchPattern {
         case Left(AudioSaveError.InvalidTrack(_)) =>
@@ -311,7 +311,7 @@ class WavAudioWriterSpec extends AnyFlatSpec with Matchers with EitherValues:
         case Left(AudioSaveError.InvalidTrack(_)) =>
       }
       runSave(
-        StereoTrack(1 << 24, Vector.empty).value,
+        StereoTrack.make(1 << 24, Vector.empty).value,
         tempDir.resolve("limit.wav")
       ) shouldBe Right(())
 

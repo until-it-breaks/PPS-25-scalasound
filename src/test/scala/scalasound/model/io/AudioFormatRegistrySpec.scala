@@ -22,7 +22,7 @@ class AudioFormatRegistrySpec extends AnyFlatSpec with Matchers with EitherValue
     AudioFileType("Fake", "fake", reader = Some(fakeReader), writer = Some(fakeWriter))
 
   private def registry(fileTypes: AudioFileType*): AudioFormatRegistry =
-    AudioFormatRegistry.of(fileTypes*).value
+    AudioFormatRegistry.make(fileTypes*).value
 
   private def path(text: String): Path = Paths.get(text)
 
@@ -149,32 +149,32 @@ class AudioFormatRegistrySpec extends AnyFlatSpec with Matchers with EitherValue
   "Building a registry" should "fail when two formats claim the same extension" in:
     val other = AudioFileType("Other WAV", "wav", reader = Some(fakeReader))
 
-    AudioFormatRegistry.of(wav, other) shouldBe
+    AudioFormatRegistry.make(wav, other) shouldBe
       Left(AudioFormatRegistryError.DuplicateExtension("wav", List("WAV", "Other WAV")))
 
   it should "compare extensions ignoring the case" in:
     val other = AudioFileType("Other", "WAV", reader = Some(fakeReader))
 
-    AudioFormatRegistry.of(wav, other).left.value shouldBe
+    AudioFormatRegistry.make(wav, other).left.value shouldBe
       AudioFormatRegistryError.DuplicateExtension("wav", List("WAV", "Other"))
 
   it should "fail when an alias is claimed by another format" in:
     val other = AudioFileType("Other", "oth", aliases = Set("Wav"), reader = Some(fakeReader))
 
-    AudioFormatRegistry.of(wav, other).left.value shouldBe
+    AudioFormatRegistry.make(wav, other).left.value shouldBe
       AudioFormatRegistryError.DuplicateExtension("wav", List("WAV", "Other"))
 
   it should "accept the same extension repeated inside one format" in:
     val repeated = wav.copy(aliases = Set("WAV", "wav"))
 
-    AudioFormatRegistry.of(repeated).isRight shouldBe true
+    AudioFormatRegistry.make(repeated).isRight shouldBe true
 
   it should "fail on a malformed extension" in:
     Seq("", ".wav", "w av", "a/b").foreach: bad =>
-      AudioFormatRegistry.of(wav.copy(primaryExtension = bad)) shouldBe
+      AudioFormatRegistry.make(wav.copy(primaryExtension = bad)) shouldBe
         Left(AudioFormatRegistryError.MalformedExtension("WAV", bad))
-    AudioFormatRegistry.of(wav.copy(aliases = Set(".wave"))) shouldBe
+    AudioFormatRegistry.make(wav.copy(aliases = Set(".wave"))) shouldBe
       Left(AudioFormatRegistryError.MalformedExtension("WAV", ".wave"))
 
   it should "accept an empty configuration" in:
-    AudioFormatRegistry.of().isRight shouldBe true
+    AudioFormatRegistry.make().isRight shouldBe true

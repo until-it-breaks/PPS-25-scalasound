@@ -13,7 +13,7 @@ class PlaybackControllerSpec extends CatsEffectSuite:
   private val framesPerChunk = 1000
   private val chunkCount     = 5
 
-  private val track = MonoTrack(
+  private val track = MonoTrack.make(
     sampleRate,
     Vector.fill(chunkCount)(AudioChunk.MonoChunk(Vector.fill(framesPerChunk)(0.0f)))
   ).fold(e => fail(e.toString), identity)

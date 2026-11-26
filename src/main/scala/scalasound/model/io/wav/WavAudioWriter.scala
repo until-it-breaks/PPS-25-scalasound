@@ -15,8 +15,8 @@ import scala.util.{Try, Using}
 
 /** Saves tracks as WAV files in the file system, using the Java Sound API.
   *
-  * Supported subset: PCM signed, 16 bit per sample, little-endian, mono or stereo. It is the same
-  * subset accepted by [[WavAudioReader]]
+  * Supported subset: PCM signed, 16 bit per sample, little-endian, mono or stereo (see
+  * [[WavFormat]]). It is the same subset accepted by [[WavAudioReader]].
   *
   * A normalised sample `x` becomes `clamp(round(x * 32768), -32768, 32767)` (see [[Pcm16]]), that
   * is the inverse of the reader's `s / 32768f`. So, `0.0 -> 0`, `-1.0 -> -32768` and
